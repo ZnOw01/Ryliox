@@ -46,6 +46,13 @@ def _coerce_int(value: Any) -> int | None:
         return None
 
 
+def _coerce_positive_int(value: Any) -> int | None:
+    parsed = _coerce_int(value)
+    if parsed is None or parsed <= 0:
+        return None
+    return parsed
+
+
 def _normalize_progress_snapshot(snapshot: dict[str, Any] | None) -> dict[str, Any]:
     """Convierte un snapshot crudo del queue en un dict compatible con ProgressResponse."""
     if not isinstance(snapshot, dict):
@@ -102,8 +109,8 @@ def _normalize_progress_snapshot(snapshot: dict[str, Any] | None) -> dict[str, A
         "percentage": percentage,
         "message": _coerce_str(snapshot.get("message")),
         "eta_seconds": _coerce_int(snapshot.get("eta_seconds")),
-        "current_chapter": _coerce_int(snapshot.get("current_chapter")),
-        "total_chapters": _coerce_int(snapshot.get("total_chapters")),
+        "current_chapter": _coerce_positive_int(snapshot.get("current_chapter")),
+        "total_chapters": _coerce_positive_int(snapshot.get("total_chapters")),
         "chapter_title": _coerce_str(snapshot.get("chapter_title")),
         "title": _coerce_str(snapshot.get("title")),
     }
