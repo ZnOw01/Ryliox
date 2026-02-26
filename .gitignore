@@ -1,0 +1,131 @@
+# ==============================================================================
+# Python environments
+# ==============================================================================
+.venv/
+venv/
+env/
+.python-version
+
+# ==============================================================================
+# Python cache / artifacts
+# ==============================================================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.mypy_cache/
+.ruff_cache/
+
+# ==============================================================================
+# Build / packaging
+# ==============================================================================
+build/
+*.egg-info/
+*.egg
+pip-wheel-metadata/
+
+# Scoped dist — only top-level and plugin dists, not arbitrary subdirs
+/dist/
+plugins/*/dist/
+
+# ==============================================================================
+# Runtime / temp
+# ==============================================================================
+*.log
+*.pid
+*.pid.lock
+*.out
+.run/
+.runtime_data/
+.runtime_output/
+.tmp/
+tmp/
+temp/
+
+# ==============================================================================
+# Project runtime data and exports
+# ==============================================================================
+output/
+data/
+/cookies.json
+
+# Any SQLite database anywhere in the tree (all are runtime/session state)
+*.sqlite3
+*.sqlite
+*.db
+
+# Loose exports that might land outside output/ (e.g. manual runs)
+output/*.epub
+output/*.pdf
+
+# ==============================================================================
+# Secrets and local configuration
+# ==============================================================================
+.env
+.env.*
+!.env.example
+!.env.test
+!.env.ci
+
+# Key/cert material
+*.key
+*.pem
+*.p12
+*.pfx
+*.crt
+*.cer
+
+# Catch-all secret files (file-level, not module names like secrets.py)
+*.secret
+
+# ==============================================================================
+# Frontend artifacts
+# ==============================================================================
+node_modules/
+frontend/node_modules/
+frontend/.astro/
+frontend/dist/
+frontend/.vite/
+frontend/.env
+frontend/.env.*
+!frontend/.env.example
+
+# ==============================================================================
+# Test / tool cache
+# ==============================================================================
+.coverage
+.coverage.*
+.pytest_cache/
+htmlcov/
+.tox/
+.nox/
+.cache/
+pytestdebug.log
+
+# ==============================================================================
+# Editor / OS
+# ==============================================================================
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ==============================================================================
+# Local agent / AI tool artifacts
+# ==============================================================================
+.codex/
+.codex_test_runtime/
+.codex_test_runtime_local/
+.cursor/
+.claude/
+.aider*
+.llm/
+.agent/
+
+# ==============================================================================
+# Local planning artifacts
+# ==============================================================================
+docs/plans/

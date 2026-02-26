@@ -1,0 +1,53 @@
+﻿---
+import "../styles/global.css";
+import App from "../components/App";
+---
+
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Ryliox</title>
+    <script is:inline>
+      (() => {
+        window.addEventListener("load", () => {
+          const host = window.location.hostname;
+          const isLocalHost = host === "localhost" || host === "127.0.0.1";
+          if (!isLocalHost) {
+            return;
+          }
+
+          const clearLegacyRuntime = async () => {
+            try {
+              if ("serviceWorker" in navigator) {
+                const registrations = await navigator.serviceWorker.getRegistrations();
+                await Promise.all(registrations.map((registration) => registration.unregister()));
+              }
+
+              if ("caches" in window) {
+                const cacheKeys = await caches.keys();
+                await Promise.all(cacheKeys.map((cacheKey) => caches.delete(cacheKey)));
+              }
+            } catch (_error) {
+              // Ignore cleanup failures in local environments.
+            }
+          };
+
+          void clearLegacyRuntime();
+        });
+      })();
+    </script>
+  </head>
+  <body>
+    <main class="mx-auto flex min-h-screen w-full max-w-6xl flex-col gap-6 overflow-x-hidden px-4 py-8 sm:px-6 lg:px-8">
+      <header class="soft-rise rounded-2xl border border-brand/20 bg-white/90 p-5 shadow-panel backdrop-blur">
+        <div class="flex min-w-0 items-center gap-3">
+          <div class="grid h-14 w-14 flex-none place-items-center rounded-2xl bg-brand text-2xl font-bold text-white shadow-sm">R</div>
+          <h1 class="truncate text-5xl font-bold leading-none text-ink sm:text-6xl">Ryliox</h1>
+        </div>
+      </header>
+      <App client:load />
+    </main>
+  </body>
+</html>

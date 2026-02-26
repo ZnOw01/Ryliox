@@ -1,0 +1,387 @@
+﻿/* ---------------------------------------------------------------------------
+   PDF stylesheet - compatible with WeasyPrint and Prince/PrinceXML
+   --------------------------------------------------------------------------- */
+
+/* -- Reset & Global --------------------------------------------------------- */
+
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+/* -- Page setup ------------------------------------------------------------- */
+
+@page {
+    size: Letter;
+    margin: 1in 0.75in;
+
+    @bottom-center {
+        content: counter(page);
+        font-size: 9pt;
+        color: #666;
+    }
+}
+
+@page cover {
+    @bottom-center {
+            content: none;
+        }
+}
+
+@page toc {
+    @bottom-center {
+            content: none;
+        }
+}
+
+/* -- Base typography -------------------------------------------------------- */
+
+body {
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 11pt;
+    line-height: 1.5;
+    color: #222;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    color: #333;
+    page-break-after: avoid;
+    break-after: avoid;
+    /* Evita que los títulos se queden solos al final de una página */
+        page-break-inside: avoid;
+        break-inside: avoid;
+}
+
+h1 {
+    font-size: 18pt;
+    margin-top: 1.5em;
+    bookmark-level: 1;
+}
+
+h2 {
+    font-size: 15pt;
+    margin-top: 1.3em;
+    bookmark-level: 2;
+}
+
+h3 {
+    font-size: 13pt;
+    margin-top: 1.2em;
+    bookmark-level: 3;
+}
+
+h4 {
+    font-size: 11pt;
+    margin-top: 1em;
+}
+
+p {
+    margin: 0.8em 0;
+    orphans: 3;
+    widows: 3;
+    /* Mejoras para aspecto de libro impreso */
+        text-align: justify;
+        -webkit-hyphens: auto;
+        -moz-hyphens: auto;
+        -ms-hyphens: auto;
+        hyphens: auto;
+}
+
+a {
+    color: #1a0dab;
+    text-decoration: none;
+}
+
+hr {
+    border: none;
+    border-top: 1px solid #ddd;
+    margin: 2em 0;
+}
+
+/* -- Cover ------------------------------------------------------------------ */
+
+.cover-page {
+    page: cover;
+    page-break-after: always;
+    break-after: page;
+    text-align: center;
+    padding-top: 2in;
+}
+
+.cover-page img {
+    max-width: 100%;
+    max-height: 5in;
+    display: block;
+    margin: 0 auto;
+}
+
+.cover-page h1 {
+    font-size: 24pt;
+    margin-top: 1in;
+    color: #333;
+    line-height: 1.2;
+}
+
+.cover-page .authors {
+    font-size: 14pt;
+    color: #555;
+    margin-top: 0.5in;
+}
+
+.cover-page .publisher {
+    font-size: 11pt;
+    color: #777;
+    margin-top: 0.3in;
+}
+
+/* -- Table of contents ------------------------------------------------------ */
+
+.toc-page {
+    page: toc;
+    page-break-after: always;
+    break-after: page;
+}
+
+.toc-page h2 {
+    font-size: 18pt;
+    margin-bottom: 1em;
+    color: #333;
+    border-bottom: 2px solid #ddd;
+    padding-bottom: 0.5em;
+}
+
+.toc-page ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.toc-page li {
+    margin: 0.4em 0;
+    line-height: 1.4;
+}
+
+.toc-page li ul {
+    margin-left: 1.5em;
+    margin-top: 0.3em;
+}
+
+/* Magia de PDF: Relleno de puntos y números de página dinámicos */
+.toc-page a {
+    color: #000;
+    text-decoration: none;
+}
+
+.toc-page a::after {
+    /* Genera los puntos "..... 45" basados en el href del enlace */
+    content: leader('.') target-counter(attr(href), page);
+}
+
+/* -- Chapters --------------------------------------------------------------- */
+
+.chapter {
+    page-break-before: always;
+    break-before: page;
+}
+
+.chapter-first {
+    page-break-before: auto;
+    break-before: auto;
+}
+
+.chapter-title {
+    font-size: 20pt;
+    margin-bottom: 1em;
+    color: #333;
+    /* Si .chapter-title es un <h1>, asegúrate de no duplicar bookmark-level 1 */
+    bookmark-level: 1;
+    bookmark-label: content();
+}
+
+/* -- Images & figures ------------------------------------------------------- */
+
+img {
+    max-width: 100%;
+    height: auto;
+    /* Evita que imágenes fuera de figures se corten */
+        page-break-inside: avoid;
+        break-inside: avoid;
+}
+
+figure {
+    page-break-inside: avoid;
+    break-inside: avoid;
+    margin: 1em 0;
+    text-align: center;
+}
+
+figcaption {
+    font-size: 9pt;
+    color: #666;
+    font-style: italic;
+    margin-top: 0.5em;
+}
+
+/* -- Code blocks ------------------------------------------------------------ */
+
+pre,
+code {
+    font-family: Consolas, Monaco, "Courier New", monospace;
+    font-size: 9pt;
+    background: #f5f5f5;
+}
+
+code {
+    padding: 0.1em 0.3em;
+    border-radius: 3px;
+}
+
+pre {
+    padding: 0.8em;
+    page-break-inside: avoid;
+    break-inside: avoid;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    white-space: pre-wrap;
+    /* Evitamos break-all para no destrozar palabras, overflow-wrap hace el trabajo sucio */
+    overflow-wrap: break-word;
+    word-break: normal;
+}
+
+pre code {
+    padding: 0;
+    background: transparent;
+    border-radius: 0;
+}
+
+/* -- Tables ----------------------------------------------------------------- */
+
+table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 1em 0;
+    font-size: 10pt;
+    /* Dejamos que la tabla fluya entre páginas si es muy grande */
+}
+
+tr {
+    /* Evita que una celda se corte a la mitad en el salto de página */
+    page-break-inside: avoid;
+    break-inside: avoid;
+}
+
+th,
+td {
+    border: 1px solid #ddd;
+    padding: 0.5em;
+    text-align: left;
+}
+
+th {
+    background: #f0f0f0;
+    font-weight: bold;
+}
+
+tbody tr:nth-child(even) {
+    background: #fafafa;
+}
+
+/* -- Lists ------------------------------------------------------------------ */
+
+ul,
+ol {
+    margin: 0.8em 0;
+    padding-left: 1.5em;
+}
+
+li {
+    margin: 0.3em 0;
+}
+
+/* -- Definition lists ------------------------------------------------------- */
+
+dl {
+    margin: 1em 0;
+}
+
+dt {
+    font-weight: bold;
+    margin-top: 0.5em;
+    /* Evita que el título se quede solo, separándose de su definición */
+        page-break-after: avoid;
+        break-after: avoid;
+}
+
+dd {
+    margin-left: 1.5em;
+    margin-bottom: 0.5em;
+}
+
+/* -- Blockquote ------------------------------------------------------------- */
+
+blockquote {
+    margin: 1em 0;
+    padding: 0.5em 1em;
+    border-left: 3px solid #ddd;
+    color: #555;
+    font-style: italic;
+    page-break-inside: avoid;
+        break-inside: avoid;
+}
+
+/* -- Admonition blocks ------------------------------------------------------ */
+
+.note,
+.warning,
+.tip,
+.important,
+.caution {
+    padding: 1em;
+    margin: 1em 0;
+    border-radius: 4px;
+    page-break-inside: avoid;
+    break-inside: avoid;
+}
+
+.note {
+    background: #e7f3ff;
+    border-left: 4px solid #2196f3;
+}
+
+.warning {
+    background: #fff3e0;
+    border-left: 4px solid #ff9800;
+}
+
+.tip {
+    background: #e8f5e9;
+    border-left: 4px solid #4caf50;
+}
+
+.important {
+    background: #fce4ec;
+    border-left: 4px solid #e91e63;
+}
+
+.caution {
+    background: #fff8e1;
+    border-left: 4px solid #ffc107;
+}
+
+/* -- Layout utilities ------------------------------------------------------- */
+
+.page-break {
+    page-break-before: always;
+    break-before: page;
+}
+
+.no-break {
+    page-break-inside: avoid;
+    break-inside: avoid;
+}

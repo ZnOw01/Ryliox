@@ -1,0 +1,97 @@
+@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+  --brand: #dc2626;
+  --brand-soft: #fee2e2;
+  --brand-deep: #991b1b;
+  --scroll-track: #fff1f2;
+  --scroll-thumb: #f87171;
+  --scroll-thumb-hover: #ef4444;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  color: #0f172a;
+  font-family: "IBM Plex Sans", "Segoe UI", Tahoma, sans-serif;
+  background:
+    radial-gradient(circle at 14% 8%, rgba(248, 113, 113, 0.2) 0%, transparent 34%),
+    radial-gradient(circle at 86% 6%, rgba(252, 165, 165, 0.2) 0%, transparent 30%),
+    linear-gradient(180deg, #fffdfd 0%, #fff1f2 100%);
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background-image: linear-gradient(rgba(239, 68, 68, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(239, 68, 68, 0.08) 1px, transparent 1px);
+  background-size: 28px 28px;
+  opacity: 0.25;
+}
+
+#astro-dev-toolbar {
+  display: none !important;
+}
+
+code,
+pre {
+  font-family: "IBM Plex Mono", Consolas, monospace;
+}
+
+@keyframes soft-rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.chapter-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scroll-thumb) var(--scroll-track);
+}
+
+.chapter-scroll::-webkit-scrollbar {
+  width: 9px;
+}
+
+.chapter-scroll::-webkit-scrollbar-track {
+  border-radius: 999px;
+  background: var(--scroll-track);
+}
+
+.chapter-scroll::-webkit-scrollbar-thumb {
+  border: 2px solid var(--scroll-track);
+  border-radius: 999px;
+  background: var(--scroll-thumb);
+}
+
+.chapter-scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--scroll-thumb-hover);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .soft-rise {
+    animation: soft-rise 320ms ease-out both;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .soft-rise {
+    animation: none !important;
+  }
+}
