@@ -442,13 +442,23 @@ class DownloadJobStore:
 
     def update_progress(self, job_id: str, progress: DownloadProgress):
         now = time.time()
+        current_chapter = (
+            int(progress.current_chapter)
+            if progress.current_chapter is not None and int(progress.current_chapter) > 0
+            else None
+        )
+        total_chapters = (
+            int(progress.total_chapters)
+            if progress.total_chapters is not None and int(progress.total_chapters) > 0
+            else None
+        )
         payload = (
             progress.status,
             int(progress.percentage),
             progress.message or None,
             progress.eta_seconds,
-            int(progress.current_chapter) if progress.current_chapter else 0,
-            int(progress.total_chapters) if progress.total_chapters else 0,
+            current_chapter,
+            total_chapters,
             progress.chapter_title or None,
         )
         with self._lock:
@@ -486,8 +496,8 @@ class DownloadJobStore:
                         int(progress.percentage),
                         progress.message or None,
                         progress.eta_seconds,
-                        int(progress.current_chapter) if progress.current_chapter else 0,
-                        int(progress.total_chapters) if progress.total_chapters else 0,
+                        current_chapter,
+                        total_chapters,
                         progress.chapter_title or None,
                         now,
                         job_id,
