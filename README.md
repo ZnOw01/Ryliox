@@ -374,8 +374,9 @@ rm data/download_jobs.sqlite3
 
 ## Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=ZnOw01/RylioX&type=Date)](https://star-history.com/#ZnOw01/RylioX&Date)
+## Star History
 
+[![Star History Chart](https://api.star-history.com/svg?repos=ZnOw01/RylioX&type=date&legend=top-left)](https://www.star-history.com/#ZnOw01/RylioX&type=date&legend=top-left)
 ---
 
 ## Seguridad
