@@ -381,10 +381,7 @@ rm data/download_jobs.sqlite3
 
 ## Seguridad
 
-- Nunca versiones `.env`, `data/`, `output/`, `.run/`, `*.sqlite3` ni `cookies.json`.
-- En producción, configura `CORS_ORIGINS` con tu dominio real en vez de `*`.
-- Los endpoints POST están protegidos por verificación de mismo origen (anti-CSRF).
-- Revisa `.gitignore` antes de hacer push.
+-
 
 ---
 
