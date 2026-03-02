@@ -8,11 +8,11 @@
 [![Astro](https://img.shields.io/badge/Astro-frontend-ff5d01?style=flat-square&logo=astro&logoColor=white)](https://astro.build/)
 [![GitHub stars](https://img.shields.io/github/stars/ZnOw01/RylioX?style=flat-square&logo=github)](https://github.com/ZnOw01/RylioX/stargazers)
 
-**Busca libros de O'Reilly Learning y exportalos en PDF o EPUB desde un navegador.**  
+**Busca libros de O'Reilly Learning y exportalos en PDF o EPUB desde un navegador.**
 Cola de descargas, progreso en tiempo real y soporte para seleccion de capitulos.
 
 > [!IMPORTANT]
-> Requiere una suscripcion activa a [O'Reilly Learning](https://learning.oreilly.com).  
+> Requiere una suscripcion activa a [O'Reilly Learning](https://learning.oreilly.com).
 > Usa esta herramienta respetando siempre los [terminos de servicio oficiales](https://www.oreilly.com/terms/).
 
 </div>
@@ -207,23 +207,6 @@ La documentacion interactiva completa esta disponible en **http://localhost:8000
 | Puerto 8000 ocupado | `python -m launcher --stop` |
 | Cola trabada en `queued` | Reinicia; si persiste, elimina `data/download_jobs.sqlite3` |
 | Sesion invalida aun con cookies | Usa el header HTTP crudo desde DevTools en lugar de un exporter |
-
----
-
-## Seguridad
-
-Los siguientes archivos y directorios **nunca** deben commitearse:
-
-```
-.env
-data/
-output/
-.run/
-*.sqlite3
-cookies.json
-```
-
-Estan incluidos en `.gitignore`. Verifica con `git status` antes de cada push.
 
 ---
 
