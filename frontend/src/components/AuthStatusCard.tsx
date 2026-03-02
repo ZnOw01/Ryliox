@@ -18,6 +18,18 @@ function formatAuthReason(reason: string | null | undefined): string {
   return labels[reason] ?? reason.replace(/_/g, " ");
 }
 
+function formatUptime(seconds: number): string {
+  if (seconds < 60) return `${Math.round(seconds)}s`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  if (hours < 24) return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
+  const days = Math.floor(hours / 24);
+  const hrs = hours % 24;
+  return hrs > 0 ? `${days}d ${hrs}h` : `${days}d`;
+}
+
 export function AuthStatusCard() {
   const queryClient = useQueryClient();
   const [cookiesText, setCookiesText] = useState("");
@@ -110,12 +122,28 @@ export function AuthStatusCard() {
       : statusTone === "amber"
         ? "border-amber-200 bg-amber-50 text-amber-800"
         : "border-red-200 bg-red-50 text-red-700";
-  const dotClassName =
-    statusTone === "green"
-      ? "bg-emerald-500"
-      : statusTone === "amber"
-        ? "bg-amber-500"
-        : "bg-red-500";
+
+  function StatusIcon() {
+    if (statusTone === "green") {
+      return (
+        <svg className="h-3.5 w-3.5 shrink-0" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <path d="M3 8l3.5 3.5L13 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      );
+    }
+    if (statusTone === "amber") {
+      return (
+        <svg className="h-3.5 w-3.5 shrink-0" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <path d="M8 5v4M8 11v.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+        </svg>
+      );
+    }
+    return (
+      <svg className="h-3.5 w-3.5 shrink-0" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+        <path d="M5 5l6 6M11 5l-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      </svg>
+    );
+  }
 
   const persistedCookieCount = useMemo(
     () => Object.keys(cookiesQuery.data?.cookies ?? {}).length,
@@ -152,9 +180,13 @@ export function AuthStatusCard() {
               void queryClient.invalidateQueries({ queryKey: queryKeys.storedCookies });
             }
           }}
-          className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+          className="flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
         >
-          Actualizar estado
+          <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <path d="M13.5 8A5.5 5.5 0 1 1 8 2.5" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" />
+            <path d="M6.5 1.5L8 2.5L6.5 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          Actualizar
         </button>
       </div>
 
@@ -162,16 +194,24 @@ export function AuthStatusCard() {
         <span
           role="status"
           aria-live="polite"
-          className={`inline-flex max-w-full flex-wrap items-center gap-2 break-words rounded-full border px-2.5 py-1 text-xs font-semibold ${badgeClassName}`}
+          className={`inline-flex max-w-full flex-wrap items-center gap-1.5 break-words rounded-full border px-2.5 py-1 text-xs font-semibold ${badgeClassName}`}
         >
-          <span className={`h-2 w-2 rounded-full ${dotClassName}`} />
+          <StatusIcon />
           {statusLabel}
         </span>
       </div>
       {healthQuery.data ? (
-        <p className="mb-3 text-xs text-slate-500" role="status" aria-live="polite" aria-atomic="true">
-          {healthQuery.data.status === "ok" ? "Servicio disponible" : `Servicio: ${healthQuery.data.status}`}
-        </p>
+        <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1">
+          <p className="flex items-center gap-1.5 text-xs text-slate-500" role="status" aria-live="polite" aria-atomic="true">
+            <span className={`h-1.5 w-1.5 rounded-full ${healthQuery.data.status === "ok" ? "bg-emerald-400" : "bg-amber-400"}`} />
+            {healthQuery.data.status === "ok" ? "Servicio disponible" : `Servicio: ${healthQuery.data.status}`}
+          </p>
+          {typeof healthQuery.data.uptime_seconds === "number" ? (
+            <p className="text-xs text-slate-400">
+              Uptime: {formatUptime(healthQuery.data.uptime_seconds)}
+            </p>
+          ) : null}
+        </div>
       ) : null}
       {!healthQuery.data && healthQuery.isFetching ? <p className="mb-3 text-xs text-slate-500" role="status" aria-live="polite">Verificando servicio...</p> : null}
       {healthQuery.error ? <p className="mb-3 text-sm text-red-600" role="alert" aria-live="assertive">Servicio no disponible: {(healthQuery.error as Error).message}</p> : null}
@@ -201,16 +241,21 @@ export function AuthStatusCard() {
               type="button"
               onClick={() => cookiesMutation.mutate(cookiesText)}
               disabled={!cookiesText.trim() || cookiesMutation.isPending}
-              className="w-full rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-deep disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+              className="flex w-full items-center justify-center gap-2 rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/60 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
             >
-              {cookiesMutation.isPending ? "Guardando..." : "Guardar cookies"}
+              {cookiesMutation.isPending ? (
+                <>
+                  <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                  Guardando...
+                </>
+              ) : "Guardar cookies"}
             </button>
 
             {sessionHealthy ? (
               <button
                 type="button"
                 onClick={() => setShowCookieEditor(false)}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 sm:w-auto"
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs font-medium text-slate-700 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40 sm:w-auto"
               >
                 Ocultar editor
               </button>
@@ -230,9 +275,9 @@ export function AuthStatusCard() {
             }}
             aria-expanded={shouldShowCookieEditor}
             aria-controls="cookie-editor"
-            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 sm:w-auto"
+              className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-medium text-slate-700 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
           >
-            Ver/editar cookies
+              Ver / editar cookies
           </button>
         </div>
       )}

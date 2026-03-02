@@ -140,46 +140,61 @@ export function SearchBooksCard() {
     <section className="soft-rise min-w-0 overflow-hidden rounded-2xl border border-slate-200/90 bg-white/95 p-5 shadow-panel backdrop-blur">
       <div className="mb-3 flex items-center justify-between gap-2">
         <h2 className="text-lg font-semibold text-ink">Buscar libros</h2>
+        {normalizedQuery && !isSearching && resultCount > 0 ? (
+          <span className="rounded-full bg-brand/10 px-2.5 py-0.5 text-xs font-semibold text-brand-deep">
+            {resultCount} resultado{resultCount === 1 ? "" : "s"}
+          </span>
+        ) : null}
       </div>
 
-      <div className="mb-2 grid min-w-0 gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+      <div className="mb-3 grid min-w-0 gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
         <label htmlFor="search-query" className="sr-only">
           Buscar libros
         </label>
-        <input
-          id="search-query"
-          value={queryInput}
-          onChange={(event) => setQueryInput(event.target.value)}
-          placeholder="python, ISBN, titulo..."
-          className="min-w-0 flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none ring-brand focus:border-brand/70 focus:ring-2"
-        />
-        <button
-          type="button"
-          onClick={() => {
-            setQueryInput("");
-            setScope("all");
-          }}
-          className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/60 focus-visible:ring-offset-2 focus-visible:ring-offset-white hover:bg-slate-50 sm:w-auto"
-        >
-          Limpiar
-        </button>
+        <div className="relative flex min-w-0 items-center">
+          <svg className="pointer-events-none absolute left-3 h-4 w-4 text-slate-400" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <circle cx="6.5" cy="6.5" r="4" stroke="currentColor" strokeWidth="1.75" />
+            <path d="M10 10l3 3" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" />
+          </svg>
+          <input
+            id="search-query"
+            value={queryInput}
+            onChange={(event) => setQueryInput(event.target.value)}
+            placeholder="python, ISBN, titulo..."
+            className="min-w-0 w-full rounded-lg border border-slate-300 py-2 pl-9 pr-3 text-sm outline-none transition focus:border-brand/70 focus:ring-2 focus:ring-brand/25"
+          />
+        </div>
+        {normalizedQuery ? (
+          <button
+            type="button"
+            onClick={() => {
+              setQueryInput("");
+              setScope("all");
+            }}
+            className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/60 focus-visible:ring-offset-2 sm:w-auto"
+          >
+            Limpiar
+          </button>
+        ) : null}
       </div>
 
       <div className="mb-4">
-        <label className="text-sm">
-          <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-500">Filtrar por</span>
-          <select
-            value={scope}
-            onChange={(event) => setScope(event.target.value as SearchScope)}
-            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm sm:max-w-xs"
-          >
-            {SEARCH_SCOPES.map((item) => (
-              <option key={item.value} value={item.value}>
-                {item.label}
-              </option>
-            ))}
-          </select>
-        </label>
+        <span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-500">Filtrar por</span>
+        <div className="flex flex-wrap gap-1.5">
+          {SEARCH_SCOPES.map((item) => (
+            <button
+              key={item.value}
+              type="button"
+              onClick={() => setScope(item.value)}
+              className={`rounded-full border px-3 py-1 text-xs font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50 ${scope === item.value
+                ? "border-brand/40 bg-brand text-white shadow-sm"
+                : "border-slate-300 bg-white text-slate-600 hover:border-brand/30 hover:bg-brand/5 hover:text-brand-deep"
+                }`}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {isSearching ? (
@@ -195,11 +210,6 @@ export function SearchBooksCard() {
         </p>
       ) : null}
 
-      {normalizedQuery && !isSearching && !parsedError ? (
-        <p className="mb-2 text-xs text-slate-500" role="status" aria-live="polite">
-          {resultCount} resultado{resultCount === 1 ? "" : "s"}.
-        </p>
-      ) : null}
 
       <ul className={`m-0 list-none space-y-2 p-0 ${isSearching ? "pointer-events-none opacity-70" : ""}`} aria-busy={isSearching}>
         {visibleResults.map((book) => {
@@ -213,8 +223,8 @@ export function SearchBooksCard() {
                 aria-pressed={isSelected}
                 className={`group w-full rounded-xl border p-3 text-left transition focus:outline-none focus:ring-2 focus:ring-brand/40 ${
                   isSelected
-                    ? "border-brand/40 bg-brand/10 shadow-[0_8px_24px_-18px_rgba(15,118,110,0.55)]"
-                    : "border-slate-200 hover:border-brand/35 hover:bg-brand/5"
+                  ? "border-brand/30 bg-brand/10 shadow-panel-md"
+                  : "border-slate-200 hover:border-brand/30 hover:bg-brand/5"
                 }`}
               >
                 <div className="flex min-w-0 items-start justify-between gap-3">

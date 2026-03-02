@@ -8,7 +8,9 @@ import App from "../components/App";
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Ryliox</title>
+    <meta name="description" content="Descarga libros de O'Reilly Learning en PDF y EPUB." />
+    <meta name="theme-color" content="#dc2626" />
+    <title>Ryliox — Descargador de libros O'Reilly</title>
     <script is:inline>
       (() => {
         window.addEventListener("load", () => {
@@ -40,14 +42,27 @@ import App from "../components/App";
     </script>
   </head>
   <body>
-    <main class="mx-auto flex min-h-screen w-full max-w-6xl flex-col gap-6 overflow-x-hidden px-4 py-8 sm:px-6 lg:px-8">
-      <header class="soft-rise rounded-2xl border border-brand/20 bg-white/90 p-5 shadow-panel backdrop-blur">
-        <div class="flex min-w-0 items-center gap-3">
-          <div class="grid h-14 w-14 flex-none place-items-center rounded-2xl bg-brand text-2xl font-bold text-white shadow-sm">R</div>
-          <h1 class="truncate text-5xl font-bold leading-none text-ink sm:text-6xl">Ryliox</h1>
+    <div class="mx-auto flex min-h-screen w-full max-w-6xl flex-col gap-6 overflow-x-hidden px-4 py-8 sm:px-6 lg:px-8">
+      <header class="soft-rise rounded-2xl border border-brand/20 bg-white/90 px-6 py-4 shadow-panel backdrop-blur">
+        <div class="flex min-w-0 items-center gap-5">
+          <div class="relative flex-none">
+            <div class="grid h-16 w-16 place-items-center rounded-2xl bg-gradient-to-br from-brand to-brand-deep text-3xl font-bold tracking-tight text-white shadow-md select-none">
+              R
+            </div>
+            <span class="absolute -right-1 -top-1 h-3.5 w-3.5 rounded-full border-2 border-white bg-emerald-400 shadow-sm" title="Servicio activo"></span>
+          </div>
+          <div class="min-w-0">
+            <h1 class="truncate text-5xl font-bold leading-[1.1] tracking-tight text-ink sm:text-6xl">Ryliox</h1>
+            <p class="mt-1 truncate text-sm text-slate-500">Descargador de libros O'Reilly</p>
+          </div>
         </div>
       </header>
-      <App client:load />
-    </main>
+      <main>
+        <App client:load />
+      </main>
+      <footer class="pb-2 text-center text-xs text-slate-400">
+        Ryliox &mdash; Solo para uso personal
+      </footer>
+    </div>
   </body>
 </html>
