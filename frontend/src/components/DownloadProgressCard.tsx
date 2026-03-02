@@ -12,6 +12,8 @@ export function DownloadProgressCard() {
   const canForceReconnect = manager.sseStatus === "error";
   const formatDescriptions = manager.formatsQuery.data?.descriptions;
   const chapters = manager.chaptersQuery.data?.chapters ?? [];
+  // Formats that can only download the full book (e.g. epub) cannot use chapter selection
+  const chapterSelectable = !manager.bookOnlyFormats.has(manager.format);
 
   return (
     <section className="soft-rise min-w-0 overflow-hidden rounded-2xl border border-slate-200/90 bg-white/90 p-5 shadow-panel backdrop-blur">
@@ -26,8 +28,9 @@ export function DownloadProgressCard() {
           <input
             readOnly
             aria-label="Libro seleccionado"
-            value={manager.selectedBook ? manager.selectedBook.title : "Selecciona un libro para comenzar"}
-            className="w-full min-w-0 truncate rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-700"
+            value={manager.selectedBook ? manager.selectedBook.title : ""}
+            placeholder="Selecciona un libro para comenzar"
+            className="w-full min-w-0 truncate rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-700 placeholder:text-slate-400"
           />
         </label>
 
@@ -39,7 +42,13 @@ export function DownloadProgressCard() {
           hasChapterSelection={manager.hasChapterSelection}
           bookOnlyFormats={manager.bookOnlyFormats}
           isLoading={manager.formatsQuery.isLoading}
-          onChange={manager.setFormat}
+          onChange={(newFormat) => {
+            manager.setFormat(newFormat);
+            // Switching to a book-only format makes chapter selection invalid — clear it immediately
+            if (manager.bookOnlyFormats.has(newFormat)) {
+              manager.clearSelectedChapters();
+            }
+          }}
         />
       </div>
 
@@ -55,12 +64,17 @@ export function DownloadProgressCard() {
         selectedBook={manager.selectedBook}
         selectedChapterIndexes={manager.selectedChapterIndexes}
         selectedChapterSet={manager.selectedChapterSet}
+        selectable={chapterSelectable}
         totalChapters={manager.totalChapters}
       />
 
       {manager.invalidFormatWithChapterSelection ? (
-        <p className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-2 text-sm text-amber-700">
-          La seleccion de capitulos no es compatible con {formatName(manager.format)}. Cambia el formato o limpia la seleccion.
+        <p className="mb-4 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-2.5 text-sm text-amber-700">
+          <svg className="mt-0.5 h-4 w-4 shrink-0" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <path d="M8 2L14.5 13H1.5L8 2z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+            <path d="M8 7v3M8 11.5v.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+          </svg>
+          <span>{formatName(manager.format)} no acepta seleccion de capitulos. Cambia el formato o limpia la seleccion.</span>
         </p>
       ) : null}
 

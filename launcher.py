@@ -31,8 +31,6 @@ _TIMEOUT_DOCKER = 120
 _TIMEOUT_SUBPROCESS = 60
 
 
-
-
 class Steps:
     """Contador de pasos para mensajes de progreso.
 
@@ -60,8 +58,6 @@ class Steps:
         self._current += 1
         total_str = str(self._total) if self._current <= self._total else "?"
         return f"[{self._current}/{total_str}] {label}"
-
-
 
 
 def _print_title() -> None:
@@ -98,8 +94,6 @@ def _open_browser(delay: float = 1.5) -> None:
 
 def _open_browser_async(delay: float = 1.5) -> None:
     threading.Thread(target=_open_browser, args=(delay,), daemon=True).start()
-
-
 
 
 def _venv_python() -> Path:
@@ -178,8 +172,6 @@ def _ensure_python_runtime(steps: Steps) -> Path:
     return venv_python
 
 
-
-
 def _clean_runtime_cache() -> None:
     """Elimina cache de cola y logs de error. No toca datos de usuario."""
     print(" - Limpiando cache de runtime...")
@@ -205,7 +197,6 @@ def _clean_runtime_cache() -> None:
         print(f"   Borrados: {', '.join(cleaned)}")
     else:
         print("   Nada que limpiar.")
-
 
 
 _FRONTEND_WATCH_EXTENSIONS = {".astro", ".tsx", ".ts", ".jsx", ".js", ".css", ".json"}
@@ -302,8 +293,6 @@ def _ensure_frontend_build(steps: Steps, rebuild: bool = False) -> None:
         ) from exc
 
 
-
-
 def _ensure_run_dir() -> None:
     """Crea .run/ si no existe (necesario para PID_FILE y LOG_FILE)."""
     RUN_DIR.mkdir(exist_ok=True)
@@ -328,8 +317,6 @@ def _launch_server(
         env=_server_env(),
         check=True,
     )
-
-
 
 
 def _detect_compose_command() -> tuple[list[str], bool]:
@@ -366,8 +353,6 @@ def _verify_docker_containers_running(compose: list[str]) -> None:
             "  [WARN] No se pudieron verificar los contenedores. "
             f"Comprueba con: {' '.join(compose)} ps"
         )
-
-
 
 
 def run_status() -> None:
@@ -439,7 +424,6 @@ def run_docker(open_browser: bool = True) -> None:
     print(f"\nServidor disponible en {URL}")
 
 
-
 _MODES: dict[str, str] = {
     "1": "unified",
     "2": "stop",
@@ -502,35 +486,71 @@ def _resolve_mode(argv: list[str], args: argparse.Namespace) -> str:
     return "unified"
 
 
+def _build_dispatch(
+    args: argparse.Namespace, open_browser: bool
+) -> dict[str, Callable[[], None]]:
+    return {
+        "quit": lambda: None,
+        "status": run_status,
+        "stop": run_stop,
+        "docker": lambda: run_docker(open_browser),
+        "backend_only": lambda: run_backend_only(open_browser),
+        "unified": lambda: run_unified(open_browser, args.rebuild_frontend),
+    }
+
+
 def main() -> int:
     try:
         os.chdir(REPO_ROOT)
         argv = sys.argv[1:]
         args = _parse_cli_args(argv)
-
-        if not argv:
-            _print_title()
-
         open_browser = not args.no_browser
-        mode = _resolve_mode(argv, args)
 
-        dispatch: dict[str, Callable[[], None]] = {
-            "quit": lambda: None,
-            "status": run_status,
-            "stop": run_stop,
-            "docker": lambda: run_docker(open_browser),
-            "backend_only": lambda: run_backend_only(open_browser),
-            "unified": lambda: run_unified(open_browser, args.rebuild_frontend),
-        }
-
-        if mode == "quit":
+        # CLI flag mode: run once and exit (no interactive loop).
+        if argv:
+            mode = _resolve_mode(argv, args)
+            if mode == "quit":
+                return 0
+            dispatch = _build_dispatch(args, open_browser)
+            action = dispatch.get(mode)
+            if action is None:
+                raise ValueError(f"Modo desconocido: {mode!r}")
+            action()
             return 0
 
-        action = dispatch.get(mode)
-        if action is None:
-            raise ValueError(f"Modo desconocido: {mode!r}")
-        action()
-        return 0
+        # Interactive mode: persistent menu loop.
+        _print_title()
+        dispatch = _build_dispatch(args, open_browser)
+
+        while True:
+            mode = _interactive_mode()
+
+            if mode == "quit":
+                print("  Hasta luego.")
+                return 0
+
+            action = dispatch.get(mode)
+            if action is None:
+                print(f"  [WARN] Modo desconocido: {mode!r}")
+                continue
+
+            try:
+                print()
+                action()
+            except KeyboardInterrupt:
+                print("\n  Detenido.")
+            except subprocess.CalledProcessError as exc:
+                print(f"\nERROR: Comando terminó con código {exc.returncode}.")
+            except RuntimeError as exc:
+                print(f"\nERROR: {exc}")
+            except Exception as exc:
+                print(f"\nERROR INESPERADO ({type(exc).__name__}): {exc}")
+                print("Por favor reporta este error incluyendo el traceback completo.")
+                import traceback
+
+                traceback.print_exc()
+
+            print("\n" + "─" * 44 + "\n")
 
     except KeyboardInterrupt:
         print("\nCancelado por el usuario.")

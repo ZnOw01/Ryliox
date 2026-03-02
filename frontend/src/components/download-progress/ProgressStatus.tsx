@@ -47,21 +47,22 @@ export function ProgressStatus({ currentLabel, progress, progressPercent }: Prog
   const pdfPath = renderOutputPath(progress?.pdf);
   const shouldShowSummaryMessage = Boolean(messageLabel && messageLabel.toLowerCase() !== "completado");
   const hasTechnicalDetails = Boolean(
-    progress?.details || progress?.code || progress?.error || epubPath || pdfPath || messageLabel
+    progress?.details || progress?.code || progress?.error || epubPath || pdfPath
   );
   const chapterProgress =
     typeof progress?.current_chapter === "number" && typeof progress?.total_chapters === "number" && progress.total_chapters > 0
       ? `${progress.current_chapter}/${progress.total_chapters}`
       : null;
+  const isActive = Boolean(progress?.status && !["idle", "completed", "cancelled", "failed"].includes(progress.status));
 
   return (
     <>
       <div className="mb-2 flex min-w-0 items-center justify-between gap-2 text-xs text-slate-600" role="status" aria-live="polite" aria-atomic="true">
         <span className="min-w-0 break-words">Estado: {statusLabel}</span>
-        <span className="shrink-0">{progressPercent}%</span>
+        <span className="shrink-0 tabular-nums">{progressPercent}%</span>
       </div>
       <div
-        className="h-2 overflow-hidden rounded-full bg-slate-200"
+        className="h-2.5 overflow-hidden rounded-full bg-slate-200"
         role="progressbar"
         aria-label="Progreso de descarga"
         aria-valuemin={0}
@@ -69,21 +70,39 @@ export function ProgressStatus({ currentLabel, progress, progressPercent }: Prog
         aria-valuenow={progressPercent}
         aria-valuetext={`${progressPercent}% - ${statusLabel}`}
       >
-        <div className="h-full bg-brand transition-all" style={{ width: `${progressPercent}%` }} />
+        <div
+          className={`h-full bg-brand transition-all duration-300 ${isActive ? "progress-bar-active" : ""}`}
+          style={{ width: `${progressPercent}%` }}
+        />
       </div>
 
       <div className="mt-3 space-y-1 text-sm text-slate-600">
         {progress?.status === "completed" ? (
-          <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+          <p className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-800">
+            <svg className="h-4 w-4 shrink-0" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <path d="M3 8l3.5 3.5L13 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
             Descarga completada correctamente.
           </p>
         ) : null}
-        {typeof progress?.queue_position === "number" ? <p>Cola: {progress.queue_position}</p> : null}
-        {chapterProgress ? <p>Capitulos procesados: {chapterProgress}</p> : null}
-        {etaLabel ? <p>Tiempo estimado de descarga: {etaLabel}</p> : null}
-        {!etaLabel && progress?.status === "processing_chapters" ? <p>Calculando tiempo restante...</p> : null}
-        {shouldShowSummaryMessage ? <p>Mensaje: {messageLabel}</p> : null}
-        {progress?.chapter_title ? <p className="break-all">Capitulo: {progress.chapter_title}</p> : null}
+        {typeof progress?.queue_position === "number" && progress.queue_position > 0 ? (
+          <p className="flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+            <svg className="h-3.5 w-3.5 shrink-0" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.75" />
+              <path d="M8 5v4l2 2" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            Posicion en cola: {progress.queue_position}
+          </p>
+        ) : null}
+        {chapterProgress ? (
+          <p className="text-xs text-slate-500">
+            Capitulo {chapterProgress}{progress?.chapter_title ? `: ${progress.chapter_title}` : ""}
+          </p>
+        ) : null}
+        {etaLabel ? (
+          <p className="text-xs text-slate-500">Tiempo restante: <span className="font-medium text-slate-700">{etaLabel}</span></p>
+        ) : null}
+        {!chapterProgress && shouldShowSummaryMessage ? <p className="text-xs text-slate-500">{messageLabel}</p> : null}
         {epubName ? <p className="break-all">EPUB generado: <span className="font-medium text-slate-700">{epubName}</span></p> : null}
         {pdfName ? <p className="break-all">PDF generado: <span className="font-medium text-slate-700">{pdfName}</span></p> : null}
 
@@ -91,7 +110,7 @@ export function ProgressStatus({ currentLabel, progress, progressPercent }: Prog
           <details className="mt-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
             <summary className="cursor-pointer text-xs font-semibold text-slate-600">Detalles para soporte</summary>
             <div className="mt-2 space-y-1 text-xs text-slate-600">
-              {messageLabel ? <p>Mensaje original: {messageLabel}</p> : null}
+              {messageLabel ? <p>Mensaje: {messageLabel}</p> : null}
               {progress?.error ? <p className="text-red-600">Error: {progress.error}</p> : null}
               {progress?.code ? <p className="text-red-600">Codigo: {progress.code}</p> : null}
               {progress?.details ? (

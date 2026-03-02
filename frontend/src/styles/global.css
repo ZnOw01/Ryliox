@@ -18,14 +18,19 @@
   box-sizing: border-box;
 }
 
+::selection {
+  background-color: rgba(220, 38, 38, 0.18);
+  color: #7f1d1d;
+}
 body {
   margin: 0;
   min-height: 100vh;
   color: #0f172a;
   font-family: "IBM Plex Sans", "Segoe UI", Tahoma, sans-serif;
   background:
-    radial-gradient(circle at 14% 8%, rgba(248, 113, 113, 0.2) 0%, transparent 34%),
-    radial-gradient(circle at 86% 6%, rgba(252, 165, 165, 0.2) 0%, transparent 30%),
+    radial-gradient(circle at 14% 8%, rgba(248, 113, 113, 0.22) 0%, transparent 34%),
+      radial-gradient(circle at 86% 6%, rgba(252, 165, 165, 0.18) 0%, transparent 30%),
+      radial-gradient(circle at 50% 100%, rgba(254, 226, 226, 0.25) 0%, transparent 50%),
     linear-gradient(180deg, #fffdfd 0%, #fff1f2 100%);
 }
 
@@ -34,10 +39,10 @@ body::before {
   position: fixed;
   inset: 0;
   pointer-events: none;
-  background-image: linear-gradient(rgba(239, 68, 68, 0.08) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(239, 68, 68, 0.08) 1px, transparent 1px);
+  background-image: linear-gradient(rgba(239, 68, 68, 0.06) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(239, 68, 68, 0.06) 1px, transparent 1px);
   background-size: 28px 28px;
-  opacity: 0.25;
+  opacity: 0.3;
 }
 
 #astro-dev-toolbar {
@@ -49,6 +54,7 @@ pre {
   font-family: "IBM Plex Mono", Consolas, monospace;
 }
 
+/* ── Animations ──────────────────────────────────────── */
 @keyframes soft-rise {
   from {
     opacity: 0;
@@ -60,6 +66,29 @@ pre {
   }
 }
 
+@keyframes progress-stripe {
+  from {
+    background-position: 0 0;
+  }
+
+  to {
+    background-position: 28px 0;
+  }
+}
+
+@keyframes pulse-dot {
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.35;
+  }
+}
+
+/* ── Scrollbar ───────────────────────────────────────── */
 .chapter-scroll {
   scrollbar-width: thin;
   scrollbar-color: var(--scroll-thumb) var(--scroll-track);
@@ -84,14 +113,37 @@ pre {
   background: var(--scroll-thumb-hover);
 }
 
+/* ── Animated progress bar ───────────────────────────── */
+
+.progress-bar-active {
+  background-image: repeating-linear-gradient(-45deg,
+      rgba(255, 255, 255, 0.15) 0px,
+      rgba(255, 255, 255, 0.15) 7px,
+      transparent 7px,
+      transparent 14px);
+  background-size: 28px 100%;
+  animation: progress-stripe 600ms linear infinite;
+}
+
+/* ── Motion preferences ──────────────────────────────── */
 @media (prefers-reduced-motion: no-preference) {
   .soft-rise {
     animation: soft-rise 320ms ease-out both;
   }
+.sse-pulse {
+  animation: pulse-dot 2s ease-in-out infinite;
+}
 }
 
 @media (prefers-reduced-motion: reduce) {
   .soft-rise {
     animation: none !important;
   }
+.progress-bar-active {
+  animation: none;
+}
+
+.sse-pulse {
+  animation: none;
+}
 }
