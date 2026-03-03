@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import ValidationError
 
 from core.kernel import Kernel
 from web.api_utils import ErrorCode
@@ -66,15 +67,39 @@ async def book_chapters(
             },
         ) from exc
 
-    chapters = [
-        ChapterSummaryResponse(
-            index=int(chapter.get("index", idx)),
-            title=str(chapter.get("title") or f"Chapter {idx + 1}"),
-            pages=chapter.get("virtual_pages"),
-            minutes=chapter.get("minutes_required"),
-        )
-        for idx, chapter in enumerate(raw_chapters)
-    ]
+    try:
+        chapters = []
+        for idx, chapter in enumerate(raw_chapters):
+            raw_index = chapter.get("index", idx)
+            raw_pages = chapter.get("virtual_pages")
+            raw_minutes = chapter.get("minutes_required")
+
+            pages = int(raw_pages) if raw_pages is not None else None
+            if pages is not None and pages <= 0:
+                pages = None
+
+            minutes = float(raw_minutes) if raw_minutes is not None else None
+            if minutes is not None and minutes < 0:
+                minutes = None
+
+            chapters.append(
+                ChapterSummaryResponse(
+                    index=int(raw_index),
+                    title=str(chapter.get("title") or f"Chapter {idx + 1}"),
+                    pages=pages,
+                    minutes=minutes,
+                )
+            )
+    except (TypeError, ValueError, ValidationError) as exc:
+        logger.warning("Datos de capitulo invalidos recibidos para %r: %s", book_id, exc)
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail={
+                "error": "Invalid chapter data returned by upstream service.",
+                "code": ErrorCode.BOOK_CHAPTERS_FAILED,
+            },
+        ) from exc
+
     return BookChaptersResponse(chapters=chapters)
 
 

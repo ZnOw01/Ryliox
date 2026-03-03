@@ -2,6 +2,7 @@ import asyncio
 import time
 from pathlib import Path
 from typing import Mapping
+from urllib.parse import urlparse
 
 import httpx
 
@@ -14,6 +15,7 @@ class HttpClient:
         self.client = httpx.AsyncClient(headers=config.HEADERS)
         self.last_request_time = 0.0
         self._rate_limit_lock = asyncio.Lock()
+        self._cookie_domain = self._resolve_cookie_domain(config.BASE_URL)
         self._request_retries = max(0, int(getattr(config.SETTINGS, "request_retries", 2)))
         self._request_retry_backoff = max(0.0, float(getattr(config.SETTINGS, "request_retry_backoff", 0.5)))
 
@@ -21,9 +23,22 @@ class HttpClient:
         self.session_store = SessionStore(legacy_cookies_file=cookies_path)
         self._load_cookies_from_store()
 
+    def _resolve_cookie_domain(self, base_url: str) -> str:
+        try:
+            return (urlparse(base_url).hostname or "").lower()
+        except ValueError:
+            return ""
+
     def _apply_cookies(self, cookies: Mapping[str, str]):
         for name, value in cookies.items():
-            self.client.cookies.set(str(name), str(value), domain=".oreilly.com")
+            if self._cookie_domain:
+                self.client.cookies.set(
+                    str(name),
+                    str(value),
+                    domain=self._cookie_domain,
+                )
+            else:
+                self.client.cookies.set(str(name), str(value))
 
     def _load_cookies_from_store(self):
         try:

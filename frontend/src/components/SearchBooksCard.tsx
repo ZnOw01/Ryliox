@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 
 import { parseApiError } from "../lib/api-error";
@@ -59,7 +59,6 @@ export function SearchBooksCard() {
   const [scope, setScope] = useState<SearchScope>(() => readSearchStateFromUrl().scope);
   const normalizedQuery = queryInput.trim();
   const debouncedQuery = useDebouncedValue(normalizedQuery, 350);
-  const lastDebouncedQueryRef = useRef(debouncedQuery);
 
   const searchQuery = useQuery({
     queryKey: queryKeys.search(debouncedQuery),
@@ -91,17 +90,11 @@ export function SearchBooksCard() {
     const search = params.toString();
     const currentSearch = window.location.search.startsWith("?") ? window.location.search.slice(1) : window.location.search;
     if (search === currentSearch) {
-      lastDebouncedQueryRef.current = debouncedQuery;
       return;
     }
 
     const nextUrl = `${window.location.pathname}${search ? `?${search}` : ""}`;
-    if (lastDebouncedQueryRef.current !== debouncedQuery) {
-      window.history.pushState(null, "", nextUrl);
-    } else {
-      window.history.replaceState(null, "", nextUrl);
-    }
-    lastDebouncedQueryRef.current = debouncedQuery;
+    window.history.replaceState(null, "", nextUrl);
   }, [debouncedQuery, scope]);
 
   useEffect(() => {
@@ -186,6 +179,7 @@ export function SearchBooksCard() {
               key={item.value}
               type="button"
               onClick={() => setScope(item.value)}
+              aria-pressed={scope === item.value}
               className={`rounded-full border px-3 py-1 text-xs font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50 ${scope === item.value
                 ? "border-brand/40 bg-brand text-white shadow-sm"
                 : "border-slate-300 bg-white text-slate-600 hover:border-brand/30 hover:bg-brand/5 hover:text-brand-deep"

@@ -102,6 +102,9 @@ htmlcov/
 .cache/
 pytestdebug.log
 
+# Keep local tests private by default (tracked historical tests are unchanged)
+tests/
+
 # ==============================================================================
 # Editor / OS
 # ==============================================================================
@@ -129,3 +132,6 @@ desktop.ini
 # Local planning artifacts
 # ==============================================================================
 docs/plans/
+
+# Local scratch artifacts
+aea.html

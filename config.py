@@ -77,8 +77,9 @@ def _resolve_runtime_dir(
         logger.warning("%s is not writable at %s. Using %s.", label, candidate, fallback_path)
         return fallback_path
 
-    logger.warning("%s is not writable at %s.", label, candidate)
-    return candidate
+    raise RuntimeError(
+        f"{label} is not writable at {candidate} and fallback {fallback_path} is also not writable."
+    )
 
 
 def _resolve_runtime_file(
@@ -102,8 +103,9 @@ def _resolve_runtime_file(
         )
         return fallback_path
 
-    logger.warning("%s parent is not writable at %s.", label, candidate.parent)
-    return candidate
+    raise RuntimeError(
+        f"{label} parent is not writable at {candidate.parent} and fallback {fallback_path.parent} is also not writable."
+    )
 
 
 class Settings(BaseSettings):
