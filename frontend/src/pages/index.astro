@@ -10,6 +10,9 @@ import App from "../components/App";
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="description" content="Descarga libros de O'Reilly Learning en PDF y EPUB." />
     <meta name="theme-color" content="#dc2626" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" />
     <title>Ryliox — Descargador de libros O'Reilly</title>
     <script is:inline>
       (() => {
@@ -24,12 +27,24 @@ import App from "../components/App";
             try {
               if ("serviceWorker" in navigator) {
                 const registrations = await navigator.serviceWorker.getRegistrations();
-                await Promise.all(registrations.map((registration) => registration.unregister()));
+                const ownRegistrations = registrations.filter((registration) => {
+                  const scriptUrl =
+                    registration.active?.scriptURL ||
+                    registration.waiting?.scriptURL ||
+                    registration.installing?.scriptURL ||
+                    "";
+                  const normalized = scriptUrl.toLowerCase();
+                  return normalized.includes("/service-worker.js") || normalized.includes("ryliox");
+                });
+                await Promise.all(ownRegistrations.map((registration) => registration.unregister()));
               }
 
               if ("caches" in window) {
                 const cacheKeys = await caches.keys();
-                await Promise.all(cacheKeys.map((cacheKey) => caches.delete(cacheKey)));
+                const ownCacheKeys = cacheKeys.filter((cacheKey) =>
+                  cacheKey.toLowerCase().startsWith("ryliox"),
+                );
+                await Promise.all(ownCacheKeys.map((cacheKey) => caches.delete(cacheKey)));
               }
             } catch (_error) {
               // Ignore cleanup failures in local environments.

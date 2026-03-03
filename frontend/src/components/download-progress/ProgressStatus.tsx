@@ -1,5 +1,5 @@
 import type { ProgressResponse } from "../../lib/types";
-import { formatEta, formatStatusLabel, renderOutputPath } from "./utils";
+import { formatEta, formatStatusLabel } from "./utils";
 
 type ProgressStatusProps = {
   currentLabel: string;
@@ -43,11 +43,9 @@ export function ProgressStatus({ currentLabel, progress, progressPercent }: Prog
   const messageLabel = localizeProgressMessage(progress?.message);
   const epubName = outputFileNames(progress?.epub);
   const pdfName = outputFileNames(progress?.pdf);
-  const epubPath = renderOutputPath(progress?.epub);
-  const pdfPath = renderOutputPath(progress?.pdf);
   const shouldShowSummaryMessage = Boolean(messageLabel && messageLabel.toLowerCase() !== "completado");
   const hasTechnicalDetails = Boolean(
-    progress?.details || progress?.code || progress?.error || epubPath || pdfPath
+    progress?.details || progress?.code || progress?.error
   );
   const chapterProgress =
     typeof progress?.current_chapter === "number" && typeof progress?.total_chapters === "number" && progress.total_chapters > 0
@@ -108,7 +106,7 @@ export function ProgressStatus({ currentLabel, progress, progressPercent }: Prog
 
         {hasTechnicalDetails ? (
           <details className="mt-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-            <summary className="cursor-pointer text-xs font-semibold text-slate-600">Detalles para soporte</summary>
+            <summary className="cursor-pointer text-xs font-semibold text-slate-600">Detalles tecnicos</summary>
             <div className="mt-2 space-y-1 text-xs text-slate-600">
               {messageLabel ? <p>Mensaje: {messageLabel}</p> : null}
               {progress?.error ? <p className="text-red-600">Error: {progress.error}</p> : null}
@@ -118,8 +116,6 @@ export function ProgressStatus({ currentLabel, progress, progressPercent }: Prog
                   {JSON.stringify(progress.details, null, 2)}
                 </pre>
               ) : null}
-              {epubPath ? <p className="break-all font-mono text-[11px] text-slate-500">Archivo EPUB (ruta local): {epubPath}</p> : null}
-              {pdfPath ? <p className="break-all font-mono text-[11px] text-slate-500">Archivo PDF (ruta local): {pdfPath}</p> : null}
             </div>
           </details>
         ) : null}
