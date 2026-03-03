@@ -8,10 +8,10 @@ import sys
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Final
+from typing import Any, Final
 
 import uvicorn
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from fastapi.staticfiles import StaticFiles
@@ -30,9 +30,14 @@ FRONTEND_DIST: Final[Path] = (
     Path(__file__).resolve().parent.parent / "frontend" / "dist"
 )
 
-_CORS_ORIGINS: Final[list[str]] = [
-    o.strip() for o in os.getenv("CORS_ORIGINS", "*").split(",") if o.strip()
-]
+_CORS_ORIGINS_RAW: Final[str] = os.getenv(
+    "CORS_ORIGINS", "http://localhost:8000,http://127.0.0.1:8000"
+).strip()
+_CORS_ORIGINS: Final[list[str]] = (
+    ["*"]
+    if _CORS_ORIGINS_RAW == "*"
+    else [o.strip() for o in _CORS_ORIGINS_RAW.split(",") if o.strip()]
+)
 
 _NO_CACHE_HEADERS: Final[dict[str, str]] = {
     "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
@@ -101,6 +106,37 @@ def create_app() -> FastAPI:
         _: Request, exc: ForbiddenOriginError
     ) -> Response:
         return error_response(str(exc), exc.http_status, code="forbidden_origin")
+
+    @app.exception_handler(HTTPException)
+    async def _handle_http_exception(_: Request, exc: HTTPException) -> Response:
+        status_code = int(exc.status_code)
+        if not 400 <= status_code < 600:
+            status_code = 500
+        detail = exc.detail
+        if isinstance(detail, dict):
+            message = str(detail.get("error") or detail.get("detail") or "Request failed")
+            code = str(detail.get("code") or "http_error")
+            details: dict[str, Any] | None = None
+            if isinstance(detail.get("details"), dict):
+                details = dict(detail["details"])
+            extra = {
+                key: value
+                for key, value in detail.items()
+                if key not in {"error", "code", "details", "detail"}
+            }
+            if extra:
+                details = {**(details or {}), **extra}
+            return error_response(message, status_code, code=code, details=details)
+
+        if isinstance(detail, str):
+            return error_response(detail, status_code, code="http_error")
+
+        return error_response(
+            "Request failed",
+            status_code,
+            code="http_error",
+            details={"detail": detail} if detail is not None else None,
+        )
 
     @app.middleware("http")
     async def _disable_html_cache(request: Request, call_next):

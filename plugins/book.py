@@ -10,10 +10,12 @@ class BookPlugin(Plugin):
     """Plugin for fetching book metadata and searching the catalog."""
 
     async def fetch(self, book_id: str) -> dict:
-        search_task = asyncio.create_task(self._fetch_search(book_id))
-        epub_task = asyncio.create_task(self._fetch_epub(book_id))
+        async with asyncio.TaskGroup() as task_group:
+            search_task = task_group.create_task(self._fetch_search(book_id))
+            epub_task = task_group.create_task(self._fetch_epub(book_id))
 
-        search_data, epub_data = await asyncio.gather(search_task, epub_task)
+        search_data = search_task.result()
+        epub_data = epub_task.result()
 
         descriptions = epub_data.get("descriptions") or {}
         html_description = (

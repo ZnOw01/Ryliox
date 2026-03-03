@@ -13,17 +13,30 @@ import webbrowser
 from pathlib import Path
 from typing import Callable
 
+import config
 from core import process_manager
-from web.dependencies import DOWNLOAD_ERROR_LOG_DIR, DOWNLOAD_QUEUE_DB
 
 REPO_ROOT = Path(__file__).resolve().parent
 
-PORT: int = int(os.getenv("PORT", "8000"))
+
+def _resolve_port(raw_value: str) -> int:
+    try:
+        parsed = int(raw_value)
+        if 1 <= parsed <= 65535:
+            return parsed
+    except (TypeError, ValueError):
+        pass
+    return 8000
+
+
+PORT: int = _resolve_port(os.getenv("PORT", "8000"))
 URL: str = f"http://localhost:{PORT}"
 
 RUN_DIR = REPO_ROOT / ".run"
 PID_FILE = RUN_DIR / "web-server.pid"
 LOG_FILE = RUN_DIR / "web-server.log"
+DOWNLOAD_QUEUE_DB = config.DATA_DIR / "download_jobs.sqlite3"
+DOWNLOAD_ERROR_LOG_DIR = config.DATA_DIR / "logs"
 
 _TIMEOUT_PIP = 300
 _TIMEOUT_NPM = 300

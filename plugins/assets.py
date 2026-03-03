@@ -1,10 +1,12 @@
 """Assets downloader plugin."""
 
 import asyncio
+import ipaddress
 import logging
 from collections.abc import Awaitable, Callable
 from pathlib import Path
-from urllib.parse import urlparse
+
+import config
 
 from .base import Plugin
 
@@ -17,6 +19,7 @@ class AssetsPlugin(Plugin):
 
     async def download_image(self, url: str, save_path: Path) -> bool:
         """Download image bytes and save to disk."""
+        self._ensure_safe_asset_url(url)
         if await asyncio.to_thread(save_path.exists):
             return True
 
@@ -31,6 +34,7 @@ class AssetsPlugin(Plugin):
 
     async def download_css(self, url: str, save_path: Path) -> bool:
         """Download CSS text and save to disk."""
+        self._ensure_safe_asset_url(url)
         if await asyncio.to_thread(save_path.exists):
             return True
 
@@ -136,4 +140,35 @@ class AssetsPlugin(Plugin):
 
     def get_cover_url(self, book_id: str) -> str:
         """Return the predictable cover URL for a book."""
-        return f"https://learning.oreilly.com/library/cover/{book_id}/"
+        return f"{config.BASE_URL}/library/cover/{book_id}/"
+
+    def _ensure_safe_asset_url(self, url: str) -> None:
+        try:
+            parsed = urlparse(str(url))
+        except ValueError as exc:
+            raise ValueError(f"Invalid asset URL: {url!r}") from exc
+
+        if parsed.scheme not in {"http", "https"}:
+            raise ValueError(f"Unsupported asset URL scheme: {parsed.scheme!r}")
+
+        host = (parsed.hostname or "").lower()
+        if not host:
+            raise ValueError("Asset URL does not contain a hostname")
+
+        if host == "localhost" or host.endswith(".local"):
+            raise ValueError(f"Blocked local asset host: {host}")
+
+        try:
+            ip = ipaddress.ip_address(host)
+        except ValueError:
+            ip = None
+        if ip and (
+            ip.is_private
+            or ip.is_loopback
+            or ip.is_link_local
+            or ip.is_multicast
+            or ip.is_reserved
+        ):
+            raise ValueError(f"Blocked private asset host: {host}")
+
+        return

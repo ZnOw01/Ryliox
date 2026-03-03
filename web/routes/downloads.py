@@ -7,14 +7,14 @@ import json
 import time
 from typing import Any
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Body, Depends, Query, status
 from fastapi.responses import StreamingResponse
 from pydantic import TypeAdapter
 
 from core.download_queue import DownloadQueueService
 from core.kernel import Kernel
 from plugins.downloader import DownloaderPlugin
-from web.api_utils import ErrorCode, sse_comment, sse_event
+from web.api_utils import ErrorCode, error_response, sse_comment, sse_event
 from web.dependencies import get_download_queue, get_kernel, require_same_origin
 from web.schemas import (
     CancelRequest,
@@ -121,7 +121,11 @@ def _progress_payload(snapshot: dict[str, Any] | None) -> dict[str, Any]:
     return _PROGRESS_ADAPTER.validate_python(normalized).model_dump(exclude_none=True)
 
 
-@router.get("/progress", response_model=ProgressResponse)
+@router.get(
+    "/progress",
+    response_model=ProgressResponse,
+    dependencies=[Depends(require_same_origin("get_progress"))],
+)
 def progress(
     job_id: str | None = Query(default=None),
     download_queue: DownloadQueueService = Depends(get_download_queue),
@@ -129,7 +133,10 @@ def progress(
     return _progress_payload(download_queue.get_progress(job_id=job_id))
 
 
-@router.get("/progress/stream")
+@router.get(
+    "/progress/stream",
+    dependencies=[Depends(require_same_origin("stream_progress"))],
+)
 async def progress_stream(
     job_id: str | None = Query(default=None),
     download_queue: DownloadQueueService = Depends(get_download_queue),
@@ -208,18 +215,20 @@ def download(
     download_queue: DownloadQueueService = Depends(get_download_queue),
 ) -> DownloadStartResponse:
     if not data.book_id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={"error": "book_id required", "code": ErrorCode.BOOK_ID_REQUIRED},
+        return error_response(
+            "book_id required",
+            status.HTTP_400_BAD_REQUEST,
+            code=ErrorCode.BOOK_ID_REQUIRED,
         )
 
     output_plugin = kernel["output"]
     if data.output_dir:
         success, message, output_dir = output_plugin.validate_dir(data.output_dir)
         if not success:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail={"error": message, "code": ErrorCode.INVALID_OUTPUT_DIR},
+            return error_response(
+                str(message),
+                status.HTTP_400_BAD_REQUEST,
+                code=ErrorCode.INVALID_OUTPUT_DIR,
             )
     else:
         output_dir = output_plugin.get_default_dir()
@@ -227,10 +236,11 @@ def download(
     try:
         formats = DownloaderPlugin.parse_formats(data.format)
     except ValueError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={"error": str(exc), "code": ErrorCode.INVALID_FORMAT},
-        ) from exc
+        return error_response(
+            str(exc),
+            status.HTTP_400_BAD_REQUEST,
+            code=ErrorCode.INVALID_FORMAT,
+        )
 
     selected_chapters = data.chapters
     if selected_chapters is not None:
@@ -240,16 +250,14 @@ def download(
             if not DownloaderPlugin.supports_chapter_selection(fmt)
         )
         if unsupported:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail={
-                    "error": (
-                        f"Chapter selection not supported for: {', '.join(unsupported)}. "
-                        "Remove 'chapters' or use chapter-compatible formats."
-                    ),
-                    "code": ErrorCode.CHAPTERS_NOT_SUPPORTED_FOR_FORMAT,
-                    "unsupported_formats": unsupported,
-                },
+            return error_response(
+                (
+                    f"Chapter selection not supported for: {', '.join(unsupported)}. "
+                    "Remove 'chapters' or use chapter-compatible formats."
+                ),
+                status.HTTP_400_BAD_REQUEST,
+                code=ErrorCode.CHAPTERS_NOT_SUPPORTED_FOR_FORMAT,
+                details={"unsupported_formats": unsupported},
             )
 
     queued_job: dict[str, Any] = download_queue.enqueue(

@@ -1,11 +1,14 @@
+﻿import ipaddress
+import logging
 import re
-from urllib.parse import quote
+from urllib.parse import quote, urljoin, urlparse
 
 import config
 from core.types import ChapterInfo
 
 from .base import Plugin
 
+logger = logging.getLogger(__name__)
 _COVER_WORD_RE = re.compile(r"\bcover\b", re.IGNORECASE)
 
 
@@ -28,17 +31,24 @@ class ChaptersPlugin(Plugin):
                 results = []
 
             for ch in results:
+                content_url = self._sanitize_remote_url(ch.get("content_url", ""))
+                if not content_url:
+                    logger.warning("Skipping chapter with blocked content_url: %r", ch.get("content_url"))
+                    continue
+
                 chapters.append(
                     ChapterInfo(
                         ourn=ch.get("ourn", ""),
                         title=ch.get("title", ""),
                         filename=self._extract_filename(ch.get("reference_id", "")),
-                        content_url=ch.get("content_url", ""),
+                        content_url=content_url,
                         images=self._extract_related_urls(
-                            ch.get("related_assets", {}).get("images", [])
+                            ch.get("related_assets", {}).get("images", []),
+                            base_url=content_url,
                         ),
                         stylesheets=self._extract_related_urls(
-                            ch.get("related_assets", {}).get("stylesheets", [])
+                            ch.get("related_assets", {}).get("stylesheets", []),
+                            base_url=content_url,
                         ),
                         virtual_pages=ch.get("virtual_pages"),
                         minutes_required=ch.get("minutes_required"),
@@ -79,7 +89,7 @@ class ChaptersPlugin(Plugin):
 
         return cover_chapters + other_chapters
 
-    def _extract_related_urls(self, payload) -> list[str]:
+    def _extract_related_urls(self, payload, *, base_url: str = "") -> list[str]:
         """Deeply extract media URLs from a dynamic JSON payload."""
         urls: list[str] = []
         seen: set[str] = set()
@@ -88,9 +98,10 @@ class ChaptersPlugin(Plugin):
 
         def push(value):
             candidate = str(value or "").strip()
-            if candidate and candidate not in seen:
-                seen.add(candidate)
-                urls.append(candidate)
+            normalized = self._sanitize_remote_url(candidate, base_url=base_url)
+            if normalized and normalized not in seen:
+                seen.add(normalized)
+                urls.append(normalized)
 
         def visit(node):
             if isinstance(node, str):
@@ -111,3 +122,43 @@ class ChaptersPlugin(Plugin):
 
         visit(payload)
         return urls
+
+    def _sanitize_remote_url(self, raw_url: str, *, base_url: str = "") -> str:
+        value = str(raw_url or "").strip()
+        if not value or value.startswith("data:"):
+            return ""
+
+        if value.startswith("//"):
+            value = f"https:{value}"
+        elif not value.startswith(("http://", "https://")):
+            value = urljoin(base_url or config.BASE_URL, value)
+
+        try:
+            parsed = urlparse(value)
+        except ValueError:
+            return ""
+
+        if parsed.scheme not in {"http", "https"}:
+            return ""
+
+        host = (parsed.hostname or "").lower()
+        if not host:
+            return ""
+
+        if host == "localhost" or host.endswith(".local"):
+            return ""
+
+        try:
+            ip = ipaddress.ip_address(host)
+            if (
+                ip.is_private
+                or ip.is_loopback
+                or ip.is_link_local
+                or ip.is_multicast
+                or ip.is_reserved
+            ):
+                return ""
+        except ValueError:
+            pass
+
+        return value

@@ -675,6 +675,9 @@ class DownloadQueueService:
         self._active_job_id: str | None = None
         self._active_cancel_event: threading.Event | None = None
         self._worker: threading.Thread | None = None
+        self._last_worker_error_signature: str | None = None
+        self._last_worker_error_logged_at: float = 0.0
+        self._worker_error_log_cooldown_seconds: float = 60.0
         self.store.requeue_inflight_jobs()
 
     def start(self):
@@ -779,8 +782,23 @@ class DownloadQueueService:
                 self._notify_progress_change()
                 self._run_job(job)
             except Exception as exc:
-                trace_text = traceback.format_exc()
-                trace_log = self._write_error_trace(trace_text, (job.job_id if job else "worker"))
+                now = time.time()
+                signature = f"{type(exc).__name__}:{exc}"
+                should_log = (
+                    signature != self._last_worker_error_signature
+                    or (
+                        now - self._last_worker_error_logged_at
+                        >= self._worker_error_log_cooldown_seconds
+                    )
+                )
+                trace_log: str | None = None
+                if should_log:
+                    trace_text = traceback.format_exc()
+                    trace_log = self._write_error_trace(
+                        trace_text, (job.job_id if job else "worker")
+                    )
+                    self._last_worker_error_signature = signature
+                    self._last_worker_error_logged_at = now
                 if job is not None:
                     try:
                         self.store.mark_failed(

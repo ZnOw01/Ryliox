@@ -1,6 +1,8 @@
 """Download orchestration plugin."""
 
+import ipaddress
 import asyncio
+import logging
 import shutil
 import time
 from collections import deque
@@ -8,11 +10,13 @@ from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
 from typing import Awaitable, Callable
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlparse
 
+import config
 from plugins.base import Plugin
 from plugins.pdf import generate_pdf_chapters_in_subprocess, generate_pdf_in_subprocess
 
+logger = logging.getLogger(__name__)
 
 @dataclass
 class DownloadProgress:
@@ -246,7 +250,13 @@ class DownloaderPlugin(Plugin):
             )
 
             chapter_href = str(ch["filename"])
-            content_url = str(ch.get("content_url", "") or "")
+            content_url = self._normalize_asset_url(
+                config.BASE_URL, str(ch.get("content_url", "") or "")
+            )
+            if not content_url:
+                raise ValueError(
+                    f"Blocked chapter content URL for chapter {ch.get('title')!r}"
+                )
             images_prefix = self._relative_asset_prefix(chapter_href, "Images")
             css_prefix = self._relative_asset_prefix(chapter_href, "Styles")
 
@@ -460,7 +470,10 @@ class DownloaderPlugin(Plugin):
 
     def _cleanup_on_cancel(self, book_dir: Path):
         if book_dir.exists():
-            shutil.rmtree(book_dir, ignore_errors=True)
+            try:
+                shutil.rmtree(book_dir)
+            except Exception as exc:
+                logger.warning("Failed to cleanup cancelled download dir %s: %s", book_dir, exc)
 
     def _write_chapter_xhtml(self, file_path: Path, xhtml: str) -> None:
         file_path.parent.mkdir(parents=True, exist_ok=True)
@@ -504,10 +517,12 @@ class DownloaderPlugin(Plugin):
         except asyncio.CancelledError:
             for t in tasks:
                 t.cancel()
+            await asyncio.gather(*tasks, return_exceptions=True)
             raise
         except Exception:
             for t in tasks:
                 t.cancel()
+            await asyncio.gather(*tasks, return_exceptions=True)
             raise
 
     async def _await_executor_future_with_cancel(
@@ -528,21 +543,22 @@ class DownloaderPlugin(Plugin):
                     if on_cancel:
                         try:
                             on_cancel()
-                        except Exception:
-                            pass
+                        except Exception as exc:
+                            logger.warning("Error cancelling background PDF process: %s", exc)
                     raise asyncio.CancelledError("Download cancelled by user")
 
     def _terminate_process_pool(self, process_pool: ProcessPoolExecutor) -> None:
         try:
             process_pool.shutdown(wait=False, cancel_futures=True)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("Failed to shutdown process pool cleanly: %s", exc)
 
         for process in getattr(process_pool, "_processes", {}).values():
             try:
                 if process.is_alive():
                     process.terminate()
-            except Exception:
+            except Exception as exc:
+                logger.warning("Failed to terminate worker process: %s", exc)
                 continue
 
     def _normalize_asset_url(self, base_url: str, asset_url: str) -> str:
@@ -550,14 +566,50 @@ class DownloaderPlugin(Plugin):
         if not value or value.startswith("data:"):
             return ""
         if value.startswith("//"):
-            return f"https:{value}"
-        if value.startswith(("http://", "https://")):
-            return value
+            normalized = f"https:{value}"
+        elif value.startswith(("http://", "https://")):
+            normalized = value
+        elif base_url:
+            normalized = urljoin(base_url, value)
+        else:
+            normalized = value
 
-        if base_url:
-            return urljoin(base_url, value)
+        if not self._is_allowed_remote_url(normalized):
+            logger.warning("Blocked asset URL outside allowed hosts: %s", normalized)
+            return ""
 
-        return value
+        return normalized
+
+    def _is_allowed_remote_url(self, url: str) -> bool:
+        try:
+            parsed = urlparse(url)
+        except ValueError:
+            return False
+
+        if parsed.scheme not in {"http", "https"}:
+            return False
+
+        host = (parsed.hostname or "").lower()
+        if not host:
+            return False
+
+        if host == "localhost" or host.endswith(".local"):
+            return False
+
+        try:
+            ip = ipaddress.ip_address(host)
+            if (
+                ip.is_private
+                or ip.is_loopback
+                or ip.is_link_local
+                or ip.is_multicast
+                or ip.is_reserved
+            ):
+                return False
+        except ValueError:
+            pass
+
+        return True
 
     def _resolve_cover_image_name(self, oebps: Path) -> str | None:
         images_dir = oebps / "Images"

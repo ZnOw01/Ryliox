@@ -1,4 +1,4 @@
-"""EPUB generator plugin."""
+﻿"""EPUB generator plugin."""
 
 from __future__ import annotations
 
@@ -428,28 +428,30 @@ class EpubPlugin(Plugin):
         return _IMAGE_MEDIA_TYPES.get(suffix.lower(), "application/octet-stream")
 
     def _create_epub_zip(self, output_dir: Path, epub_path: Path) -> None:
-        """Comprime el EPUB. El estándar exige que 'mimetype' sea el primer archivo, sin compresión."""
+        """Compress the EPUB package from known build roots only."""
         with zipfile.ZipFile(epub_path, "w", zipfile.ZIP_DEFLATED) as zf:
             mimetype_path = output_dir / "mimetype"
             zf.write(mimetype_path, "mimetype", compress_type=zipfile.ZIP_STORED)
 
-            for file_path in sorted(output_dir.rglob("*")):
-                if not file_path.is_file() or file_path.name == "mimetype":
+            included_roots = [output_dir / "META-INF", output_dir / "OEBPS"]
+            for root in included_roots:
+                if not root.exists():
                     continue
+                for file_path in sorted(root.rglob("*")):
+                    if not file_path.is_file():
+                        continue
 
-                arcname = file_path.relative_to(output_dir).as_posix()
-                if arcname.endswith(".epub"):
-                    continue
+                    arcname = file_path.relative_to(output_dir).as_posix()
+                    if arcname.endswith(".epub"):
+                        continue
 
-                info = zipfile.ZipInfo(arcname)
-                info.compress_type = zipfile.ZIP_DEFLATED
-                info.external_attr = (file_path.stat().st_mode & 0o777) << 16
-                info.flag_bits |= (
-                    0x800  # Forzar codificación UTF-8 para los nombres de archivo
-                )
+                    info = zipfile.ZipInfo(arcname)
+                    info.compress_type = zipfile.ZIP_DEFLATED
+                    info.external_attr = (file_path.stat().st_mode & 0o777) << 16
+                    info.flag_bits |= 0x800
 
-                with file_path.open("rb") as fh, zf.open(info, "w") as zfh:
-                    shutil.copyfileobj(fh, zfh, length=1024 * 64)
+                    with file_path.open("rb") as fh, zf.open(info, "w") as zfh:
+                        shutil.copyfileobj(fh, zfh, length=1024 * 64)
 
     def _collect_existing_chapters(self, oebps: Path, chapters: list[dict]) -> list[dict]:
         chapter_entries = []
@@ -715,3 +717,4 @@ class EpubPlugin(Plugin):
             return True
 
         return bool(_PLACEHOLDER_TITLE_RE.match(normalized))
+

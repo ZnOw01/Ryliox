@@ -58,6 +58,8 @@ async def save_cookies(
             },
         )
 
+    previous_cookies = session_store.get_cookies()
+
     try:
         session_store.save_cookies(payload)
     except Exception as exc:
@@ -79,6 +81,13 @@ async def save_cookies(
         not status_result.get("valid")
         and status_result.get("reason") != "network_error"
     ):
+        try:
+            session_store.save_cookies(previous_cookies)
+            kernel.http.reload_cookies()
+        except Exception:
+            logger.exception(
+                "No se pudieron restaurar cookies previas tras validacion fallida."
+            )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail={

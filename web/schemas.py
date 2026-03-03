@@ -215,11 +215,17 @@ class DownloadRequest(_RequestModel):
             return ["epub"]
         if isinstance(value, str):
             stripped = value.strip()
-            return [stripped] if stripped else ["epub"]
+            if not stripped:
+                raise ValueError("format must not be empty")
+            return [stripped]
         if isinstance(value, (list, tuple, set)):
             clean = [str(item).strip() for item in value if str(item).strip()]
-            return clean if clean else ["epub"]
-        return ["epub"]
+            if not clean:
+                raise ValueError("format list must contain at least one value")
+            return clean
+        raise ValueError(
+            "format must be a string or an array of strings (for example: 'epub' or ['epub','pdf'])"
+        )
 
     @model_validator(mode="after")
     def _validate_chapters(self) -> DownloadRequest:

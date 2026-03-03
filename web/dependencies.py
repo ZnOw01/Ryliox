@@ -1,4 +1,4 @@
-"""FastAPI dependency providers."""
+﻿"""FastAPI dependency providers."""
 
 from __future__ import annotations
 
@@ -43,56 +43,57 @@ def _build_download_queue() -> DownloadQueueService:
 
 
 def initialize_app_services(app: FastAPI) -> None:
-    """Inicializa todos los servicios con scope de app durante el startup.
-
-    Se llama una sola vez desde el lifespan. Las dependencias ``get_*``
-    asumen que este método ya se ejecutó y simplemente leen del estado.
-    """
+    """Initialize all application-scoped services during startup."""
     app.state.session_store = SessionStore()
     app.state.kernel = create_default_kernel()
     app.state.download_queue = _build_download_queue()
-    logger.info("Servicios de app inicializados correctamente.")
+    logger.info("Application services initialized.")
 
 
 async def shutdown_app_services(app: FastAPI) -> None:
-    """Para los servicios de app de forma ordenada durante el shutdown."""
+    """Stop services in a safe order during shutdown."""
     download_queue: DownloadQueueService | None = getattr(
         app.state, "download_queue", None
     )
     if download_queue is not None:
         try:
             download_queue.stop()
-            logger.info("DownloadQueueService detenido.")
+            logger.info("DownloadQueueService stopped.")
         except Exception:
-            logger.exception("Error al detener DownloadQueueService.")
+            logger.exception("Error while stopping DownloadQueueService.")
 
     kernel: Kernel | None = getattr(app.state, "kernel", None)
     if kernel is not None and getattr(kernel, "http", None) is not None:
         try:
             await kernel.http.close()
-            logger.info("Sesión HTTP del kernel cerrada.")
+            logger.info("Kernel HTTP session closed.")
         except Exception:
-            logger.exception("Error al cerrar la sesión HTTP del kernel.")
+            logger.exception("Error while closing kernel HTTP session.")
 
 
 def get_kernel(request: Request) -> Kernel:
-    """Retorna el kernel con scope de app."""
+    """Return the app-scoped kernel."""
     return request.app.state.kernel  # type: ignore[no-any-return]
 
 
 def get_session_store(request: Request) -> SessionStore:
-    """Retorna el SessionStore con scope de app."""
+    """Return the app-scoped SessionStore."""
     return request.app.state.session_store  # type: ignore[no-any-return]
 
 
 def get_download_queue(request: Request) -> DownloadQueueService:
-    """Retorna el DownloadQueueService con scope de app."""
+    """Return the app-scoped DownloadQueueService."""
     return request.app.state.download_queue  # type: ignore[no-any-return]
 
 
 def _normalize_host(host: str) -> str:
-    """Normaliza un host a minúsculas."""
     return host.lower()
+
+
+def _first_forwarded_value(value: str | None) -> str:
+    if not value:
+        return ""
+    return value.split(",", 1)[0].strip()
 
 
 def _default_port_for_scheme(scheme: str) -> int | None:
@@ -104,7 +105,7 @@ def _default_port_for_scheme(scheme: str) -> int | None:
 
 
 def _is_same_origin(request: Request) -> bool:
-    """Retorna True si el request es same-origin o no tiene header Origin."""
+    """Return True when the request appears same-origin."""
     origin = request.headers.get("origin", "").strip()
     if not origin:
         return True
@@ -112,7 +113,7 @@ def _is_same_origin(request: Request) -> bool:
     try:
         parsed_origin = urlparse(origin)
     except ValueError:
-        logger.warning("Header Origin malformado bloqueado: %r", origin)
+        logger.warning("Blocked malformed Origin header: %r", origin)
         return False
 
     origin_scheme = parsed_origin.scheme.lower()
@@ -123,20 +124,33 @@ def _is_same_origin(request: Request) -> bool:
     try:
         origin_port = parsed_origin.port or _default_port_for_scheme(origin_scheme)
     except ValueError:
-        logger.warning("Header Origin con puerto inválido bloqueado: %r", origin)
+        logger.warning("Blocked Origin header with invalid port: %r", origin)
         return False
 
-    request_host_header = request.headers.get("host", "").strip()
-    request_scheme = request.url.scheme.lower()
+    request_host_header = _first_forwarded_value(
+        request.headers.get("x-forwarded-host")
+    ) or request.headers.get("host", "").strip()
+    request_scheme = _first_forwarded_value(
+        request.headers.get("x-forwarded-proto")
+    ) or request.url.scheme.lower()
+    request_scheme = request_scheme.lower()
+
     if not request_host_header or not request_scheme:
         return False
 
     try:
         parsed_request = urlparse(f"{request_scheme}://{request_host_header}")
-        request_port = parsed_request.port or _default_port_for_scheme(request_scheme)
+        request_port = parsed_request.port
     except ValueError:
-        logger.warning("Header Host malformado bloqueado: %r", request_host_header)
+        logger.warning("Blocked malformed Host header: %r", request_host_header)
         return False
+
+    if request_port is None:
+        forwarded_port = _first_forwarded_value(request.headers.get("x-forwarded-port"))
+        if forwarded_port.isdigit():
+            request_port = int(forwarded_port)
+        else:
+            request_port = _default_port_for_scheme(request_scheme)
 
     request_host = _normalize_host(parsed_request.hostname or "")
     if not request_host or origin_port is None or request_port is None:
@@ -150,14 +164,7 @@ def _is_same_origin(request: Request) -> bool:
 
 
 def require_same_origin(operation: str) -> Callable[[Request], None]:
-    """Retorna una dependencia FastAPI que bloquea requests cross-origin.
-
-    Uso::
-
-        @router.post("/sensitive")
-        def endpoint(_: None = Depends(require_same_origin("sensitive_op"))):
-            ...
-    """
+    """Return a FastAPI dependency that blocks cross-origin requests."""
 
     def _guard(request: Request) -> None:
         if not _is_same_origin(request):

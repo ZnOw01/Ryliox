@@ -8,6 +8,8 @@ import shutil
 import signal
 import subprocess
 import time
+import csv
+from io import StringIO
 from pathlib import Path
 
 
@@ -18,12 +20,24 @@ def is_process_alive(pid: int) -> bool:
 
     if os.name == "nt":
         result = subprocess.run(
-            ["tasklist", "/FI", f"PID eq {pid}"],
+            ["tasklist", "/FI", f"PID eq {pid}", "/FO", "CSV", "/NH"],
             capture_output=True,
             text=True,
             check=False,
         )
-        return str(pid) in result.stdout
+        if result.returncode != 0 or not result.stdout.strip():
+            return False
+
+        reader = csv.reader(StringIO(result.stdout))
+        for row in reader:
+            if len(row) < 2:
+                continue
+            try:
+                if int(str(row[1]).strip()) == pid:
+                    return True
+            except ValueError:
+                continue
+        return False
 
     try:
         os.kill(pid, 0)
@@ -308,14 +322,20 @@ def stop_background_server(port: int, pid_file: Path) -> None:
     found = False
 
     pid = read_background_pid(pid_file)
-    if pid and is_process_alive(pid):
-        found = True
-        try:
-            stop_pid(pid)
-            print(f" - Stopped PID from launcher file: {pid}.")
-            stopped = True
-        except RuntimeError as exc:
-            print(f" - Could not stop PID {pid}: {exc}")
+    listener_pids = find_listener_pids(port)
+    if pid:
+        if pid in listener_pids and is_process_alive(pid):
+            found = True
+            try:
+                stop_pid(pid)
+                print(f" - Stopped PID from launcher file: {pid}.")
+                stopped = True
+            except RuntimeError as exc:
+                print(f" - Could not stop PID {pid}: {exc}")
+        else:
+            print(
+                f" - Ignoring tracked PID {pid}: not listening on port {port} (stale pid file)."
+            )
     clear_background_pid(pid_file)
 
     extra_pids = find_listener_pids(port)
