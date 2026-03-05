@@ -66,7 +66,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const data = await parseResponseBody(response);
   const payload = isRecord(data) ? data : {};
 
-  if (!response.ok || typeof payload.error === "string") {
+  if (!response.ok) {
     throw new ApiError(parseApiErrorPayload(data, response.status), response.status);
   }
 
@@ -142,6 +142,10 @@ export function subscribeProgress(
       const payload = JSON.parse(message.data) as ProgressResponse;
       onProgress(payload);
     } catch {
+      console.warn("Invalid progress payload received from SSE stream.");
+      if (onError) {
+        onError(new Event("error"));
+      }
     }
   });
 

@@ -13,17 +13,7 @@ import { queryKeys } from "../lib/query-keys";
 import type { ProgressResponse } from "../lib/types";
 import { useBookStore } from "../store/book-store";
 
-const ACTIVE_STATES = new Set([
-  "starting",
-  "fetching_metadata",
-  "fetching_chapters",
-  "downloading_cover",
-  "processing_chapters",
-  "downloading_assets",
-  "generating_epub",
-  "generating_pdf",
-  "generating_pdf_chapters",
-]);
+const ACTIVE_STATES = new Set(["queued", "running"]);
 
 const RECONNECT_DELAY_MS = 2500;
 
@@ -60,6 +50,17 @@ export function useDownloadManager() {
     queryFn: () => getProgress(activeJobId),
     refetchInterval: 8000,
   });
+
+  useEffect(() => {
+    const progressJobId = progressQuery.data?.job_id ?? null;
+    if (!progressJobId) {
+      return;
+    }
+    if (activeJobId === progressJobId) {
+      return;
+    }
+    setActiveJobId(progressJobId);
+  }, [activeJobId, progressQuery.data?.job_id]);
 
   const chaptersQuery = useQuery({
     queryKey: queryKeys.bookChapters(selectedBook?.id ?? null),
@@ -224,10 +225,18 @@ export function useDownloadManager() {
     setSelectedChapters([]);
   }, []);
 
-  const progressPercent = Math.max(0, Math.min(100, Number(progressQuery.data?.percentage ?? 0)));
+  const progressStatus = progressQuery.data?.status ?? "idle";
+  const clampedProgressPercent = Math.max(0, Math.min(100, Number(progressQuery.data?.percentage ?? 0)));
+  const progressPercent = progressStatus === "completed"
+    ? 100
+    : progressStatus === "queued"
+      ? 0
+      : progressStatus === "running"
+        ? clampedProgressPercent
+        : 0;
   const active = isDownloadActive(progressQuery.data);
   const totalChapters = chaptersQuery.data?.total ?? 0;
-  const currentLabel = progressQuery.data?.status ?? "idle";
+  const currentLabel = progressStatus;
   const shouldShowStartHint = currentLabel === "idle" || active;
 
   const formatsDisabled = formatsQuery.isLoading || formats.length === 0;

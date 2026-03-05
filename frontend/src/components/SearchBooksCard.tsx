@@ -171,25 +171,33 @@ export function SearchBooksCard() {
         ) : null}
       </div>
 
-      <div className="mb-4">
-        <span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-500">Filtrar por</span>
-        <div className="flex flex-wrap gap-1.5">
-          {SEARCH_SCOPES.map((item) => (
-            <button
-              key={item.value}
-              type="button"
-              onClick={() => setScope(item.value)}
-              aria-pressed={scope === item.value}
-              className={`rounded-full border px-3 py-1 text-xs font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50 ${scope === item.value
-                ? "border-brand/40 bg-brand text-white shadow-sm"
-                : "border-slate-300 bg-white text-slate-600 hover:border-brand/30 hover:bg-brand/5 hover:text-brand-deep"
-                }`}
-            >
-              {item.label}
-            </button>
-          ))}
+      <fieldset className="mb-4">
+        <legend className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-500">Filtrar por</legend>
+        <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="Filtrar por">
+          {SEARCH_SCOPES.map((item) => {
+            const checked = scope === item.value;
+            return (
+              <label
+                key={item.value}
+                className={`cursor-pointer rounded-full border px-3 py-1 text-xs font-medium transition focus-within:outline-none focus-within:ring-2 focus-within:ring-brand/50 ${checked
+                  ? "border-brand/40 bg-brand text-white shadow-sm"
+                  : "border-slate-300 bg-white text-slate-600 hover:border-brand/30 hover:bg-brand/5 hover:text-brand-deep"
+                  }`}
+              >
+                <input
+                  type="radio"
+                  name="search-scope"
+                  value={item.value}
+                  checked={checked}
+                  onChange={() => setScope(item.value)}
+                  className="sr-only"
+                />
+                {item.label}
+              </label>
+            );
+          })}
         </div>
-      </div>
+      </fieldset>
 
       {isSearching ? (
         <div className="mb-3 flex items-center gap-2 rounded-lg border border-brand/30 bg-brand/5 px-3 py-2 text-sm text-brand" role="status" aria-live="polite">
@@ -198,7 +206,7 @@ export function SearchBooksCard() {
         </div>
       ) : null}
       {parsedError ? (
-        <p className="text-sm text-red-600">
+        <p className="text-sm text-red-600" role="alert" aria-live="assertive" aria-atomic="true">
           {parsedError.message}
           {parsedError.code ? ` (${parsedError.code})` : ""}
         </p>
@@ -213,7 +221,6 @@ export function SearchBooksCard() {
               <button
                 type="button"
                 onClick={() => setSelectedBook(book)}
-                aria-label={`${isSelected ? "Libro seleccionado" : "Seleccionar libro"}: ${book.title}`}
                 aria-pressed={isSelected}
                 className={`group w-full rounded-xl border p-3 text-left transition focus:outline-none focus:ring-2 focus:ring-brand/40 ${
                   isSelected

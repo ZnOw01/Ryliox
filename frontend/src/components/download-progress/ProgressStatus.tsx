@@ -51,7 +51,7 @@ export function ProgressStatus({ currentLabel, progress, progressPercent }: Prog
     typeof progress?.current_chapter === "number" && typeof progress?.total_chapters === "number" && progress.total_chapters > 0
       ? `${progress.current_chapter}/${progress.total_chapters}`
       : null;
-  const isActive = Boolean(progress?.status && !["idle", "completed", "cancelled", "failed"].includes(progress.status));
+  const isActive = progress?.status === "running";
 
   return (
     <>

@@ -274,7 +274,6 @@ export function AuthStatusCard() {
               setShowCookieEditor(true);
             }}
             aria-expanded={shouldShowCookieEditor}
-            aria-controls="cookie-editor"
               className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-medium text-slate-700 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
           >
               Ver / editar cookies
@@ -282,7 +281,7 @@ export function AuthStatusCard() {
         </div>
       )}
 
-      {cookiesMutation.error ? <p className="mt-2 text-sm text-red-600">{(cookiesMutation.error as Error).message}</p> : null}
+      {cookiesMutation.error ? <p className="mt-2 text-sm text-red-600" role="alert" aria-live="assertive">{(cookiesMutation.error as Error).message}</p> : null}
     </section>
   );
 }

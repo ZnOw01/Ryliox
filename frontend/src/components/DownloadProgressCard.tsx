@@ -23,16 +23,16 @@ export function DownloadProgressCard() {
       </div>
 
       <div className="mb-4 grid gap-3 sm:grid-cols-2">
-        <label className="min-w-0 text-sm">
+        <div className="min-w-0 text-sm">
           <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-500">Libro</span>
-          <input
-            readOnly
-            aria-label="Libro seleccionado"
-            value={manager.selectedBook ? manager.selectedBook.title : ""}
-            placeholder="Selecciona un libro para comenzar"
-            className="w-full min-w-0 truncate rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-700 placeholder:text-slate-400"
-          />
-        </label>
+          <p
+            role="status"
+            aria-live="polite"
+            className="w-full min-w-0 truncate rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-700"
+          >
+            {manager.selectedBook ? manager.selectedBook.title : "Selecciona un libro para comenzar"}
+          </p>
+        </div>
 
         <FormatSelector
           format={manager.format}

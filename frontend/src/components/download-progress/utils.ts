@@ -47,18 +47,10 @@ export function formatEta(seconds: number | null | undefined): string | null {
 export function formatStatusLabel(status: string): string {
   const labels: Record<string, string> = {
     idle: "en espera",
-    starting: "iniciando descarga",
-    fetching_metadata: "cargando metadata",
-    fetching_chapters: "cargando capitulos",
-    downloading_cover: "descargando portada",
-    processing_chapters: "procesando capitulos",
-    downloading_assets: "descargando recursos",
-    generating_epub: "generando EPUB",
-    generating_pdf: "generando PDF",
-    generating_pdf_chapters: "generando PDFs por capitulo",
+    queued: "en cola",
+    running: "en progreso",
     completed: "completado",
-    cancelled: "cancelado",
-    failed: "fallido",
+    error: "error",
   };
   return labels[status] ?? status.replace(/_/g, " ");
 }
