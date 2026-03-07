@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 
 import { parseApiError } from "../lib/api-error";
@@ -57,6 +57,8 @@ export function SearchBooksCard() {
   const setSelectedBook = useBookStore((state) => state.setSelectedBook);
   const [queryInput, setQueryInput] = useState(() => readSearchStateFromUrl().query);
   const [scope, setScope] = useState<SearchScope>(() => readSearchStateFromUrl().scope);
+  const [activeResultIndex, setActiveResultIndex] = useState(0);
+  const resultsListRef = useRef<HTMLUListElement | null>(null);
   const normalizedQuery = queryInput.trim();
   const debouncedQuery = useDebouncedValue(normalizedQuery, 350);
 
@@ -64,6 +66,7 @@ export function SearchBooksCard() {
     queryKey: queryKeys.search(debouncedQuery),
     queryFn: () => searchBooks(debouncedQuery),
     enabled: debouncedQuery.length > 0,
+    placeholderData: (previousData) => previousData,
     staleTime: 30000,
   });
 
@@ -116,18 +119,38 @@ export function SearchBooksCard() {
     if (!normalizedQuery) {
       return [];
     }
-    if (normalizedQuery !== debouncedQuery) {
-      return [];
-    }
 
     const results = searchQuery.data?.results || [];
-    return results.filter((book) => searchMatch(book, debouncedQuery, scope));
-  }, [debouncedQuery, normalizedQuery, scope, searchQuery.data?.results]);
+    return results.filter((book) => searchMatch(book, normalizedQuery, scope));
+  }, [normalizedQuery, scope, searchQuery.data?.results]);
 
   const parsedError = debouncedQuery && searchQuery.error ? parseApiError(searchQuery.error) : null;
   const isSearching = Boolean(normalizedQuery) && (searchQuery.isPending || searchQuery.isFetching);
-  const visibleResults = isSearching ? [] : filteredResults;
+  const visibleResults = filteredResults;
   const resultCount = filteredResults.length;
+  const hasStaleResults = Boolean(normalizedQuery) && normalizedQuery !== debouncedQuery && visibleResults.length > 0;
+
+  useEffect(() => {
+    if (visibleResults.length === 0) {
+      setActiveResultIndex(0);
+      return;
+    }
+    setActiveResultIndex((current) => Math.min(current, visibleResults.length - 1));
+  }, [visibleResults.length]);
+
+  useEffect(() => {
+    if (!resultsListRef.current || visibleResults.length === 0) {
+      return;
+    }
+
+    const activeItem = resultsListRef.current.querySelector<HTMLElement>(
+      `[data-result-index="${activeResultIndex}"]`,
+    );
+    activeItem?.scrollIntoView({ block: "nearest" });
+  }, [activeResultIndex, visibleResults.length]);
+
+  const activeDescendant =
+    visibleResults.length > 0 ? `search-result-${visibleResults[activeResultIndex]?.id ?? activeResultIndex}` : undefined;
 
   return (
     <section className="soft-rise min-w-0 overflow-hidden rounded-2xl border border-slate-200/90 bg-white/95 p-5 shadow-panel backdrop-blur">
@@ -153,7 +176,42 @@ export function SearchBooksCard() {
             id="search-query"
             value={queryInput}
             onChange={(event) => setQueryInput(event.target.value)}
+            onKeyDown={(event) => {
+              if (visibleResults.length === 0) {
+                return;
+              }
+
+              if (event.key === "ArrowDown") {
+                event.preventDefault();
+                setActiveResultIndex((current) => Math.min(current + 1, visibleResults.length - 1));
+                return;
+              }
+
+              if (event.key === "ArrowUp") {
+                event.preventDefault();
+                setActiveResultIndex((current) => Math.max(current - 1, 0));
+                return;
+              }
+
+              if (event.key === "Enter") {
+                const activeBook = visibleResults[activeResultIndex];
+                if (!activeBook) {
+                  return;
+                }
+                event.preventDefault();
+                setSelectedBook(activeBook);
+                return;
+              }
+
+              if (event.key === "Escape") {
+                setActiveResultIndex(0);
+              }
+            }}
             placeholder="python, ISBN, titulo..."
+            aria-activedescendant={activeDescendant}
+            aria-autocomplete="list"
+            aria-controls="search-results"
+            aria-expanded={visibleResults.length > 0}
             className="min-w-0 w-full rounded-lg border border-slate-300 py-2 pl-9 pr-3 text-sm outline-none transition focus:border-brand/70 focus:ring-2 focus:ring-brand/25"
           />
         </div>
@@ -202,7 +260,7 @@ export function SearchBooksCard() {
       {isSearching ? (
         <div className="mb-3 flex items-center gap-2 rounded-lg border border-brand/30 bg-brand/5 px-3 py-2 text-sm text-brand" role="status" aria-live="polite">
           <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-brand/30 border-t-brand" />
-          Buscando libros...
+          {hasStaleResults ? "Actualizando resultados..." : "Buscando libros..."}
         </div>
       ) : null}
       {parsedError ? (
@@ -211,21 +269,40 @@ export function SearchBooksCard() {
           {parsedError.code ? ` (${parsedError.code})` : ""}
         </p>
       ) : null}
+      {visibleResults.length > 0 ? (
+        <p className="mb-3 text-xs text-slate-400" role="status" aria-live="polite">
+          Usa flechas para navegar y Enter para seleccionar.
+        </p>
+      ) : null}
 
 
-      <ul className={`m-0 list-none space-y-2 p-0 ${isSearching ? "pointer-events-none opacity-70" : ""}`} aria-busy={isSearching}>
+      <ul
+        id="search-results"
+        ref={resultsListRef}
+        className={`m-0 list-none space-y-2 p-0 ${isSearching ? "opacity-90" : ""}`}
+        aria-busy={isSearching}
+        role="listbox"
+      >
         {visibleResults.map((book) => {
           const isSelected = selectedBookId === book.id;
+          const isActive = visibleResults[activeResultIndex]?.id === book.id;
           return (
             <li key={book.id}>
               <button
                 type="button"
                 onClick={() => setSelectedBook(book)}
+                onMouseEnter={() => setActiveResultIndex(visibleResults.findIndex((item) => item.id === book.id))}
                 aria-pressed={isSelected}
+                id={`search-result-${book.id}`}
+                data-result-index={visibleResults.findIndex((item) => item.id === book.id)}
+                role="option"
+                aria-selected={isSelected || isActive}
                 className={`group w-full rounded-xl border p-3 text-left transition focus:outline-none focus:ring-2 focus:ring-brand/40 ${
                   isSelected
                   ? "border-brand/30 bg-brand/10 shadow-panel-md"
-                  : "border-slate-200 hover:border-brand/30 hover:bg-brand/5"
+                  : isActive
+                    ? "border-brand/20 bg-brand/5"
+                    : "border-slate-200 hover:border-brand/30 hover:bg-brand/5"
                 }`}
               >
                 <div className="flex min-w-0 items-start justify-between gap-3">
