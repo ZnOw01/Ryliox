@@ -12,6 +12,7 @@ pytestmark = pytest.mark.integration
         "/api/status",
         "/api/formats",
         "/api/progress",
+        "/docs",
     ],
 )
 def test_api_smoke_endpoints(app_client, path):

@@ -8,6 +8,10 @@
     "build:watch": "astro build --watch",
     "check": "astro check"
   },
+  "overrides": {
+    "volar-service-yaml": "0.0.70",
+    "yaml-language-server": "1.21.0"
+  },
   "dependencies": {
     "@astrojs/react": "^4.4.2",
     "@astrojs/tailwind": "^6.0.2",

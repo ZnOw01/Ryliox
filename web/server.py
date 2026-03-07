@@ -88,8 +88,8 @@ def create_app() -> FastAPI:
     from web.routes.system import router as system_router
 
     app = FastAPI(
-        docs_url=None,
-        redoc_url=None,
+        docs_url="/docs",
+        redoc_url="/redoc",
         openapi_url="/api/openapi.json",
         lifespan=_lifespan,
     )
