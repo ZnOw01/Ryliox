@@ -9,6 +9,7 @@ import type {
   FormatsResponse,
   HealthResponse,
   ProgressResponse,
+  RevealResponse,
   SaveCookiesResponse,
   SearchResponse,
 } from "./types";
@@ -121,6 +122,13 @@ export function cancelDownload(jobId?: string | null): Promise<CancelResponse> {
   return request<CancelResponse>("/api/cancel", {
     method: "POST",
     body: JSON.stringify(jobId ? { job_id: jobId } : {}),
+  });
+}
+
+export function revealFile(path: string): Promise<RevealResponse> {
+  return request<RevealResponse>("/api/reveal", {
+    method: "POST",
+    body: JSON.stringify({ path }),
   });
 }
 

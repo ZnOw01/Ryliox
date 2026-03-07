@@ -94,3 +94,8 @@ export type CancelResponse = {
 export type SaveCookiesResponse = {
   success: boolean;
 };
+
+export type RevealResponse = {
+  success: boolean;
+  message?: string | null;
+};

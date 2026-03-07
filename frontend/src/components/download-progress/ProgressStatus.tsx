@@ -1,3 +1,6 @@
+import { useState } from "react";
+
+import { revealFile } from "../../lib/api";
 import type { ProgressResponse } from "../../lib/types";
 import { formatEta, formatStatusLabel } from "./utils";
 
@@ -38,6 +41,9 @@ function outputFileNames(value: string | string[] | null | undefined): string | 
 }
 
 export function ProgressStatus({ currentLabel, progress, progressPercent }: ProgressStatusProps) {
+  const [actionMessage, setActionMessage] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [revealingPath, setRevealingPath] = useState<string | null>(null);
   const etaLabel = formatEta(progress?.eta_seconds);
   const statusLabel = formatStatusLabel(currentLabel);
   const messageLabel = localizeProgressMessage(progress?.message);
@@ -52,6 +58,36 @@ export function ProgressStatus({ currentLabel, progress, progressPercent }: Prog
       ? `${progress.current_chapter}/${progress.total_chapters}`
       : null;
   const isActive = progress?.status === "running";
+  const revealTargets = [
+    ...(progress?.epub ? [progress.epub] : []),
+    ...(progress?.pdf ? (Array.isArray(progress.pdf) ? progress.pdf : [progress.pdf]) : []),
+    ...(progress?.trace_log ? [progress.trace_log] : []),
+  ].filter((value, index, array): value is string => Boolean(value) && array.indexOf(value) === index);
+
+  async function handleReveal(path: string) {
+    setActionMessage(null);
+    setActionError(null);
+    setRevealingPath(path);
+    try {
+      await revealFile(path);
+      setActionMessage("Ruta abierta en el sistema.");
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "No se pudo abrir la ruta.");
+    } finally {
+      setRevealingPath(null);
+    }
+  }
+
+  async function handleCopy(value: string) {
+    setActionMessage(null);
+    setActionError(null);
+    try {
+      await navigator.clipboard.writeText(value);
+      setActionMessage("Ruta copiada al portapapeles.");
+    } catch {
+      setActionError("No se pudo copiar la ruta.");
+    }
+  }
 
   return (
     <>
@@ -103,6 +139,37 @@ export function ProgressStatus({ currentLabel, progress, progressPercent }: Prog
         {!chapterProgress && shouldShowSummaryMessage ? <p className="text-xs text-slate-500">{messageLabel}</p> : null}
         {epubName ? <p className="break-all">EPUB generado: <span className="font-medium text-slate-700">{epubName}</span></p> : null}
         {pdfName ? <p className="break-all">PDF generado: <span className="font-medium text-slate-700">{pdfName}</span></p> : null}
+        {revealTargets.length > 0 ? (
+          <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-3">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Archivos generados</p>
+            <div className="space-y-2">
+              {revealTargets.map((path) => (
+                <div key={path} className="rounded-lg border border-slate-200 bg-white px-3 py-2">
+                  <p className="break-all text-xs text-slate-500">{path}</p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => void handleReveal(path)}
+                      disabled={revealingPath === path}
+                      className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {revealingPath === path ? "Abriendo..." : "Abrir ubicacion"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void handleCopy(path)}
+                      className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
+                    >
+                      Copiar ruta
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
+        {actionMessage ? <p className="text-xs text-emerald-700">{actionMessage}</p> : null}
+        {actionError ? <p className="text-xs text-red-600">{actionError}</p> : null}
 
         {hasTechnicalDetails ? (
           <details className="mt-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
