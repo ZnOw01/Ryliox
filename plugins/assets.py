@@ -5,6 +5,7 @@ import ipaddress
 import logging
 from collections.abc import Awaitable, Callable
 from pathlib import Path
+from urllib.parse import urlparse
 
 import config
 
