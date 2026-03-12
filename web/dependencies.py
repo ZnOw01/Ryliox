@@ -108,7 +108,7 @@ def _is_same_origin(request: Request) -> bool:
     """Return True when the request appears same-origin."""
     origin = request.headers.get("origin", "").strip()
     if not origin:
-        return True
+        return False
 
     try:
         parsed_origin = urlparse(origin)
