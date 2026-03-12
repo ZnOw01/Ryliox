@@ -20,13 +20,15 @@ def test_launcher_paths_follow_config_data_dir():
 
 
 def _build_request(
-    headers: dict[str, str], url: str = "http://localhost/api/cookies"
+    headers: dict[str, str],
+    url: str = "http://localhost/api/cookies",
+    method: str = "GET",
 ) -> Request:
     scheme, rest = url.split("://", 1)
     path = "/" + rest.split("/", 1)[1]
     scope = {
         "type": "http",
-        "method": "GET",
+        "method": method,
         "path": path,
         "headers": [
             (k.lower().encode("latin-1"), v.encode("latin-1"))
@@ -38,9 +40,16 @@ def _build_request(
     return Request(scope)
 
 
-def test_require_same_origin_blocks_requests_without_origin_header():
+def test_require_same_origin_allows_safe_requests_without_origin_header():
     guard = require_same_origin("get_cookies")
     request = _build_request({"host": "localhost"})
+
+    guard(request)
+
+
+def test_require_same_origin_blocks_unsafe_requests_without_origin_header():
+    guard = require_same_origin("save_cookies")
+    request = _build_request({"host": "localhost"}, method="POST")
 
     with pytest.raises(ForbiddenOriginError):
         guard(request)

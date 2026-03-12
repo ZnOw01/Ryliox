@@ -40,3 +40,9 @@ def test_progress_endpoint_ignores_zero_chapter_values(app_client, monkeypatch):
     assert payload["job_id"] == "job-1"
     assert payload.get("current_chapter") is None
     assert payload.get("total_chapters") is None
+
+
+def test_progress_endpoint_allows_safe_same_origin_get_without_origin_header(app_client):
+    response = app_client.get("/api/progress")
+
+    assert response.status_code == 200

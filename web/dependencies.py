@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 DOWNLOAD_QUEUE_DB = config.DATA_DIR / "download_jobs.sqlite3"
 DOWNLOAD_ERROR_LOG_DIR = config.DATA_DIR / "logs"
 QUEUE_POLL_INTERVAL_SECONDS: float = 0.5
+_SAFE_METHODS = {"GET", "HEAD", "OPTIONS", "TRACE"}
 
 
 class ForbiddenOriginError(Exception):
@@ -108,7 +109,7 @@ def _is_same_origin(request: Request) -> bool:
     """Return True when the request appears same-origin."""
     origin = request.headers.get("origin", "").strip()
     if not origin:
-        return False
+        return request.method.upper() in _SAFE_METHODS
 
     try:
         parsed_origin = urlparse(origin)
