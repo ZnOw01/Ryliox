@@ -1,6 +1,5 @@
 """Download orchestration plugin."""
 
-import ipaddress
 import asyncio
 import logging
 import shutil
@@ -10,25 +9,21 @@ from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
 from typing import Awaitable, Callable
-from urllib.parse import urljoin, urlparse
 
 import config
+from core.url_utils import is_safe_url, normalize_asset_url
 from plugins.base import Plugin
 from plugins.pdf import generate_pdf_chapters_in_subprocess, generate_pdf_in_subprocess
 
 logger = logging.getLogger(__name__)
 
-
-def _configured_base_host() -> str:
-    try:
-        return (urlparse(config.BASE_URL).hostname or "").lower()
-    except ValueError:
-        return ""
-
-
-def _is_allowed_host(host: str) -> bool:
-    base_host = _configured_base_host()
-    return bool(base_host) and (host == base_host or host.endswith(f".{base_host}"))
+PROGRESS_COVER_DOWNLOAD = 12
+PROGRESS_CHAPTERS_START = 15
+PROGRESS_CHAPTERS_SPAN = 65
+PROGRESS_ASSET_DOWNLOAD = 80
+PROGRESS_ASSET_SPAN = 10
+PROGRESS_EPUB_GENERATION = 90
+PROGRESS_PDF_GENERATION = 95
 
 @dataclass
 class DownloadProgress:
@@ -235,7 +230,7 @@ class DownloaderPlugin(Plugin):
         oebps = output_plugin.get_oebps_dir(book_dir)
 
         if not skip_images:
-            report("downloading_cover", 12)
+            report("downloading_cover", PROGRESS_COVER_DOWNLOAD)
             cover_url = book_info.get("cover_url")
             if cover_url:
                 await abort_if_cancelled()
@@ -255,7 +250,10 @@ class DownloaderPlugin(Plugin):
             await abort_if_cancelled()
 
             chapter_pct = (
-                15 + int((i / total_chapters) * 65) if total_chapters > 0 else 15
+                PROGRESS_CHAPTERS_START
+                + int((i / total_chapters) * PROGRESS_CHAPTERS_SPAN)
+                if total_chapters > 0
+                else PROGRESS_CHAPTERS_START
             )
 
             report(
@@ -330,7 +328,7 @@ class DownloaderPlugin(Plugin):
                     chapter_title=ch.get("title", ""),
                 )
 
-        report("downloading_assets", 80, eta_seconds=None)
+        report("downloading_assets", PROGRESS_ASSET_DOWNLOAD, eta_seconds=None)
 
         image_tasks: list[tuple[str, str]] = []
         seen_image_filenames: set[str] = set()
@@ -372,7 +370,10 @@ class DownloaderPlugin(Plugin):
                 if total_assets <= 0:
                     return
                 css_completed = completed
-                pct = 80 + int(((css_completed + image_completed) / total_assets) * 10)
+                pct = PROGRESS_ASSET_DOWNLOAD + int(
+                    ((css_completed + image_completed) / total_assets)
+                    * PROGRESS_ASSET_SPAN
+                )
                 report(
                     "downloading_assets",
                     pct,
@@ -384,7 +385,10 @@ class DownloaderPlugin(Plugin):
                 if total_assets <= 0:
                     return
                 image_completed = completed
-                pct = 80 + int(((css_completed + image_completed) / total_assets) * 10)
+                pct = PROGRESS_ASSET_DOWNLOAD + int(
+                    ((css_completed + image_completed) / total_assets)
+                    * PROGRESS_ASSET_SPAN
+                )
                 report(
                     "downloading_assets",
                     pct,
@@ -423,7 +427,7 @@ class DownloaderPlugin(Plugin):
         )
 
         if "epub" in formats:
-            report("generating_epub", 90)
+            report("generating_epub", PROGRESS_EPUB_GENERATION)
             epub_plugin = self._epub_plugin or self.kernel["epub"]
             cover_image_name = self._resolve_cover_image_name(oebps)
             await abort_if_cancelled()
@@ -444,7 +448,7 @@ class DownloaderPlugin(Plugin):
             loop = asyncio.get_running_loop()
             with ProcessPoolExecutor(max_workers=1) as process_pool:
                 if "pdf-chapters" in formats:
-                    report("generating_pdf_chapters", 95)
+                    report("generating_pdf_chapters", PROGRESS_PDF_GENERATION)
                     await abort_if_cancelled()
                     future = loop.run_in_executor(
                         process_pool,
@@ -462,7 +466,7 @@ class DownloaderPlugin(Plugin):
                     await abort_if_cancelled()
                     result.files["pdf"] = pdf_paths
                 else:
-                    report("generating_pdf", 95)
+                    report("generating_pdf", PROGRESS_PDF_GENERATION)
                     await abort_if_cancelled()
                     future = loop.run_in_executor(
                         process_pool,
@@ -578,59 +582,6 @@ class DownloaderPlugin(Plugin):
                 logger.warning("Failed to terminate worker process: %s", exc)
                 continue
 
-    def _normalize_asset_url(self, base_url: str, asset_url: str) -> str:
-        value = str(asset_url or "").strip()
-        if not value or value.startswith("data:"):
-            return ""
-        if value.startswith("//"):
-            normalized = f"https:{value}"
-        elif value.startswith(("http://", "https://")):
-            normalized = value
-        elif base_url:
-            normalized = urljoin(base_url, value)
-        else:
-            normalized = value
-
-        if not self._is_allowed_remote_url(normalized):
-            logger.warning("Blocked asset URL outside allowed hosts: %s", normalized)
-            return ""
-
-        return normalized
-
-    def _is_allowed_remote_url(self, url: str) -> bool:
-        try:
-            parsed = urlparse(url)
-        except ValueError:
-            return False
-
-        if parsed.scheme not in {"http", "https"}:
-            return False
-
-        host = (parsed.hostname or "").lower()
-        if not host:
-            return False
-
-        if host == "localhost" or host.endswith(".local"):
-            return False
-
-        try:
-            ip = ipaddress.ip_address(host)
-            if (
-                ip.is_private
-                or ip.is_loopback
-                or ip.is_link_local
-                or ip.is_multicast
-                or ip.is_reserved
-            ):
-                return False
-        except ValueError:
-            pass
-
-        if not _is_allowed_host(host):
-            return False
-
-        return True
-
     def _resolve_cover_image_name(self, oebps: Path) -> str | None:
         images_dir = oebps / "Images"
         if not images_dir.exists():
@@ -651,6 +602,12 @@ class DownloaderPlugin(Plugin):
         if files:
             return files[0].name
         return None
+
+    def _normalize_asset_url(self, base_url: str, asset_url: str) -> str:
+        return normalize_asset_url(base_url, asset_url)
+
+    def _is_allowed_remote_url(self, url: str) -> bool:
+        return is_safe_url(url)
 
     def _sanitize_chapters_for_output(self, chapters: list[dict]) -> list[dict]:
         sanitized: list[dict] = []

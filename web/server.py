@@ -63,6 +63,15 @@ self.addEventListener('activate', (event) => {
 """
 
 
+def _warn_if_wildcard_cors() -> None:
+    if _CORS_ORIGINS_RAW == "*":
+        logger.warning(
+            "CORS_ORIGINS=* is set; allowing all origins. "
+            "This is insecure and exposes the API to CSRF attacks. "
+            "Only use this in development."
+        )
+
+
 def _no_cache_response(content: str, media_type: str) -> Response:
     """Devuelve una respuesta con cabeceras que deshabilitan el caché."""
     return Response(content=content, media_type=media_type, headers=_NO_CACHE_HEADERS)
@@ -88,6 +97,8 @@ def create_app() -> FastAPI:
     from web.routes.books import router as books_router
     from web.routes.downloads import router as downloads_router
     from web.routes.system import router as system_router
+
+    _warn_if_wildcard_cors()
 
     app = FastAPI(
         docs_url="/docs",
@@ -214,9 +225,6 @@ def _configure_stdio_utf8() -> None:
             pass
 
 
-app = create_app()
-
-
 def run_server() -> None:
     """Configura stdio e inicia la app con Uvicorn de forma estricta."""
     _configure_stdio_utf8()
@@ -237,7 +245,7 @@ def run_server() -> None:
 
     logger.info("Servidor iniciando en http://%s:%d", host, port)
 
-    uvicorn.run("web.server:app", host=host, port=port)
+    uvicorn.run(create_app(), host=host, port=port)
 
 
 def main() -> None:

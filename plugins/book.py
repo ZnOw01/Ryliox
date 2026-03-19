@@ -31,12 +31,31 @@ class BookPlugin(Plugin):
         return None
 
     async def fetch(self, book_id: str) -> dict:
-        async with asyncio.TaskGroup() as task_group:
-            search_task = task_group.create_task(self._fetch_search(book_id))
-            epub_task = task_group.create_task(self._fetch_epub(book_id))
+        search_data: dict = {}
+        epub_data: dict = {}
 
-        search_data = search_task.result()
-        epub_data = epub_task.result()
+        search_task = None
+        epub_task = None
+        try:
+            async with asyncio.TaskGroup() as task_group:
+                search_task = task_group.create_task(self._fetch_search(book_id))
+                epub_task = task_group.create_task(self._fetch_epub(book_id))
+        except* Exception:
+            # Allow partial results to be consumed after a TaskGroup failure.
+            pass
+
+        def _task_result(task: asyncio.Task | None) -> dict:
+            if task is None or not task.done() or task.cancelled():
+                return {}
+            try:
+                result = task.result()
+            except Exception:
+                return {}
+            return result if isinstance(result, dict) else {}
+
+        search_data = _task_result(search_task)
+        epub_data = _task_result(epub_task)
+
         fallback_metadata = await self._fetch_epub_fallback_metadata(
             book_id,
             missing_fields={

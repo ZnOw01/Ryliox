@@ -75,27 +75,21 @@ class DownloadJobStore:
         self.terminal_job_retention = max(0, int(terminal_job_retention))
         self.progress_write_interval_seconds = max(0.0, float(progress_write_interval_seconds))
         self._lock = threading.RLock()
-        self._conn: sqlite3.Connection | None = None
         self._last_progress_write_at: dict[str, float] = {}
         self._last_progress_payload: dict[str, tuple[Any, ...]] = {}
         self._initialize()
 
     def _connect(self) -> sqlite3.Connection:
-        if self._conn is None:
-            conn = sqlite3.connect(str(self.db_path), timeout=30, check_same_thread=False)
-            conn.row_factory = sqlite3.Row
-            self._conn = conn
-        return self._conn
+        conn = sqlite3.connect(str(self.db_path), timeout=30)
+        conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA busy_timeout=30000")
+        return conn
 
     def close(self):
         with self._lock:
-            if self._conn is None:
-                return
-            try:
-                self._conn.close()
-            except Exception:
-                pass
-            self._conn = None
+            self._last_progress_payload.clear()
+            self._last_progress_write_at.clear()
 
     def _initialize(self):
         with self._lock:
@@ -650,7 +644,15 @@ class DownloadJobStore:
             ).fetchone()
             snapshot["queue_position"] = int(queue_position_row["queue_position"]) if queue_position_row else 1
 
-        return {key: value for key, value in snapshot.items() if value is not None}
+        return self._filter_snapshot_values(snapshot)
+
+    def _filter_snapshot_values(self, snapshot: dict[str, Any]) -> dict[str, Any]:
+        filtered: dict[str, Any] = {}
+        for key, value in snapshot.items():
+            if value is None:
+                continue
+            filtered[key] = value
+        return filtered
 
 
 class DownloadQueueService:
@@ -861,6 +863,20 @@ class DownloadQueueService:
 
             result = asyncio.run(run_download())
             self.store.mark_completed(job.job_id, result)
+            self._notify_progress_change()
+        except asyncio.CancelledError as exc:
+            message = str(exc)
+            trace_text = traceback.format_exc()
+            trace_log = self._write_error_trace(trace_text, job.job_id)
+            error_message = message or "Download cancelled by user"
+            self.store.mark_failed(
+                job_id=job.job_id,
+                status="cancelled",
+                error=error_message,
+                code="download_cancelled",
+                details=None,
+                trace_log=trace_log,
+            )
             self._notify_progress_change()
         except Exception as exc:
             message = str(exc)

@@ -10,10 +10,11 @@ from __future__ import annotations
 
 import logging
 import os
+import sys
 import secrets
 from pathlib import Path
-from types import MappingProxyType
-from typing import Final
+from types import MappingProxyType, ModuleType
+from typing import Any, Final
 
 from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -43,6 +44,25 @@ _PROTECTED_HEADERS: Final[frozenset[str]] = frozenset(
         "accept-language",
     }
 )
+_RUNTIME_EXPORTS: Final[frozenset[str]] = frozenset(
+    {
+        "SETTINGS",
+        "OUTPUT_DIR",
+        "DATA_DIR",
+        "COOKIES_FILE",
+        "SESSION_DB_FILE",
+        "BASE_URL",
+        "API_V1",
+        "API_V2",
+        "REQUEST_DELAY",
+        "REQUEST_TIMEOUT",
+        "REQUEST_RETRIES",
+        "REQUEST_RETRY_BACKOFF",
+        "HEADERS",
+    }
+)
+
+_RUNTIME_VALUES: dict[str, Any] | None = None
 
 
 def _to_absolute_path(path: Path) -> Path:
@@ -196,48 +216,12 @@ class Settings(BaseSettings):
         return self
 
 
-SETTINGS: Final = Settings()
-
-OUTPUT_DIR: Final[Path] = _resolve_runtime_dir(
-    SETTINGS.output_dir,
-    default=BASE_DIR / "output",
-    fallback=_RUNTIME_OUTPUT_FALLBACK_DIR,
-    label="OUTPUT_DIR",
-)
-DATA_DIR: Final[Path] = _resolve_runtime_dir(
-    SETTINGS.data_dir,
-    default=BASE_DIR / "data",
-    fallback=_RUNTIME_DATA_FALLBACK_DIR,
-    label="DATA_DIR",
-)
-COOKIES_FILE: Final[Path] = _resolve_runtime_file(
-    SETTINGS.cookies_file,
-    default=DATA_DIR / "cookies.json",
-    fallback_dir=DATA_DIR,
-    label="COOKIES_FILE",
-)
-SESSION_DB_FILE: Final[Path] = _resolve_runtime_file(
-    SETTINGS.session_db_file,
-    default=DATA_DIR / "session.sqlite3",
-    fallback_dir=DATA_DIR,
-    label="SESSION_DB_FILE",
-)
-
-BASE_URL: Final[str] = SETTINGS.base_url
-API_V1: Final[str] = f"{BASE_URL}/api/v1"
-API_V2: Final[str] = f"{BASE_URL}/api/v2"
-REQUEST_DELAY: Final[float] = SETTINGS.request_delay
-REQUEST_TIMEOUT: Final[int] = SETTINGS.request_timeout
-REQUEST_RETRIES: Final[int] = SETTINGS.request_retries
-REQUEST_RETRY_BACKOFF: Final[float] = SETTINGS.request_retry_backoff
-
-
-def _resolve_user_agent() -> str:
+def _resolve_user_agent(settings: Settings) -> str:
     """Resolve user-agent from explicit value, fake-useragent, or fallback list."""
-    if ua := (SETTINGS.user_agent or "").strip():
+    if ua := (settings.user_agent or "").strip():
         return ua
 
-    if SETTINGS.enable_fake_ua:
+    if settings.enable_fake_ua:
         try:
             from fake_useragent import UserAgent
 
@@ -255,13 +239,148 @@ def _resolve_user_agent() -> str:
 
     return secrets.choice(_FALLBACK_USER_AGENTS)
 
-HEADERS: Final[MappingProxyType[str, str]] = MappingProxyType(
-    {
-        "Accept": SETTINGS.accept,
-        "Accept-Encoding": SETTINGS.accept_encoding,
-        "Accept-Language": SETTINGS.accept_language,
-        "Referer": BASE_URL,
-        "User-Agent": _resolve_user_agent(),
-        **(SETTINGS.extra_headers or {}),
+
+def _build_runtime_values(settings: Settings) -> dict[str, Any]:
+    data_dir = _resolve_runtime_dir(
+        settings.data_dir,
+        default=BASE_DIR / "data",
+        fallback=_RUNTIME_DATA_FALLBACK_DIR,
+        label="DATA_DIR",
+    )
+    output_dir = _resolve_runtime_dir(
+        settings.output_dir,
+        default=BASE_DIR / "output",
+        fallback=_RUNTIME_OUTPUT_FALLBACK_DIR,
+        label="OUTPUT_DIR",
+    )
+    cookies_file = _resolve_runtime_file(
+        settings.cookies_file,
+        default=data_dir / "cookies.json",
+        fallback_dir=data_dir,
+        label="COOKIES_FILE",
+    )
+    session_db_file = _resolve_runtime_file(
+        settings.session_db_file,
+        default=data_dir / "session.sqlite3",
+        fallback_dir=data_dir,
+        label="SESSION_DB_FILE",
+    )
+    base_url = settings.base_url
+    values: dict[str, Any] = {
+        "SETTINGS": settings,
+        "OUTPUT_DIR": output_dir,
+        "DATA_DIR": data_dir,
+        "COOKIES_FILE": cookies_file,
+        "SESSION_DB_FILE": session_db_file,
+        "BASE_URL": base_url,
+        "API_V1": f"{base_url}/api/v1",
+        "API_V2": f"{base_url}/api/v2",
+        "REQUEST_DELAY": settings.request_delay,
+        "REQUEST_TIMEOUT": settings.request_timeout,
+        "REQUEST_RETRIES": settings.request_retries,
+        "REQUEST_RETRY_BACKOFF": settings.request_retry_backoff,
     }
-)
+    values["HEADERS"] = MappingProxyType(
+        {
+            "Accept": settings.accept,
+            "Accept-Encoding": settings.accept_encoding,
+            "Accept-Language": settings.accept_language,
+            "Referer": base_url,
+            "User-Agent": _resolve_user_agent(settings),
+            **(settings.extra_headers or {}),
+        }
+    )
+    return values
+
+
+def _ensure_runtime_values() -> dict[str, Any]:
+    global _RUNTIME_VALUES
+    if _RUNTIME_VALUES is None:
+        _RUNTIME_VALUES = _build_runtime_values(Settings())
+    return _RUNTIME_VALUES
+
+
+def _set_runtime_value(name: str, value: Any) -> None:
+    values = _ensure_runtime_values()
+    settings = values["SETTINGS"]
+
+    if name == "SETTINGS":
+        if not isinstance(value, Settings):
+            raise TypeError("SETTINGS must be a Settings instance")
+        values.clear()
+        values.update(_build_runtime_values(value))
+        return
+
+    if name == "BASE_URL":
+        base_url = str(value).rstrip("/")
+        settings.base_url = base_url
+        values["BASE_URL"] = base_url
+        values["API_V1"] = f"{base_url}/api/v1"
+        values["API_V2"] = f"{base_url}/api/v2"
+        values["HEADERS"] = MappingProxyType(
+            {
+                "Accept": settings.accept,
+                "Accept-Encoding": settings.accept_encoding,
+                "Accept-Language": settings.accept_language,
+                "Referer": base_url,
+                "User-Agent": _resolve_user_agent(settings),
+                **(settings.extra_headers or {}),
+            }
+        )
+        return
+
+    normalized_value = value
+    if name == "OUTPUT_DIR":
+        normalized_value = Path(value)
+        settings.output_dir = normalized_value
+    elif name == "DATA_DIR":
+        normalized_value = Path(value)
+        settings.data_dir = normalized_value
+    elif name == "COOKIES_FILE":
+        normalized_value = Path(value)
+        settings.cookies_file = normalized_value
+    elif name == "SESSION_DB_FILE":
+        normalized_value = Path(value)
+        settings.session_db_file = normalized_value
+    elif name == "REQUEST_DELAY":
+        normalized_value = float(value)
+        settings.request_delay = normalized_value
+    elif name == "REQUEST_TIMEOUT":
+        normalized_value = int(value)
+        settings.request_timeout = normalized_value
+    elif name == "REQUEST_RETRIES":
+        normalized_value = int(value)
+        settings.request_retries = normalized_value
+    elif name == "REQUEST_RETRY_BACKOFF":
+        normalized_value = float(value)
+        settings.request_retry_backoff = normalized_value
+
+    values[name] = normalized_value
+
+
+def __getattr__(name: str) -> Any:
+    if name in _RUNTIME_EXPORTS:
+        return _ensure_runtime_values()[name]
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+def __dir__() -> list[str]:
+    return sorted(set(globals()) | set(_RUNTIME_EXPORTS))
+
+
+class _ConfigModule(ModuleType):
+    """Module wrapper that keeps runtime config lazy and mutable."""
+
+    def __getattr__(self, name: str) -> Any:
+        if name in _RUNTIME_EXPORTS:
+            return _ensure_runtime_values()[name]
+        return super().__getattr__(name)
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        if name in _RUNTIME_EXPORTS:
+            _set_runtime_value(name, value)
+            return
+        super().__setattr__(name, value)
+
+
+sys.modules[__name__].__class__ = _ConfigModule

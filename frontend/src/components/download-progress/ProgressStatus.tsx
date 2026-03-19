@@ -49,31 +49,10 @@ function canUseClipboardApi(): boolean {
   );
 }
 
-function canUseLegacyCopy(): boolean {
-  return typeof document !== "undefined" && typeof document.execCommand === "function";
+function getClipboardUnavailableMessage(): string {
+  return "La copia no esta disponible en este navegador o contexto seguro.";
 }
 
-function legacyCopyText(value: string): boolean {
-  if (!canUseLegacyCopy()) {
-    return false;
-  }
-
-  const textarea = document.createElement("textarea");
-  textarea.value = value;
-  textarea.setAttribute("readonly", "");
-  textarea.style.position = "fixed";
-  textarea.style.opacity = "0";
-  textarea.style.pointerEvents = "none";
-  document.body.appendChild(textarea);
-  textarea.select();
-  textarea.setSelectionRange(0, textarea.value.length);
-
-  try {
-    return document.execCommand("copy");
-  } finally {
-    textarea.remove();
-  }
-}
 
 export function ProgressStatus({ currentLabel, progress, progressPercent }: ProgressStatusProps) {
   const [actionMessage, setActionMessage] = useState<string | null>(null);
@@ -98,7 +77,7 @@ export function ProgressStatus({ currentLabel, progress, progressPercent }: Prog
     ...(progress?.pdf ? (Array.isArray(progress.pdf) ? progress.pdf : [progress.pdf]) : []),
     ...(progress?.trace_log ? [progress.trace_log] : []),
   ].filter((value, index, array): value is string => Boolean(value) && array.indexOf(value) === index);
-  const supportsCopy = canUseClipboardApi() || canUseLegacyCopy();
+  const supportsCopy = canUseClipboardApi();
 
   async function handleReveal(path: string) {
     setActionMessage(null);
@@ -118,18 +97,12 @@ export function ProgressStatus({ currentLabel, progress, progressPercent }: Prog
     setActionMessage(null);
     setActionError(null);
     try {
-      if (canUseClipboardApi()) {
-        await navigator.clipboard.writeText(value);
-      } else if (!legacyCopyText(value)) {
-        throw new Error("copy_unavailable");
-      }
+      await navigator.clipboard.writeText(value);
       setActionMessage("Ruta copiada al portapapeles.");
-    } catch {
-      setActionError(
-        supportsCopy
-          ? "No se pudo copiar la ruta."
-          : "La copia no esta disponible en este contexto del navegador."
-      );
+    } catch (error) {
+      setActionError(error instanceof Error && error.name === "NotAllowedError"
+        ? "El navegador bloqueo la copia al portapapeles."
+        : "No se pudo copiar la ruta.");
     }
   }
 
@@ -208,6 +181,9 @@ export function ProgressStatus({ currentLabel, progress, progressPercent }: Prog
                       {supportsCopy ? "Copiar ruta" : "Copia no disponible"}
                     </button>
                   </div>
+                  {!supportsCopy ? (
+                    <p className="mt-2 text-[11px] text-slate-500">{getClipboardUnavailableMessage()}</p>
+                  ) : null}
                 </div>
               ))}
             </div>

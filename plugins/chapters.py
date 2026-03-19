@@ -1,27 +1,15 @@
-﻿import ipaddress
-import logging
+﻿import logging
 import re
-from urllib.parse import quote, urljoin, urlparse
+from urllib.parse import quote
 
 import config
+from core.url_utils import sanitize_remote_url
 from core.types import ChapterInfo
 
 from .base import Plugin
 
 logger = logging.getLogger(__name__)
 _COVER_WORD_RE = re.compile(r"\bcover\b", re.IGNORECASE)
-
-
-def _configured_base_host() -> str:
-    try:
-        return (urlparse(config.BASE_URL).hostname or "").lower()
-    except ValueError:
-        return ""
-
-
-def _is_allowed_host(host: str) -> bool:
-    base_host = _configured_base_host()
-    return bool(base_host) and (host == base_host or host.endswith(f".{base_host}"))
 
 
 class ChaptersPlugin(Plugin):
@@ -43,7 +31,7 @@ class ChaptersPlugin(Plugin):
                 results = []
 
             for ch in results:
-                content_url = self._sanitize_remote_url(ch.get("content_url", ""))
+                content_url = sanitize_remote_url(ch.get("content_url", ""))
                 if not content_url:
                     logger.warning("Skipping chapter with blocked content_url: %r", ch.get("content_url"))
                     continue
@@ -110,7 +98,7 @@ class ChaptersPlugin(Plugin):
 
         def push(value):
             candidate = str(value or "").strip()
-            normalized = self._sanitize_remote_url(candidate, base_url=base_url)
+            normalized = sanitize_remote_url(candidate, base_url=base_url)
             if normalized and normalized not in seen:
                 seen.add(normalized)
                 urls.append(normalized)
@@ -136,44 +124,5 @@ class ChaptersPlugin(Plugin):
         return urls
 
     def _sanitize_remote_url(self, raw_url: str, *, base_url: str = "") -> str:
-        value = str(raw_url or "").strip()
-        if not value or value.startswith("data:"):
-            return ""
+        return sanitize_remote_url(raw_url, base_url=base_url)
 
-        if value.startswith("//"):
-            value = f"https:{value}"
-        elif not value.startswith(("http://", "https://")):
-            value = urljoin(base_url or config.BASE_URL, value)
-
-        try:
-            parsed = urlparse(value)
-        except ValueError:
-            return ""
-
-        if parsed.scheme not in {"http", "https"}:
-            return ""
-
-        host = (parsed.hostname or "").lower()
-        if not host:
-            return ""
-
-        if host == "localhost" or host.endswith(".local"):
-            return ""
-
-        try:
-            ip = ipaddress.ip_address(host)
-            if (
-                ip.is_private
-                or ip.is_loopback
-                or ip.is_link_local
-                or ip.is_multicast
-                or ip.is_reserved
-            ):
-                return ""
-        except ValueError:
-            pass
-
-        if not _is_allowed_host(host):
-            return ""
-
-        return value

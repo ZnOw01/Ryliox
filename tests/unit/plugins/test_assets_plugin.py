@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+import config
 from plugins.assets import AssetsPlugin
 
 pytestmark = pytest.mark.unit
@@ -30,3 +31,16 @@ def test_download_all_images_uses_urlparse_to_derive_filename(tmp_path: Path):
     saved_path = result["https://example.com/assets/cover.png?size=large"]
     assert saved_path == tmp_path / "Images" / "cover.png"
     assert saved_path.read_bytes() == b"ok"
+
+
+def test_ensure_safe_asset_url_blocks_external_hosts():
+    plugin = AssetsPlugin()
+
+    with pytest.raises(ValueError, match="Blocked asset host outside allowed hosts"):
+        plugin._ensure_safe_asset_url("https://example.com/assets/cover.png")
+
+
+def test_ensure_safe_asset_url_allows_base_host():
+    plugin = AssetsPlugin()
+
+    plugin._ensure_safe_asset_url(f"{config.BASE_URL}/assets/cover.png")

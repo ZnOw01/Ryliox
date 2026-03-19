@@ -49,12 +49,12 @@ export function useDownloadManager() {
     queryFn: getFormats,
   });
 
-  const progressQueryKey = useMemo(() => queryKeys.downloadProgress(activeJobId), [activeJobId]);
+  const progressQueryKey = queryKeys.downloadProgress(activeJobId);
 
   const progressQuery = useQuery({
     queryKey: progressQueryKey,
     queryFn: () => getProgress(activeJobId),
-    enabled: Boolean(activeJobId),
+    enabled: true,
     refetchInterval: ({ state }) => {
       const next = state.data as ProgressResponse | undefined;
       return next && !isTerminalProgress(next) ? 8000 : false;
@@ -85,13 +85,20 @@ export function useDownloadManager() {
     }
   }, []);
 
+  const progressStatus = progressQuery.data?.status ?? "idle";
   const shouldTrackProgress = Boolean(activeJobId) && !isTerminalProgress(progressQuery.data);
 
   useEffect(() => {
     if (!shouldTrackProgress) {
       reconnectAttemptRef.current = 0;
       clearReconnectTimer();
-      setSseStatus("idle");
+      if (progressStatus === "completed") {
+        setSseStatus("connected");
+      } else if (progressStatus === "error") {
+        setSseStatus("error");
+      } else if (!progressQuery.data?.job_id) {
+        setSseStatus("idle");
+      }
       return;
     }
 
@@ -125,10 +132,14 @@ export function useDownloadManager() {
 
     unsubscribe = subscribeProgress({
       onProgress: (next) => {
-        if (!activeJobId && next.job_id) {
-          setActiveJobId(next.job_id);
+        const nextJobId = next.job_id ?? null;
+        if (!activeJobId && nextJobId) {
+          setActiveJobId(nextJobId);
         }
         queryClient.setQueryData(progressQueryKey, next);
+        if (nextJobId) {
+          queryClient.setQueryData(queryKeys.downloadProgress(nextJobId), next);
+        }
       },
       onOpen: () => {
         reconnectAttemptRef.current = 0;
@@ -150,7 +161,16 @@ export function useDownloadManager() {
       clearReconnectTimer();
       closeConnection();
     };
-  }, [activeJobId, clearReconnectTimer, progressQueryKey, queryClient, reconnectToken, shouldTrackProgress]);
+  }, [
+    activeJobId,
+    clearReconnectTimer,
+    progressQuery.data?.job_id,
+    progressStatus,
+    progressQueryKey,
+    queryClient,
+    reconnectToken,
+    shouldTrackProgress,
+  ]);
 
   const forceReconnect = useCallback(() => {
     if (!shouldTrackProgress) {
@@ -247,7 +267,6 @@ export function useDownloadManager() {
     setSelectedChapters([]);
   }, []);
 
-  const progressStatus = progressQuery.data?.status ?? "idle";
   const clampedProgressPercent = Math.max(0, Math.min(100, Number(progressQuery.data?.percentage ?? 0)));
   const progressPercent = progressStatus === "completed"
     ? 100

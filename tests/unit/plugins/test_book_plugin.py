@@ -131,3 +131,81 @@ def test_fetch_enriches_sparse_metadata_from_epub_files(monkeypatch):
     assert result["authors"] == ["Marc Loy", "Patrick Niemeyer", "Daniel Leuck"]
     assert result["publishers"] == ["O'Reilly Media, Inc."]
     assert result["cover_url"] == "https://learning.oreilly.com/api/v2/epubs/urn:orm:book:9781098181642/files/assets/cover.png"
+
+
+def test_fetch_keeps_partial_results_when_taskgroup_fails(monkeypatch):
+    plugin = BookPlugin()
+    plugin.kernel = SimpleNamespace(http=SimpleNamespace())
+
+    async def fake_fetch_search(_book_id: str):
+        return {
+            "authors": ["Marc Loy"],
+            "publishers": ["O'Reilly"],
+            "cover_url": "https://example.test/cover.png",
+        }
+
+    async def fake_fetch_epub(_book_id: str):
+        raise RuntimeError("epub unavailable")
+
+    async def fake_fallback_metadata(_book_id: str, *, missing_fields):
+        assert missing_fields == {
+            "authors": False,
+            "publishers": False,
+            "cover_url": False,
+        }
+        return {}
+
+    class FakeTask:
+        def __init__(self, coro):
+            self._result = None
+            self._exception = None
+            self._done = False
+            self._cancelled = False
+            try:
+                self._result = coro.send(None)
+            except StopIteration as exc:
+                self._result = exc.value
+            except Exception as exc:  # pragma: no cover - exercised by the test
+                self._exception = exc
+            finally:
+                self._done = True
+
+        def done(self):
+            return self._done
+
+        def cancelled(self):
+            return self._cancelled
+
+        def result(self):
+            if self._exception is not None:
+                raise self._exception
+            return self._result
+
+    class FakeTaskGroup:
+        def __init__(self):
+            self._tasks = []
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            errors = [task._exception for task in self._tasks if task._exception is not None]
+            if errors:
+                raise ExceptionGroup("taskgroup failure", errors)
+            return False
+
+        def create_task(self, coro):
+            task = FakeTask(coro)
+            self._tasks.append(task)
+            return task
+
+    monkeypatch.setattr("plugins.book.asyncio.TaskGroup", FakeTaskGroup)
+    monkeypatch.setattr(plugin, "_fetch_search", fake_fetch_search)
+    monkeypatch.setattr(plugin, "_fetch_epub", fake_fetch_epub)
+    monkeypatch.setattr(plugin, "_fetch_epub_fallback_metadata", fake_fallback_metadata)
+
+    result = asyncio.run(plugin.fetch("9781098181642"))
+
+    assert result["authors"] == ["Marc Loy"]
+    assert result["publishers"] == ["O'Reilly"]
+    assert result["cover_url"] == "https://example.test/cover.png"

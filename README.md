@@ -152,6 +152,8 @@ El endpoint `POST /api/cookies` acepta tres formatos:
 | Array JSON (EditThisCookie) | `[{ "name": "...", "value": "..." }]` |
 
 > Si la sesion sigue siendo invalida es probable que falten cookies `HttpOnly` que los extension exporters no incluyen. Usa siempre el formato de header crudo desde Network.
+>
+> Las cookies se guardan localmente en disco para reutilizar la sesion. Tratarlas como credenciales en texto plano: no compartas ese archivo ni subas `data/` o `cookies.json` a ningun repositorio.
 
 ---
 
@@ -171,7 +173,7 @@ Copia `.env.example` a `.env` y ajusta los valores que necesites. Todas las vari
 | `HOST` | `127.0.0.1` | Interfaz de escucha |
 | `PORT` | `8000` | Puerto del servidor |
 | `LOG_LEVEL` | `INFO` | Nivel de logging |
-| `CORS_ORIGINS` | `*` | Origenes CORS permitidos |
+| `CORS_ORIGINS` | `http://localhost:8000,http://127.0.0.1:8000` | Origenes CORS permitidos (use `*` para permitir cualquier origen, pero esto expone la API publicamente; usar solo en desarrollo) |
 
 > `HEADERS` no puede sobreescribir `User-Agent`, `Accept`, `Accept-Encoding` ni `Accept-Language`. Usa sus variables dedicadas en su lugar.
 

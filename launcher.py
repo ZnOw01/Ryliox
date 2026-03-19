@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -42,6 +43,22 @@ _TIMEOUT_PIP = 300
 _TIMEOUT_NPM = 300
 _TIMEOUT_DOCKER = 120
 _TIMEOUT_SUBPROCESS = 60
+
+_OPTIONAL_REQUIREMENTS = frozenset(
+    {
+        "bleach",
+        "fake-useragent",
+        "weasyprint",
+    }
+)
+
+_REQUIREMENT_IMPORT_ALIASES: dict[str, tuple[str, ...]] = {
+    "beautifulsoup4": ("bs4",),
+    "charset-normalizer": ("charset_normalizer",),
+    "fake-useragent": ("fake_useragent",),
+    "pydantic-settings": ("pydantic_settings",),
+    "python-dotenv": ("dotenv",),
+}
 
 
 class Steps:
@@ -129,19 +146,100 @@ def _server_env() -> dict[str, str]:
     return env
 
 
-def _venv_has_runtime_dependencies(venv_python: Path) -> bool:
-    """Verifica dependencias importando los paquetes clave del requirements.txt.
+def _canonical_requirement_name(name: str) -> str:
+    """Normalize a requirement name for matching and filtering."""
+    return re.sub(r"[-_.]+", "-", name).lower()
 
-    La lista está aquí y no en requirements.txt directamente para evitar
-    parsear el archivo (que puede tener extras, versiones, comentarios).
-    Actualizar esta lista cuando cambie requirements.txt.
-    """
+
+def _parse_requirement_line(line: str) -> str | None:
+    """Extract the requirement name from a single requirements.txt line."""
+    stripped = line.strip()
+    if not stripped or stripped.startswith("#"):
+        return None
+    if stripped.startswith(("-", ".", "/")):
+        return None
+    if "://" in stripped or stripped.startswith(("git+", "hg+", "svn+", "bzr+")):
+        return None
+
+    # Strip inline comments, environment markers, extras, and version specifiers.
+    stripped = stripped.split("#", 1)[0].strip()
+    if not stripped:
+        return None
+    stripped = stripped.split(";", 1)[0].strip()
+    if not stripped:
+        return None
+    stripped = stripped.split(" @ ", 1)[0].strip()
+    if not stripped:
+        return None
+    stripped = stripped.split("[", 1)[0].strip()
+    if not stripped:
+        return None
+    stripped = re.split(r"\s*(?:===|==|~=|!=|<=|>=|<|>)\s*", stripped, maxsplit=1)[0].strip()
+    if not stripped:
+        return None
+    return stripped
+
+
+def _requirement_to_import_names(requirement_name: str) -> list[str]:
+    """Return the importable module names that can satisfy one requirement."""
+    canonical_name = _canonical_requirement_name(requirement_name)
+    import_names = list(_REQUIREMENT_IMPORT_ALIASES.get(canonical_name, ()))
+    import_names.append(canonical_name.replace("-", "_"))
+    if canonical_name == "beautifulsoup4":
+        import_names.append("bs4")
+    elif canonical_name == "python-dotenv":
+        import_names.append("dotenv")
+
+    unique_names: list[str] = []
+    seen: set[str] = set()
+    for name in import_names:
+        candidate = name.strip()
+        if not candidate or candidate in seen:
+            continue
+        seen.add(candidate)
+        unique_names.append(candidate)
+    return unique_names
+
+
+def _runtime_requirement_modules(requirements_path: Path) -> list[str]:
+    """Collect the importable modules needed to boot the app."""
+    modules: list[str] = []
+    seen: set[str] = set()
+
+    for line in requirements_path.read_text(encoding="utf-8").splitlines():
+        requirement_name = _parse_requirement_line(line)
+        if not requirement_name:
+            continue
+
+        if _canonical_requirement_name(requirement_name) in _OPTIONAL_REQUIREMENTS:
+            continue
+
+        for module_name in _requirement_to_import_names(requirement_name):
+            if module_name in seen:
+                continue
+            seen.add(module_name)
+            modules.append(module_name)
+
+    return modules
+
+
+def _venv_has_runtime_dependencies(venv_python: Path) -> bool:
+    """Verifica dependencias importando los módulos necesarios para arrancar."""
+    requirements_path = REPO_ROOT / "requirements.txt"
+    if not requirements_path.exists():
+        return False
+    modules = _runtime_requirement_modules(requirements_path)
+    if not modules:
+        return False
+    module_list = repr(modules)
+    script = (
+        "import importlib.util, sys\n"
+        f"modules = {module_list}\n"
+        "missing = [name for name in modules if importlib.util.find_spec(name) is None]\n"
+        "sys.exit(0 if not missing else 1)\n"
+    )
     result = subprocess.run(
-        [
-            str(venv_python),
-            "-c",
-            "import fastapi, uvicorn, bleach, lxml, httpx, pydantic_settings, fake_useragent",
-        ],
+        [str(venv_python), "-c", script],
         cwd=REPO_ROOT,
         capture_output=True,
         check=False,

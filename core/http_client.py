@@ -2,12 +2,13 @@ import asyncio
 import time
 from pathlib import Path
 from typing import Mapping
-from urllib.parse import urlparse
+from urllib.parse import urljoin, urlparse
 
 import httpx
 
 import config
 from core.session_store import SessionStore
+from core.url_utils import normalize_remote_url
 
 
 class HttpClient:
@@ -47,6 +48,40 @@ class HttpClient:
             cookies = {}
         self._apply_cookies(cookies)
 
+    def _normalize_request_url(self, url: str) -> str:
+        if not url.startswith(("http://", "https://")):
+            url = urljoin(config.BASE_URL, url)
+        normalized = normalize_remote_url(url, base_url=config.BASE_URL)
+        if not normalized:
+            raise ValueError(f"Blocked unsafe request URL: {url!r}")
+        return normalized
+
+    async def _request_with_safe_redirects(self, url: str, **kwargs) -> httpx.Response:
+        max_redirects = 10
+        current_url = url
+        request_kwargs = dict(kwargs)
+        request_kwargs["follow_redirects"] = False
+
+        for _ in range(max_redirects + 1):
+            await self._rate_limit()
+            response = await self.client.get(current_url, **request_kwargs)
+            if not response.is_redirect:
+                return response
+
+            location = response.headers.get("location")
+            if not location:
+                return response
+
+            next_url = urljoin(str(response.request.url), location)
+            normalized_next_url = normalize_remote_url(
+                next_url, base_url=config.BASE_URL
+            )
+            if not normalized_next_url:
+                raise ValueError(f"Blocked unsafe redirect URL: {next_url!r}")
+            current_url = normalized_next_url
+
+        raise RuntimeError("Too many redirects while fetching remote URL")
+
     async def _rate_limit(self):
         async with self._rate_limit_lock:
             elapsed = time.monotonic() - self.last_request_time
@@ -55,21 +90,28 @@ class HttpClient:
             self.last_request_time = time.monotonic()
 
     async def get(self, url: str, **kwargs) -> httpx.Response:
-        if not url.startswith("http"):
-            url = config.BASE_URL + url
+        url = self._normalize_request_url(url)
+        follow_redirects = bool(kwargs.pop("follow_redirects", False))
         if "allow_redirects" in kwargs:
-            kwargs["follow_redirects"] = kwargs.pop("allow_redirects")
+            follow_redirects = bool(kwargs.pop("allow_redirects"))
         kwargs.setdefault("timeout", config.REQUEST_TIMEOUT)
         attempts = self._request_retries + 1
         for attempt in range(attempts):
-            await self._rate_limit()
             try:
-                response = await self.client.get(url, **kwargs)
+                if follow_redirects:
+                    response = await self._request_with_safe_redirects(url, **kwargs)
+                else:
+                    await self._rate_limit()
+                    response = await self.client.get(
+                        url, follow_redirects=False, **kwargs
+                    )
             except httpx.RequestError:
                 if attempt >= self._request_retries:
                     raise
                 await asyncio.sleep(self._request_retry_backoff * (2 ** attempt))
                 continue
+            except ValueError:
+                raise
 
             if response.status_code not in {429, 500, 502, 503, 504} or attempt >= self._request_retries:
                 return response

@@ -2,6 +2,7 @@
 # Python environments
 # ==============================================================================
 .venv/
+.venv-linux/
 venv/
 env/
 .python-version
@@ -102,8 +103,8 @@ htmlcov/
 .cache/
 pytestdebug.log
 
-# Keep local tests private by default (tracked historical tests are unchanged)
-tests/
+# Keep local tests tracked for integration coverage.
+# tests/
 
 # ==============================================================================
 # Editor / OS
