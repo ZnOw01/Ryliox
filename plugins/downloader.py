@@ -65,6 +65,7 @@ class DownloaderPlugin(Plugin):
             "pdf-chapters",
         ]
     )
+    VISIBLE_FORMATS = ("epub", "pdf")
 
     FORMAT_ALIASES: dict[str, str] = {}
 
@@ -133,9 +134,9 @@ class DownloaderPlugin(Plugin):
     @classmethod
     def get_format_help(cls) -> dict[str, str]:
         return {
-            "epub": "Standard EPUB format (default)",
-            "pdf": "Single PDF file",
-            "pdf-chapters": "Separate PDF per chapter",
+            "epub": "Libro completo en EPUB",
+            "pdf": "Un solo PDF con el libro completo o con los capitulos seleccionados.",
+            "pdf-chapters": "Un PDF separado por cada capitulo seleccionado",
         }
 
     @classmethod
@@ -146,7 +147,7 @@ class DownloaderPlugin(Plugin):
     @classmethod
     def get_formats_info(cls) -> dict:
         return {
-            "formats": sorted(cls.SUPPORTED_FORMATS),
+            "formats": list(cls.VISIBLE_FORMATS),
             "aliases": cls.FORMAT_ALIASES,
             "book_only": sorted(cls.BOOK_ONLY_FORMATS),
             "descriptions": cls.get_format_help(),

@@ -44,14 +44,14 @@ export function FormatSelector({
               value={item}
               disabled={hasChapterSelection && bookOnlyFormats.has(item)}
             >
-              {formatName(item)}{descriptions?.[item] ? ` - ${descriptions[item]}` : ""}
+              {formatName(item)}
             </option>
           ))
           : null}
       </select>
       {hasChapterSelection ? (
         <p id="format-helper-text" className="mt-1 text-xs text-slate-500">
-          Algunos formatos pueden quedar deshabilitados al seleccionar capitulos.
+          EPUB siempre descarga el libro completo. PDF puede usar todos o solo los capitulos elegidos.
         </p>
       ) : null}
       {selectedFormatDescription ? <p className="mt-1 break-words text-xs text-slate-500">{selectedFormatDescription}</p> : null}
