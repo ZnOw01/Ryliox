@@ -4,12 +4,13 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import time
 from typing import Any
 
 from fastapi import APIRouter, Body, Depends, Query, status
 from fastapi.responses import StreamingResponse
-from pydantic import TypeAdapter
+from pydantic import TypeAdapter, ValidationError
 
 from core.download_queue import DownloadQueueService
 from core.kernel import Kernel
@@ -25,6 +26,7 @@ from web.schemas import (
 )
 
 router = APIRouter(prefix="/api", tags=["downloads"])
+logger = logging.getLogger(__name__)
 
 SSE_HEARTBEAT_INTERVAL_SECONDS: float = 15.0
 _PROGRESS_ADAPTER: TypeAdapter[ProgressResponse] = TypeAdapter(ProgressResponse)
@@ -49,6 +51,13 @@ def _coerce_int(value: Any) -> int | None:
 def _coerce_positive_int(value: Any) -> int | None:
     parsed = _coerce_int(value)
     if parsed is None or parsed <= 0:
+        return None
+    return parsed
+
+
+def _coerce_non_negative_int(value: Any) -> int | None:
+    parsed = _coerce_int(value)
+    if parsed is None or parsed < 0:
         return None
     return parsed
 
@@ -108,7 +117,7 @@ def _normalize_progress_snapshot(snapshot: dict[str, Any] | None) -> dict[str, A
         "status": "running",
         "percentage": percentage,
         "message": _coerce_str(snapshot.get("message")),
-        "eta_seconds": _coerce_int(snapshot.get("eta_seconds")),
+        "eta_seconds": _coerce_non_negative_int(snapshot.get("eta_seconds")),
         "current_chapter": _coerce_positive_int(snapshot.get("current_chapter")),
         "total_chapters": _coerce_positive_int(snapshot.get("total_chapters")),
         "chapter_title": _coerce_str(snapshot.get("chapter_title")),
@@ -116,9 +125,36 @@ def _normalize_progress_snapshot(snapshot: dict[str, Any] | None) -> dict[str, A
     }
 
 
+def _invalid_progress_payload(snapshot: dict[str, Any] | None) -> dict[str, Any]:
+    job_id = ""
+    book_id = None
+    if isinstance(snapshot, dict):
+        job_id = _coerce_str(snapshot.get("job_id")) or ""
+        book_id = _coerce_str(snapshot.get("book_id"))
+
+    if not job_id:
+        return {"status": "idle", "job_id": ""}
+
+    return {
+        "status": "error",
+        "job_id": job_id,
+        "book_id": book_id,
+        "error": "Progress data became invalid.",
+        "code": "invalid_progress_snapshot",
+    }
+
+
 def _progress_payload(snapshot: dict[str, Any] | None) -> dict[str, Any]:
     normalized = _normalize_progress_snapshot(snapshot)
-    return _PROGRESS_ADAPTER.validate_python(normalized).model_dump(exclude_none=True)
+    try:
+        return _PROGRESS_ADAPTER.validate_python(normalized).model_dump(
+            exclude_none=True
+        )
+    except ValidationError as exc:
+        logger.warning("Invalid progress snapshot sanitized to fallback payload: %s", exc)
+        return _PROGRESS_ADAPTER.validate_python(
+            _invalid_progress_payload(snapshot)
+        ).model_dump(exclude_none=True)
 
 
 @router.get(

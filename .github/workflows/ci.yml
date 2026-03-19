@@ -23,6 +23,7 @@ jobs:
     outputs:
       backend: ${{ steps.filter.outputs.backend }}
       frontend: ${{ steps.filter.outputs.frontend }}
+      ops: ${{ steps.filter.outputs.ops }}
       ci: ${{ steps.filter.outputs.ci }}
     steps:
       - name: Checkout
@@ -48,6 +49,10 @@ jobs:
               - '.env.example'
             frontend:
               - 'frontend/**'
+            ops:
+              - 'Dockerfile'
+              - 'docker-compose.yml'
+              - '.github/workflows/**'
             ci:
               - '.github/workflows/**'
 
@@ -181,3 +186,57 @@ jobs:
       - name: Build frontend
         run: npm run build
         working-directory: frontend
+
+  ops-docker-smoke:
+    name: Docker and compose smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: changes
+    if: needs.changes.outputs.backend == 'true' || needs.changes.outputs.frontend == 'true' || needs.changes.outputs.ops == 'true' || needs.changes.outputs.ci == 'true'
+    env:
+      COMPOSE_PROJECT_NAME: ryliox-ci
+      DATA_DIR: ${{ github.workspace }}/.ci-data
+      OUTPUT_DIR: ${{ github.workspace }}/.ci-output
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Prepare runtime directories
+        run: mkdir -p .ci-data .ci-output
+
+      - name: Validate compose configuration
+        run: docker compose config
+
+      - name: Build image
+        run: docker build -t ryliox-ci:latest .
+
+      - name: Start container and smoke health endpoint
+        run: |
+          set -euo pipefail
+
+          container_id="$(docker run -d \
+            --name ryliox-ci \
+            -p 8000:8000 \
+            -e HOST=0.0.0.0 \
+            -e PORT=8000 \
+            -e DATA_DIR=/app/data \
+            -e OUTPUT_DIR=/app/output \
+            -v "${DATA_DIR}:/app/data" \
+            -v "${OUTPUT_DIR}:/app/output" \
+            ryliox-ci:latest)"
+
+          cleanup() {
+            docker rm -f "${container_id}" >/dev/null 2>&1 || true
+          }
+
+          trap cleanup EXIT
+
+          for _ in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8000/api/health >/tmp/health.json; then
+              exit 0
+            fi
+            sleep 2
+          done
+
+          docker logs "${container_id}"
+          exit 1

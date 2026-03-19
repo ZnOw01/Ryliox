@@ -60,8 +60,16 @@ def normalize_cookies_payload(payload: Any) -> dict[str, str]:
 
     if isinstance(payload, dict):
         cookies_field = payload.get("cookies")
+        if isinstance(cookies_field, dict):
+            normalized = _cookies_from_dict(cookies_field)
+            if normalized:
+                return normalized
         if isinstance(cookies_field, list):
             normalized = _cookies_from_list(cookies_field)
+            if normalized:
+                return normalized
+        if isinstance(cookies_field, str):
+            normalized = _cookies_from_cookie_header(cookies_field)
             if normalized:
                 return normalized
 

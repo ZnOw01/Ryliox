@@ -91,12 +91,6 @@ def _normalize_host(host: str) -> str:
     return host.lower()
 
 
-def _first_forwarded_value(value: str | None) -> str:
-    if not value:
-        return ""
-    return value.split(",", 1)[0].strip()
-
-
 def _default_port_for_scheme(scheme: str) -> int | None:
     if scheme == "http":
         return 80
@@ -128,32 +122,9 @@ def _is_same_origin(request: Request) -> bool:
         logger.warning("Blocked Origin header with invalid port: %r", origin)
         return False
 
-    request_host_header = _first_forwarded_value(
-        request.headers.get("x-forwarded-host")
-    ) or request.headers.get("host", "").strip()
-    request_scheme = _first_forwarded_value(
-        request.headers.get("x-forwarded-proto")
-    ) or request.url.scheme.lower()
-    request_scheme = request_scheme.lower()
-
-    if not request_host_header or not request_scheme:
-        return False
-
-    try:
-        parsed_request = urlparse(f"{request_scheme}://{request_host_header}")
-        request_port = parsed_request.port
-    except ValueError:
-        logger.warning("Blocked malformed Host header: %r", request_host_header)
-        return False
-
-    if request_port is None:
-        forwarded_port = _first_forwarded_value(request.headers.get("x-forwarded-port"))
-        if forwarded_port.isdigit():
-            request_port = int(forwarded_port)
-        else:
-            request_port = _default_port_for_scheme(request_scheme)
-
-    request_host = _normalize_host(parsed_request.hostname or "")
+    request_scheme = request.url.scheme.lower()
+    request_host = _normalize_host(request.url.hostname or "")
+    request_port = request.url.port or _default_port_for_scheme(request_scheme)
     if not request_host or origin_port is None or request_port is None:
         return False
 

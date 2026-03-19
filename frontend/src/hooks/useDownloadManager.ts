@@ -14,14 +14,20 @@ import type { ProgressResponse } from "../lib/types";
 import { useBookStore } from "../store/book-store";
 
 const ACTIVE_STATES = new Set(["queued", "running"]);
+const TERMINAL_STATES = new Set(["completed", "error"]);
 
 const RECONNECT_DELAY_MS = 2500;
 
-export type SseStatus = "connecting" | "connected" | "reconnecting" | "error";
+export type SseStatus = "idle" | "connecting" | "connected" | "reconnecting" | "error";
 
 function isDownloadActive(progress?: ProgressResponse) {
   const status = progress?.status;
   return Boolean(status && ACTIVE_STATES.has(status));
+}
+
+function isTerminalProgress(progress?: ProgressResponse) {
+  const status = progress?.status;
+  return Boolean(status && TERMINAL_STATES.has(status));
 }
 
 export function useDownloadManager() {
@@ -33,7 +39,7 @@ export function useDownloadManager() {
   const setSkipImages = useBookStore((state) => state.setSkipImages);
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
   const [selectedChapters, setSelectedChapters] = useState<number[]>([]);
-  const [sseStatus, setSseStatus] = useState<SseStatus>("connecting");
+  const [sseStatus, setSseStatus] = useState<SseStatus>("idle");
   const [reconnectToken, setReconnectToken] = useState(0);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reconnectAttemptRef = useRef(0);
@@ -48,7 +54,11 @@ export function useDownloadManager() {
   const progressQuery = useQuery({
     queryKey: progressQueryKey,
     queryFn: () => getProgress(activeJobId),
-    refetchInterval: 8000,
+    enabled: Boolean(activeJobId),
+    refetchInterval: ({ state }) => {
+      const next = state.data as ProgressResponse | undefined;
+      return next && !isTerminalProgress(next) ? 8000 : false;
+    },
   });
 
   useEffect(() => {
@@ -75,7 +85,16 @@ export function useDownloadManager() {
     }
   }, []);
 
+  const shouldTrackProgress = Boolean(activeJobId) && !isTerminalProgress(progressQuery.data);
+
   useEffect(() => {
+    if (!shouldTrackProgress) {
+      reconnectAttemptRef.current = 0;
+      clearReconnectTimer();
+      setSseStatus("idle");
+      return;
+    }
+
     let disposed = false;
     let closed = false;
     let unsubscribe = () => {};
@@ -131,14 +150,17 @@ export function useDownloadManager() {
       clearReconnectTimer();
       closeConnection();
     };
-  }, [activeJobId, clearReconnectTimer, progressQueryKey, queryClient, reconnectToken]);
+  }, [activeJobId, clearReconnectTimer, progressQueryKey, queryClient, reconnectToken, shouldTrackProgress]);
 
   const forceReconnect = useCallback(() => {
+    if (!shouldTrackProgress) {
+      return;
+    }
     clearReconnectTimer();
     reconnectAttemptRef.current += 1;
     setSseStatus("reconnecting");
     setReconnectToken((current) => current + 1);
-  }, [clearReconnectTimer]);
+  }, [clearReconnectTimer, shouldTrackProgress]);
 
   useEffect(() => {
     setSelectedChapters([]);

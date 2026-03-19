@@ -25,7 +25,7 @@ def test_chapters_fetch_list_breaks_repeated_pagination_next():
                         "ourn": "urn:orm:chapter:1",
                         "title": "Intro",
                         "reference_id": "book-/intro.xhtml",
-                        "content_url": "https://example.com/intro",
+                        "content_url": "https://learning.oreilly.com/intro",
                         "related_assets": {"images": [], "stylesheets": []},
                         "virtual_pages": 1,
                         "minutes_required": 1.0,
@@ -40,3 +40,16 @@ def test_chapters_fetch_list_breaks_repeated_pagination_next():
 
     assert len(chapters) == 1
     assert calls["count"] == 1
+
+
+def test_sanitize_remote_url_blocks_external_hosts():
+    plugin = ChaptersPlugin()
+
+    assert plugin._sanitize_remote_url("https://example.com/chapter.xhtml") == ""
+
+
+def test_sanitize_remote_url_allows_base_host_and_subdomains():
+    plugin = ChaptersPlugin()
+
+    assert plugin._sanitize_remote_url("https://learning.oreilly.com/chapter.xhtml")
+    assert plugin._sanitize_remote_url("https://cdn.learning.oreilly.com/chapter.xhtml")

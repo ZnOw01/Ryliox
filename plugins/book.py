@@ -1,5 +1,7 @@
 import asyncio
-from urllib.parse import quote, quote_plus
+from urllib.parse import quote, quote_plus, urlparse
+
+from bs4 import BeautifulSoup
 
 import config
 
@@ -9,6 +11,25 @@ from .base import Plugin
 class BookPlugin(Plugin):
     """Plugin for fetching book metadata and searching the catalog."""
 
+    def _extract_book_id_candidate(self, raw_query: str) -> str | None:
+        value = str(raw_query).strip()
+        if not value:
+            return None
+
+        if value.startswith(("http://", "https://")):
+            try:
+                parsed = urlparse(value)
+            except ValueError:
+                return None
+            parts = [part for part in parsed.path.split("/") if part]
+            if parts:
+                return parts[-1]
+
+        if "/" not in value and "\\" not in value:
+            return value
+
+        return None
+
     async def fetch(self, book_id: str) -> dict:
         async with asyncio.TaskGroup() as task_group:
             search_task = task_group.create_task(self._fetch_search(book_id))
@@ -16,6 +37,14 @@ class BookPlugin(Plugin):
 
         search_data = search_task.result()
         epub_data = epub_task.result()
+        fallback_metadata = await self._fetch_epub_fallback_metadata(
+            book_id,
+            missing_fields={
+                "authors": not search_data.get("authors"),
+                "publishers": not search_data.get("publishers"),
+                "cover_url": not search_data.get("cover_url"),
+            },
+        )
 
         descriptions = epub_data.get("descriptions") or {}
         html_description = (
@@ -26,10 +55,10 @@ class BookPlugin(Plugin):
             "id": book_id,
             "ourn": epub_data.get("ourn"),
             "title": epub_data.get("title"),
-            "authors": search_data.get("authors", []),
-            "publishers": search_data.get("publishers", []),
+            "authors": search_data.get("authors") or fallback_metadata.get("authors", []),
+            "publishers": search_data.get("publishers") or fallback_metadata.get("publishers", []),
             "description": html_description,
-            "cover_url": search_data.get("cover_url"),
+            "cover_url": search_data.get("cover_url") or fallback_metadata.get("cover_url"),
             "isbn": epub_data.get("isbn"),
             "language": epub_data.get("language", "en"),
             "publication_date": epub_data.get("publication_date"),
@@ -61,8 +90,125 @@ class BookPlugin(Plugin):
         url = f"{config.API_V2}/epubs/urn:orm:book:{encoded_book_id}/"
         return await self.http.get_json(url)
 
+    async def _fetch_epub_fallback_metadata(
+        self,
+        book_id: str,
+        *,
+        missing_fields: dict[str, bool],
+    ) -> dict:
+        if not any(missing_fields.values()):
+            return {}
+
+        async with asyncio.TaskGroup() as task_group:
+            titlepage_task = (
+                task_group.create_task(self._fetch_epub_file(book_id, "titlepage01.html"))
+                if missing_fields.get("authors")
+                else None
+            )
+            copyright_task = (
+                task_group.create_task(self._fetch_epub_file(book_id, "copyright-page01.html"))
+                if missing_fields.get("authors") or missing_fields.get("publishers")
+                else None
+            )
+            cover_task = (
+                task_group.create_task(self._fetch_epub_file(book_id, "cover.html"))
+                if missing_fields.get("cover_url")
+                else None
+            )
+
+        titlepage_html = titlepage_task.result() if titlepage_task else ""
+        copyright_html = copyright_task.result() if copyright_task else ""
+        cover_html = cover_task.result() if cover_task else ""
+
+        authors = self._extract_authors_from_epub_pages(
+            titlepage_html=titlepage_html,
+            copyright_html=copyright_html,
+        )
+        publishers = self._extract_publishers_from_epub_page(copyright_html)
+        cover_url = self._extract_cover_url_from_epub_page(book_id, cover_html)
+
+        return {
+            "authors": authors,
+            "publishers": publishers,
+            "cover_url": cover_url,
+        }
+
+    async def _fetch_epub_file(self, book_id: str, relative_path: str) -> str:
+        encoded_book_id = quote(str(book_id).strip(), safe="")
+        encoded_path = quote(relative_path, safe="/")
+        url = f"{config.API_V2}/epubs/urn:orm:book:{encoded_book_id}/files/{encoded_path}"
+        try:
+            return await self.http.get_text(url)
+        except Exception:
+            return ""
+
+    def _extract_authors_from_epub_pages(
+        self,
+        *,
+        titlepage_html: str,
+        copyright_html: str,
+    ) -> list[str]:
+        for html in (titlepage_html, copyright_html):
+            authors = self._extract_authors_from_html(html)
+            if authors:
+                return authors
+        return []
+
+    def _extract_authors_from_html(self, html: str) -> list[str]:
+        if not html.strip():
+            return []
+
+        soup = BeautifulSoup(html, "html.parser")
+        author_nodes = soup.select(".author")
+        candidates: list[str] = []
+
+        for node in author_nodes:
+            text = node.get_text(" ", strip=True)
+            if not text:
+                continue
+            normalized = text.removeprefix("por ").strip()
+            normalized = normalized.replace(" y ", ", ")
+            parts = [part.strip(" ,") for part in normalized.split(",") if part.strip(" ,")]
+            candidates.extend(parts)
+
+        deduped: list[str] = []
+        for name in candidates:
+            if name not in deduped:
+                deduped.append(name)
+        return deduped
+
+    def _extract_publishers_from_epub_page(self, html: str) -> list[str]:
+        if not html.strip():
+            return []
+
+        soup = BeautifulSoup(html, "html.parser")
+        publishers: list[str] = []
+
+        for node in soup.select(".publishername"):
+            value = node.get_text(" ", strip=True).strip(" ,")
+            if value and value not in publishers:
+                publishers.append(value)
+
+        return publishers
+
+    def _extract_cover_url_from_epub_page(self, book_id: str, html: str) -> str | None:
+        if html.strip():
+            soup = BeautifulSoup(html, "html.parser")
+            image = soup.find("img")
+            if image and image.get("src"):
+                raw_src = str(image["src"]).strip()
+                if raw_src.startswith(("http://", "https://")):
+                    return raw_src
+                return f"{config.BASE_URL}{raw_src}" if raw_src.startswith("/") else f"{config.BASE_URL}/{raw_src}"
+
+        clean_book_id = str(book_id).strip()
+        if clean_book_id:
+            return f"{config.BASE_URL}/library/cover/{clean_book_id}/"
+        return None
+
     async def search(self, query: str, limit: int = 10) -> list[dict]:
-        encoded_query = quote_plus(str(query).strip())
+        raw_query = str(query).strip()
+        encoded_query = quote_plus(raw_query)
         try:
             safe_limit = max(1, min(int(limit), 100))
         except (TypeError, ValueError):
@@ -89,5 +235,31 @@ class BookPlugin(Plugin):
                     "publishers": item.get("publishers", []),
                 }
             )
+
+        if results:
+            return results
+
+        candidate = self._extract_book_id_candidate(raw_query)
+        if not candidate:
+            return results
+
+        try:
+            fallback_book = await self.fetch(candidate)
+        except Exception:
+            return results
+
+        title = str(fallback_book.get("title") or "").strip()
+        if not title:
+            return results
+
+        return [
+            {
+                "id": str(fallback_book.get("id") or candidate),
+                "title": title,
+                "authors": fallback_book.get("authors", []),
+                "cover_url": fallback_book.get("cover_url"),
+                "publishers": fallback_book.get("publishers", []),
+            }
+        ]
 
         return results

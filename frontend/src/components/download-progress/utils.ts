@@ -60,6 +60,7 @@ export function formatSseStatusLabel(status: SseStatus): string {
     connected: "activas",
     connecting: "iniciando",
     error: "pausadas",
+    idle: "en espera",
     reconnecting: "reintentando",
   };
   return labels[status];

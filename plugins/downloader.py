@@ -18,6 +18,18 @@ from plugins.pdf import generate_pdf_chapters_in_subprocess, generate_pdf_in_sub
 
 logger = logging.getLogger(__name__)
 
+
+def _configured_base_host() -> str:
+    try:
+        return (urlparse(config.BASE_URL).hostname or "").lower()
+    except ValueError:
+        return ""
+
+
+def _is_allowed_host(host: str) -> bool:
+    base_host = _configured_base_host()
+    return bool(base_host) and (host == base_host or host.endswith(f".{base_host}"))
+
 @dataclass
 class DownloadProgress:
     """Progress state for download operations."""
@@ -207,6 +219,10 @@ class DownloaderPlugin(Plugin):
         else:
             chapters = all_chapters
         chapters = self._sanitize_chapters_for_output(chapters)
+        if selected_chapters is not None and not chapters:
+            raise ValueError(
+                "Selected chapters did not match any available chapters."
+            )
 
         book_dir = await asyncio.to_thread(
             output_plugin.create_book_dir,
@@ -608,6 +624,9 @@ class DownloaderPlugin(Plugin):
                 return False
         except ValueError:
             pass
+
+        if not _is_allowed_host(host):
+            return False
 
         return True
 

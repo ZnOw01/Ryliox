@@ -12,6 +12,8 @@ from typing import Any, Final
 
 import uvicorn
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from fastapi.staticfiles import StaticFiles
@@ -136,6 +138,17 @@ def create_app() -> FastAPI:
             status_code,
             code="http_error",
             details={"detail": detail} if detail is not None else None,
+        )
+
+    @app.exception_handler(RequestValidationError)
+    async def _handle_request_validation_error(
+        _: Request, exc: RequestValidationError
+    ) -> Response:
+        return error_response(
+            "Validation failed",
+            422,
+            code="validation_error",
+            details={"errors": jsonable_encoder(exc.errors())},
         )
 
     @app.middleware("http")

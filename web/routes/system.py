@@ -69,6 +69,18 @@ async def reveal_file(
         )
 
     path = Path(data.path).resolve()
+    output_root = config.OUTPUT_DIR.resolve()
+    try:
+        path.relative_to(output_root)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "error": "Path must be inside OUTPUT_DIR",
+                "code": "path_outside_output_dir",
+            },
+        ) from exc
+
     if not path.exists():
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

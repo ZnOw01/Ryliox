@@ -17,6 +17,29 @@ const SEARCH_SCOPES: Array<{ value: SearchScope; label: string }> = [
   { value: "publisher", label: "Editorial" },
 ];
 
+function extractBookIdCandidate(query: string): string | null {
+  const value = query.trim();
+  if (!value) {
+    return null;
+  }
+
+  if (/^https?:\/\//i.test(value)) {
+    try {
+      const url = new URL(value);
+      const parts = url.pathname.split("/").filter(Boolean);
+      return parts.length > 0 ? parts[parts.length - 1] : null;
+    } catch {
+      return null;
+    }
+  }
+
+  if (!/[\\/]/.test(value)) {
+    return value;
+  }
+
+  return null;
+}
+
 function readSearchStateFromUrl(): { query: string; scope: SearchScope } {
   if (typeof window === "undefined") {
     return { query: "", scope: "all" };
@@ -36,6 +59,8 @@ function searchMatch(book: SearchBook, query: string, scope: SearchScope): boole
   }
 
   const value = query.toLowerCase();
+  const bookId = (book.id || "").toLowerCase();
+  const idCandidate = extractBookIdCandidate(query)?.toLowerCase() ?? "";
   const title = (book.title || "").toLowerCase();
   const authors = (book.authors || []).join(" ").toLowerCase();
   const publishers = (book.publishers || []).join(" ").toLowerCase();
@@ -49,7 +74,14 @@ function searchMatch(book: SearchBook, query: string, scope: SearchScope): boole
   if (scope === "publisher") {
     return publishers.includes(value);
   }
-  return title.includes(value) || authors.includes(value) || publishers.includes(value);
+
+  return (
+    title.includes(value)
+    || authors.includes(value)
+    || publishers.includes(value)
+    || bookId.includes(value)
+    || Boolean(idCandidate && bookId.includes(idCandidate))
+  );
 }
 
 export function SearchBooksCard() {

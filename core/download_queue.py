@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import sqlite3
 import threading
 import time
@@ -16,6 +17,7 @@ from typing import Any, Callable
 from core.kernel import Kernel
 from plugins.downloader import DownloadProgress, DownloadResult
 
+logger = logging.getLogger(__name__)
 
 TERMINAL_STATES = frozenset(["completed", "error", "cancelled"])
 
@@ -701,8 +703,16 @@ class DownloadQueueService:
             active_cancel_event.set()
         if worker and worker.is_alive():
             worker.join(timeout=max(0.1, timeout_seconds))
-        if worker is None or not worker.is_alive():
-            self.store.close()
+        if worker is not None and worker.is_alive():
+            message = (
+                "Download queue worker did not stop within "
+                f"{max(0.1, timeout_seconds):.1f}s; leaving store open."
+            )
+            logger.error(message)
+            raise RuntimeError(message)
+        self.store.close()
+        with self._state_lock:
+            self._worker = None
 
     def enqueue(
         self,

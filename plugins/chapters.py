@@ -12,6 +12,18 @@ logger = logging.getLogger(__name__)
 _COVER_WORD_RE = re.compile(r"\bcover\b", re.IGNORECASE)
 
 
+def _configured_base_host() -> str:
+    try:
+        return (urlparse(config.BASE_URL).hostname or "").lower()
+    except ValueError:
+        return ""
+
+
+def _is_allowed_host(host: str) -> bool:
+    base_host = _configured_base_host()
+    return bool(base_host) and (host == base_host or host.endswith(f".{base_host}"))
+
+
 class ChaptersPlugin(Plugin):
     """Plugin for fetching book chapters and their content."""
 
@@ -160,5 +172,8 @@ class ChaptersPlugin(Plugin):
                 return ""
         except ValueError:
             pass
+
+        if not _is_allowed_host(host):
+            return ""
 
         return value

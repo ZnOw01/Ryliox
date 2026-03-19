@@ -65,3 +65,19 @@ def test_require_same_origin_allows_matching_origin_header():
     )
 
     guard(request)
+
+
+def test_require_same_origin_ignores_forwarded_headers_by_default():
+    guard = require_same_origin("save_cookies")
+    request = _build_request(
+        {
+            "host": "localhost",
+            "origin": "https://app.example.com",
+            "x-forwarded-host": "app.example.com",
+            "x-forwarded-proto": "https",
+        },
+        method="POST",
+    )
+
+    with pytest.raises(ForbiddenOriginError):
+        guard(request)

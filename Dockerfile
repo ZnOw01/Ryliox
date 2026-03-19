@@ -1,3 +1,13 @@
+FROM node:18-bookworm-slim AS frontend-build
+
+WORKDIR /build/frontend
+
+COPY frontend/package*.json ./
+RUN npm ci
+
+COPY frontend/ ./
+RUN npm run build
+
 FROM python:3.11-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -22,10 +32,11 @@ RUN groupadd --gid 1001 appgroup \
 
 WORKDIR /app
 
-COPY requirements.txt .
+COPY requirements.txt ./
 RUN pip install --no-cache-dir --disable-pip-version-check -r requirements.txt
 
-COPY --chown=appuser:appgroup . .
+COPY --chown=appuser:appgroup . ./
+COPY --from=frontend-build /build/frontend/dist /app/frontend/dist
 
 RUN mkdir -p /app/data/logs /app/output \
     && chown -R appuser:appgroup /app/data /app/output

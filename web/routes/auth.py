@@ -19,6 +19,16 @@ router = APIRouter(prefix="/api", tags=["auth"])
 _CookiesBody = Union[dict, list, str, None]
 
 
+def _restore_previous_cookies(
+    session_store: SessionStore, kernel: Kernel, previous_cookies: dict[str, str]
+) -> None:
+    try:
+        session_store.save_cookies(previous_cookies)
+        kernel.http.reload_cookies()
+    except Exception:
+        logger.exception("No se pudieron restaurar cookies previas.")
+
+
 @router.get("/status", response_model=StatusResponse)
 async def auth_status(
     kernel: Kernel = Depends(get_kernel),
@@ -75,19 +85,34 @@ async def save_cookies(
         logger.warning("reload_cookies falló tras guardar: %s", exc)
 
     auth = kernel["auth"]
-    status_result: dict = await auth.get_status()
+    try:
+        status_result: dict = await auth.get_status()
+    except Exception as exc:
+        logger.warning("Validacion de cookies fallo por error inesperado: %s", exc)
+        _restore_previous_cookies(session_store, kernel, previous_cookies)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={
+                "error": "Unable to validate cookies right now. Please try again.",
+                "code": "cookies_validation_unavailable",
+            },
+        ) from exc
 
-    if (
-        not status_result.get("valid")
-        and status_result.get("reason") != "network_error"
-    ):
-        try:
-            session_store.save_cookies(previous_cookies)
-            kernel.http.reload_cookies()
-        except Exception:
-            logger.exception(
-                "No se pudieron restaurar cookies previas tras validacion fallida."
-            )
+    if status_result.get("reason") == "network_error":
+        _restore_previous_cookies(session_store, kernel, previous_cookies)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={
+                "error": (
+                    "Unable to validate cookies because the upstream auth check "
+                    "is temporarily unavailable. Previous session was restored."
+                ),
+                "code": "cookies_validation_unavailable",
+            },
+        )
+
+    if not status_result.get("valid"):
+        _restore_previous_cookies(session_store, kernel, previous_cookies)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail={

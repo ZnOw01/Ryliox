@@ -9,6 +9,7 @@ Precedence (highest -> lowest):
 from __future__ import annotations
 
 import logging
+import os
 import secrets
 from pathlib import Path
 from types import MappingProxyType
@@ -48,17 +49,28 @@ def _to_absolute_path(path: Path) -> Path:
     return path if path.is_absolute() else (BASE_DIR / path)
 
 
+def _nearest_existing_directory(path: Path) -> Path | None:
+    current = path
+    while True:
+        if current.exists():
+            if current.is_dir():
+                return current
+            parent = current.parent
+            return parent if parent != current else None
+        parent = current.parent
+        if parent == current:
+            return None
+        current = parent
+
+
 def _dir_is_writable(path: Path) -> bool:
-    try:
-        if path.exists() and not path.is_dir():
-            return False
-        path.mkdir(parents=True, exist_ok=True)
-        probe = path / ".rw_probe"
-        probe.write_text("ok", encoding="utf-8")
-        probe.unlink(missing_ok=True)
-        return True
-    except OSError:
+    if path.exists():
+        return path.is_dir() and os.access(path, os.W_OK | os.X_OK)
+
+    existing_parent = _nearest_existing_directory(path.parent)
+    if existing_parent is None:
         return False
+    return os.access(existing_parent, os.W_OK | os.X_OK)
 
 
 def _resolve_runtime_dir(
