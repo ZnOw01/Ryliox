@@ -11,7 +11,8 @@ from plugins.chapters import ChaptersPlugin
 pytestmark = pytest.mark.unit
 
 
-def test_chapters_fetch_list_breaks_repeated_pagination_next():
+@pytest.mark.asyncio
+async def test_chapters_fetch_list_breaks_repeated_pagination_next():
     first_url = f"{config.API_V2}/epub-chapters/?epub_identifier=urn:orm:book:demo"
     calls: dict[str, int] = {"count": 0}
 
@@ -36,7 +37,7 @@ def test_chapters_fetch_list_breaks_repeated_pagination_next():
 
     plugin = ChaptersPlugin()
     plugin.kernel = SimpleNamespace(http=DummyHttp())
-    chapters = asyncio.run(plugin.fetch_list("demo"))
+    chapters = await plugin.fetch_list("demo")
 
     assert len(chapters) == 1
     assert calls["count"] == 1

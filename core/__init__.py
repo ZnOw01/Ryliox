@@ -3,7 +3,13 @@
 from __future__ import annotations
 
 from importlib import import_module
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from . import process_manager
+    from .http_client import HttpClient
+    from .kernel import Kernel, create_default_kernel
+    from .types import BookInfo, ChapterInfo, ChapterSummary, FormatInfo
 
 __all__ = [
     "Kernel",

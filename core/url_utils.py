@@ -26,6 +26,10 @@ def _is_allowed_host(host: str) -> bool:
 def _is_blocked_host(host: str) -> bool:
     if not host:
         return True
+    if any(ch.isspace() for ch in host):
+        return True
+    if any(ch in "[]:/\\@?&#%" for ch in host):
+        return True
     if host == "localhost" or host.endswith(".local"):
         return True
 

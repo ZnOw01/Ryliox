@@ -8,7 +8,7 @@ import logging
 import time
 from typing import Any
 
-from fastapi import APIRouter, Body, Depends, Query, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request, status
 from fastapi.responses import StreamingResponse
 from pydantic import TypeAdapter, ValidationError
 
@@ -92,11 +92,23 @@ def _normalize_progress_snapshot(snapshot: dict[str, Any] | None) -> dict[str, A
             "pdf": snapshot.get("pdf"),
         }
 
-    if raw_status in {"error", "cancelled"}:
+    if raw_status == "cancelled":
+        return {
+            **base,
+            "status": "cancelled",
+            "error": _coerce_str(snapshot.get("error")) or "Download cancelled by user",
+            "code": _coerce_str(snapshot.get("code")),
+            "details": (
+                snapshot.get("details")
+                if isinstance(snapshot.get("details"), dict)
+                else None
+            ),
+            "trace_log": _coerce_str(snapshot.get("trace_log")),
+        }
+
+    if raw_status == "error":
         fallback = (
-            "Download cancelled by user"
-            if raw_status == "cancelled"
-            else "Download failed"
+            "Download failed"
         )
         return {
             **base,
@@ -140,7 +152,7 @@ def _invalid_progress_payload(snapshot: dict[str, Any] | None) -> dict[str, Any]
         "job_id": job_id,
         "book_id": book_id,
         "error": "Progress data became invalid.",
-        "code": "invalid_progress_snapshot",
+        "code": ErrorCode.INVALID_PROGRESS_SNAPSHOT,
     }
 
 
@@ -166,7 +178,13 @@ def progress(
     job_id: str | None = Query(default=None),
     download_queue: DownloadQueueService = Depends(get_download_queue),
 ) -> dict[str, Any]:
-    return _progress_payload(download_queue.get_progress(job_id=job_id))
+    snapshot = download_queue.get_progress(job_id=job_id)
+    if job_id and not snapshot:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"error": "Job not found", "code": ErrorCode.JOB_NOT_FOUND},
+        )
+    return _progress_payload(snapshot)
 
 
 @router.get(
@@ -174,16 +192,35 @@ def progress(
     dependencies=[Depends(require_same_origin("stream_progress"))],
 )
 async def progress_stream(
+    request: Request,
     job_id: str | None = Query(default=None),
     download_queue: DownloadQueueService = Depends(get_download_queue),
 ) -> StreamingResponse:
+    if job_id and not download_queue.get_progress(job_id=job_id):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"error": "Job not found", "code": ErrorCode.JOB_NOT_FOUND},
+        )
+
     async def event_stream():
         last_signature: str | None = None
         last_heartbeat_at = time.monotonic()
         progress_version = download_queue.get_progress_version()
         try:
             while True:
+                if await request.is_disconnected():
+                    return
                 snapshot = download_queue.get_progress(job_id=job_id)
+                if job_id and not snapshot:
+                    yield sse_event(
+                        "error",
+                        {
+                            "error": "Job not found",
+                            "code": str(ErrorCode.JOB_NOT_FOUND),
+                            "job_id": job_id,
+                        },
+                    )
+                    return
                 payload = _progress_payload(snapshot)
                 signature = json.dumps(payload, sort_keys=True, separators=(",", ":"))
 

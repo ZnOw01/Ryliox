@@ -46,18 +46,20 @@ def _make_plugin(response: _FakeResponse) -> tuple[AuthPlugin, _FakeHttp]:
     return plugin, http
 
 
-def test_get_status_marks_expired_session_from_structured_json():
+@pytest.mark.asyncio
+async def test_get_status_marks_expired_session_from_structured_json():
     plugin, http = _make_plugin(
         _FakeResponse(200, {"user_type": "Expired", "profile": {"name": "demo"}})
     )
 
-    status = asyncio.run(plugin.get_status())
+    status = await plugin.get_status()
 
     assert http.calls == [("/profile/", {"allow_redirects": False})]
     assert status == {"valid": False, "reason": "subscription_expired"}
 
 
-def test_get_status_accepts_authenticated_html_profile_response():
+@pytest.mark.asyncio
+async def test_get_status_accepts_authenticated_html_profile_response():
     plugin, _ = _make_plugin(
         _FakeResponse(
             200,
@@ -66,12 +68,13 @@ def test_get_status_accepts_authenticated_html_profile_response():
         )
     )
 
-    status = asyncio.run(plugin.get_status())
+    status = await plugin.get_status()
 
     assert status == {"valid": True, "reason": None}
 
 
-def test_get_status_treats_non_json_login_html_as_invalid():
+@pytest.mark.asyncio
+async def test_get_status_treats_non_json_login_html_as_invalid():
     plugin, _ = _make_plugin(
         _FakeResponse(
             200,
@@ -80,20 +83,22 @@ def test_get_status_treats_non_json_login_html_as_invalid():
         )
     )
 
-    status = asyncio.run(plugin.get_status())
+    status = await plugin.get_status()
 
     assert status == {"valid": False, "reason": "not_authenticated"}
 
 
-def test_get_status_requires_dict_payload():
+@pytest.mark.asyncio
+async def test_get_status_requires_dict_payload():
     plugin, _ = _make_plugin(_FakeResponse(200, payload=["unexpected"]))
 
-    status = asyncio.run(plugin.get_status())
+    status = await plugin.get_status()
 
     assert status == {"valid": False, "reason": "not_authenticated"}
 
 
-def test_validate_session_returns_boolean_status():
+@pytest.mark.asyncio
+async def test_validate_session_returns_boolean_status():
     plugin, _ = _make_plugin(_FakeResponse(200, {"user_type": "Active"}))
 
-    assert asyncio.run(plugin.validate_session()) is True
+    assert await plugin.validate_session() is True

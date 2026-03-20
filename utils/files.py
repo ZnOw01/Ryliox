@@ -5,6 +5,24 @@ from __future__ import annotations
 import re
 import unicodedata
 
+_TRANSLITERATION_REPLACEMENTS = str.maketrans(
+    {
+        "Æ": "AE",
+        "æ": "ae",
+        "Œ": "OE",
+        "œ": "oe",
+        "Ø": "O",
+        "ø": "o",
+        "Ł": "L",
+        "ł": "l",
+        "Đ": "D",
+        "đ": "d",
+        "Þ": "Th",
+        "þ": "th",
+        "ß": "ss",
+    }
+)
+
 _FILENAME_CHAR_MAP: dict[int, str | None] = str.maketrans(
     {
         "/": "-",
@@ -45,7 +63,7 @@ def remove_accents(text: str) -> str:
         >>> remove_accents("über")
         'uber'
     """
-    normalized = unicodedata.normalize("NFKD", text)
+    normalized = unicodedata.normalize("NFKD", text.translate(_TRANSLITERATION_REPLACEMENTS))
     return normalized.encode("ascii", "ignore").decode("ascii")
 
 
@@ -54,7 +72,10 @@ def _truncate_to_bytes(text: str, max_bytes: int) -> str:
     encoded = text.encode("utf-8")
     if len(encoded) <= max_bytes:
         return text
-    return encoded[:max_bytes].decode("utf-8", errors="ignore")
+    truncated = encoded[:max_bytes]
+    while truncated and (truncated[-1] & 0xC0) == 0x80:
+        truncated = truncated[:-1]
+    return truncated.decode("utf-8", errors="ignore")
 
 
 def _fix_windows_reserved(name: str) -> str:
@@ -95,11 +116,11 @@ def sanitize_filename(name: str | None) -> str:
 
     name = name.translate(_FILENAME_CHAR_MAP)
 
-    name = " ".join(name.split()).strip(".")
+    name = " ".join(name.split()).strip().strip(".")
 
     name = _fix_windows_reserved(name)
 
-    name = _truncate_to_bytes(name, _MAX_FILENAME_BYTES).strip().strip(".")
+    name = _truncate_to_bytes(name, _MAX_FILENAME_BYTES)
 
     return name or "unnamed_file"
 

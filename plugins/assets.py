@@ -8,6 +8,7 @@ from urllib.parse import urlparse
 
 import config
 from core.url_utils import ensure_safe_asset_url
+
 from .base import Plugin
 
 ASSET_DOWNLOAD_CONCURRENCY_LIMIT = 8
@@ -31,6 +32,23 @@ class AssetsPlugin(Plugin):
         content = await self.http.get_bytes(url)
         await asyncio.to_thread(save_path.write_bytes, content)
         return True
+
+    async def download_cover_image(self, url: str, images_dir: Path, stem: str = "cover") -> Path:
+        """Download a cover image using the real media type for the final suffix."""
+        ensure_safe_asset_url(url)
+        await asyncio.to_thread(images_dir.mkdir, parents=True, exist_ok=True)
+
+        response = await self.http.get(url)
+        response.raise_for_status()
+        content = response.content
+        suffix = self._detect_image_suffix(
+            response.headers.get("content-type"),
+            url,
+            content,
+        )
+        save_path = images_dir / f"{stem}{suffix}"
+        await asyncio.to_thread(save_path.write_bytes, content)
+        return save_path
 
     async def download_css(self, url: str, save_path: Path) -> bool:
         """Download CSS text and save to disk."""
@@ -108,7 +126,7 @@ class AssetsPlugin(Plugin):
 
         def build_path(_: int, url: str) -> Path:
             parsed_url = urlparse(url)
-            filename = parsed_url.path.split("/")[-1]
+            filename = Path(parsed_url.path).name
             if not filename:
                 filename = "image_asset.bin"
             return output_dir / "Images" / filename
@@ -144,3 +162,31 @@ class AssetsPlugin(Plugin):
 
     def _ensure_safe_asset_url(self, url: str) -> None:
         ensure_safe_asset_url(url)
+
+    def _detect_image_suffix(self, content_type: str | None, url: str, content: bytes) -> str:
+        media_type = str(content_type or "").split(";", 1)[0].strip().lower()
+        if media_type == "image/jpeg":
+            return ".jpg"
+        if media_type == "image/png":
+            return ".png"
+        if media_type == "image/webp":
+            return ".webp"
+        if media_type == "image/gif":
+            return ".gif"
+        if media_type == "image/svg+xml":
+            return ".svg"
+
+        if content.startswith(b"\xff\xd8\xff"):
+            return ".jpg"
+        if content.startswith(b"\x89PNG\r\n\x1a\n"):
+            return ".png"
+        if content.startswith((b"GIF87a", b"GIF89a")):
+            return ".gif"
+        if content.startswith(b"RIFF") and content[8:12] == b"WEBP":
+            return ".webp"
+        if content.lstrip().startswith(b"<svg"):
+            return ".svg"
+
+        parsed_url = urlparse(url)
+        suffix = Path(parsed_url.path).suffix.lower()
+        return suffix if suffix else ".img"

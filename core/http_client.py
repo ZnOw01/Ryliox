@@ -1,7 +1,10 @@
 import asyncio
+import logging
 import time
+from collections.abc import Mapping, Sequence
+from http.cookiejar import Cookie
 from pathlib import Path
-from typing import Mapping
+from typing import Any
 from urllib.parse import urljoin, urlparse
 
 import httpx
@@ -9,6 +12,24 @@ import httpx
 import config
 from core.session_store import SessionStore
 from core.url_utils import normalize_remote_url
+
+logger = logging.getLogger(__name__)
+
+
+def _parse_cookie_expires(value: Any) -> int | None:
+    if value in {None, ""}:
+        return None
+    if isinstance(value, (int, float)):
+        return int(float(value))
+    if isinstance(value, str):
+        stripped = value.strip()
+        if not stripped:
+            return None
+        try:
+            return int(float(stripped))
+        except ValueError:
+            return None
+    return None
 
 
 class HttpClient:
@@ -30,22 +51,48 @@ class HttpClient:
         except ValueError:
             return ""
 
-    def _apply_cookies(self, cookies: Mapping[str, str]):
-        for name, value in cookies.items():
-            if self._cookie_domain:
-                self.client.cookies.set(
-                    str(name),
-                    str(value),
-                    domain=self._cookie_domain,
-                )
-            else:
-                self.client.cookies.set(str(name), str(value))
+    def _build_cookie(self, record: Mapping[str, Any]) -> Cookie:
+        domain = str(record.get("domain") or self._cookie_domain or "").strip().lower()
+        path = str(record.get("path") or "/").strip() or "/"
+        secure = bool(record.get("secure"))
+        expires = _parse_cookie_expires(record.get("expires"))
+        rest: dict[str, Any] = {}
+        if record.get("http_only"):
+            rest["HttpOnly"] = True
+        same_site = str(record.get("same_site") or "").strip()
+        if same_site:
+            rest["SameSite"] = same_site
+
+        return Cookie(
+            version=0,
+            name=str(record["name"]),
+            value=str(record["value"]),
+            port=None,
+            port_specified=False,
+            domain=domain,
+            domain_specified=bool(domain),
+            domain_initial_dot=domain.startswith("."),
+            path=path,
+            path_specified=True,
+            secure=secure,
+            expires=expires,
+            discard=expires is None,
+            comment=None,
+            comment_url=None,
+            rest=rest,
+            rfc2109=False,
+        )
+
+    def _apply_cookies(self, cookies: Sequence[Mapping[str, Any]]):
+        for record in cookies:
+            self.client.cookies.jar.set_cookie(self._build_cookie(record))
 
     def _load_cookies_from_store(self):
         try:
-            cookies = self.session_store.load_cookies(migrate_legacy=True)
+            cookies = self.session_store.load_cookie_records(migrate_legacy=True)
         except Exception:
-            cookies = {}
+            logger.exception("Failed to load cookies from SessionStore.")
+            cookies = []
         self._apply_cookies(cookies)
 
     def _normalize_request_url(self, url: str) -> str:

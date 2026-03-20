@@ -2,7 +2,6 @@ import { formatName } from "./utils";
 
 type FormatSelectorProps = {
   bookOnlyFormats: Set<string>;
-  descriptions?: Record<string, string>;
   format: string;
   formats: string[];
   hasChapterSelection: boolean;
@@ -13,7 +12,6 @@ type FormatSelectorProps = {
 
 export function FormatSelector({
   bookOnlyFormats,
-  descriptions,
   format,
   formats,
   hasChapterSelection,

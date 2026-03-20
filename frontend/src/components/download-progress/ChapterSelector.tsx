@@ -1,5 +1,6 @@
 import type { ChapterSummary, SearchBook } from "../../lib/types";
 import { ErrorNotice } from "./ErrorNotice";
+import { chapterMeta } from "./utils";
 
 type ChapterSelectorProps = {
   chapters: ChapterSummary[];
@@ -115,6 +116,7 @@ export function ChapterSelector({
               const checked = selectable && selectedChapterSet.has(chapter.index);
 
               if (!selectable) {
+                const meta = chapterMeta(chapter);
                 // Read-only row — no checkbox, no interaction
                 return (
                   <div
@@ -125,9 +127,12 @@ export function ChapterSelector({
                     <span className="block min-w-0 truncate text-sm text-slate-600">
                       {chapter.title}
                     </span>
+                    {meta ? <span className="text-xs text-slate-400">{meta}</span> : null}
                   </div>
                 );
               }
+
+              const meta = chapterMeta(chapter);
 
               return (
                 <label
@@ -144,6 +149,7 @@ export function ChapterSelector({
                     <span className={`block truncate ${checked ? "font-medium text-brand-deep" : "text-slate-800"}`}>
                       {chapter.title}
                     </span>
+                    {meta ? <span className="block text-xs text-slate-500">{meta}</span> : null}
                   </span>
                 </label>
               );

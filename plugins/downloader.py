@@ -5,10 +5,10 @@ import logging
 import shutil
 import time
 from collections import deque
+from collections.abc import Awaitable, Callable
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
-from typing import Awaitable, Callable
 
 import config
 from core.url_utils import is_safe_url, normalize_asset_url
@@ -77,6 +77,7 @@ class DownloaderPlugin(Plugin):
         output_plugin=None,
         epub_plugin=None,
     ):
+        super().__init__()
         self._book_plugin = book_plugin
         self._chapters_plugin = chapters_plugin
         self._assets_plugin = assets_plugin
@@ -235,8 +236,7 @@ class DownloaderPlugin(Plugin):
             if cover_url:
                 await abort_if_cancelled()
                 images_dir = output_plugin.get_images_dir(book_dir)
-                await asyncio.to_thread(images_dir.mkdir, parents=True, exist_ok=True)
-                await assets_plugin.download_image(cover_url, images_dir / "cover.jpg")
+                await assets_plugin.download_cover_image(cover_url, images_dir, stem="cover")
 
         all_css_urls: list[str] = []
         seen_css_urls: set[str] = set()
@@ -559,7 +559,7 @@ class DownloaderPlugin(Plugin):
                 return await asyncio.wait_for(
                     asyncio.shield(future), timeout=poll_interval_seconds
                 )
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 if cancel_check and cancel_check():
                     if on_cancel:
                         try:
@@ -578,6 +578,9 @@ class DownloaderPlugin(Plugin):
             try:
                 if process.is_alive():
                     process.terminate()
+                    process.join(timeout=1.0)
+                    if process.is_alive():
+                        process.kill()
             except Exception as exc:
                 logger.warning("Failed to terminate worker process: %s", exc)
                 continue

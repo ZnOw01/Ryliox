@@ -50,6 +50,8 @@ export function formatStatusLabel(status: string): string {
     queued: "en cola",
     running: "en progreso",
     completed: "completado",
+    cancelled: "cancelado",
+    canceled: "cancelado",
     error: "error",
   };
   return labels[status] ?? status.replace(/_/g, " ");

@@ -26,6 +26,7 @@ class ErrorCode(StrEnum):
     INVALID_COOKIES_PAYLOAD = "invalid_cookies_payload"
     INVALID_SESSION_AFTER_COOKIES = "invalid_session_after_cookies"
     COOKIES_SAVE_FAILED = "cookies_save_failed"
+    COOKIES_VALIDATION_UNAVAILABLE = "cookies_validation_unavailable"
     BOOK_CHAPTERS_FAILED = "book_chapters_failed"
     BOOK_FETCH_FAILED = "book_fetch_failed"
     BOOK_ID_REQUIRED = "book_id_required"
@@ -34,7 +35,10 @@ class ErrorCode(StrEnum):
     CHAPTERS_NOT_SUPPORTED_FOR_FORMAT = "chapters_not_supported_for_format"
     PATH_REQUIRED = "path_required"
     PATH_NOT_FOUND = "path_not_found"
+    PATH_OUTSIDE_OUTPUT_DIR = "path_outside_output_dir"
     REVEAL_FAILED = "reveal_failed"
+    INVALID_PROGRESS_SNAPSHOT = "invalid_progress_snapshot"
+    JOB_NOT_FOUND = "job_not_found"
 
 
 def error_response(

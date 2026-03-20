@@ -10,11 +10,11 @@ import threading
 import time
 import traceback
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
-from core.kernel import Kernel
 from plugins.downloader import DownloadProgress, DownloadResult
 
 logger = logging.getLogger(__name__)
@@ -90,6 +90,23 @@ class DownloadJobStore:
         with self._lock:
             self._last_progress_payload.clear()
             self._last_progress_write_at.clear()
+
+    def _cleanup_progress_cache_conn(self, conn: sqlite3.Connection) -> None:
+        if not self._last_progress_payload and not self._last_progress_write_at:
+            return
+        tracked_job_ids = set(self._last_progress_payload) | set(self._last_progress_write_at)
+        if not tracked_job_ids:
+            return
+        placeholders = ",".join(["?"] * len(tracked_job_ids))
+        rows = conn.execute(
+            f"SELECT job_id FROM download_jobs WHERE job_id IN ({placeholders})",
+            tuple(tracked_job_ids),
+        ).fetchall()
+        existing_job_ids = {str(row["job_id"]) for row in rows}
+        orphaned = tracked_job_ids - existing_job_ids
+        for job_id in orphaned:
+            self._last_progress_payload.pop(job_id, None)
+            self._last_progress_write_at.pop(job_id, None)
 
     def _initialize(self):
         with self._lock:
@@ -186,6 +203,7 @@ class DownloadJobStore:
             """,
             (*tuple(TERMINAL_STATES), self.terminal_job_retention),
         )
+        self._cleanup_progress_cache_conn(conn)
 
     def _json_dumps(self, value: Any) -> str:
         return json.dumps(value, separators=(",", ":"))
@@ -233,13 +251,22 @@ class DownloadJobStore:
                     ),
                 )
                 snapshot = self._get_job_snapshot_conn(conn, job_id)
+                if snapshot is None:
+                    logger.warning("Job snapshot missing right after enqueue for job_id=%s; retrying", job_id)
+                    snapshot = self._get_job_snapshot_conn(conn, job_id)
                 conn.commit()
+                if snapshot is None:
+                    logger.warning("Returning fallback snapshot for queued job_id=%s", job_id)
                 return snapshot or {"job_id": job_id, "status": "queued", "book_id": str(book_id), "percentage": 0}
 
     def claim_next_queued_job(self) -> DownloadJob | None:
         with self._lock:
             with self._connect() as conn:
-                conn.execute("BEGIN IMMEDIATE")
+                try:
+                    conn.execute("BEGIN IMMEDIATE")
+                except sqlite3.OperationalError as exc:
+                    logger.warning("Unable to claim queued job due to SQLite lock contention: %s", exc)
+                    return None
                 row = conn.execute(
                     """
                     SELECT *
@@ -263,6 +290,7 @@ class DownloadJobStore:
                     ("starting", now, now, row["job_id"]),
                 )
                 if cursor.rowcount != 1:
+                    logger.debug("Skipped claiming queued job %s due to concurrent update", row["job_id"])
                     conn.commit()
                     return None
 
@@ -436,7 +464,7 @@ class DownloadJobStore:
                 ).fetchone()
                 return bool(row["cancel_requested"]) if row is not None else False
 
-    def update_progress(self, job_id: str, progress: DownloadProgress):
+    def update_progress(self, job_id: str, progress: DownloadProgress) -> bool:
         now = time.time()
         current_chapter = (
             int(progress.current_chapter)
@@ -467,9 +495,9 @@ class DownloadJobStore:
                 or (now - previous_at) >= self.progress_write_interval_seconds
             )
             if not should_write:
-                return
+                return False
             with self._connect() as conn:
-                conn.execute(
+                cursor = conn.execute(
                     """
                     UPDATE download_jobs
                     SET
@@ -500,8 +528,11 @@ class DownloadJobStore:
                     ),
                 )
                 conn.commit()
+                if cursor.rowcount != 1:
+                    return False
                 self._last_progress_payload[job_id] = payload
                 self._last_progress_write_at[job_id] = now
+                return True
 
     def mark_completed(self, job_id: str, result: DownloadResult):
         now = time.time()
@@ -575,6 +606,38 @@ class DownloadJobStore:
                         now,
                         job_id,
                     ),
+                )
+                self._prune_terminal_jobs_conn(conn)
+                conn.commit()
+                self._last_progress_payload.pop(job_id, None)
+                self._last_progress_write_at.pop(job_id, None)
+
+    def mark_cancelled(
+        self,
+        *,
+        job_id: str,
+        error: str = "Download cancelled by user",
+        code: str = "download_cancelled",
+    ) -> None:
+        now = time.time()
+        with self._lock:
+            with self._connect() as conn:
+                conn.execute(
+                    """
+                    UPDATE download_jobs
+                    SET
+                        status = 'cancelled',
+                        error = ?,
+                        code = ?,
+                        details_json = NULL,
+                        trace_log = NULL,
+                        message = 'Cancelled',
+                        cancel_requested = 1,
+                        finished_at = ?,
+                        updated_at = ?
+                    WHERE job_id = ?
+                    """,
+                    (error, code, now, now, job_id),
                 )
                 self._prune_terminal_jobs_conn(conn)
                 conn.commit()
@@ -661,7 +724,7 @@ class DownloadQueueService:
     def __init__(
         self,
         *,
-        kernel_factory: Callable[[], Kernel],
+        kernel_factory: Callable[[], Any],
         db_path: Path,
         error_log_dir: Path,
         poll_interval_seconds: float = 0.5,
@@ -842,8 +905,8 @@ class DownloadQueueService:
                 downloader = kernel["downloader"]
 
                 def report_progress(progress: DownloadProgress):
-                    self.store.update_progress(job.job_id, progress)
-                    self._notify_progress_change()
+                    if self.store.update_progress(job.job_id, progress):
+                        self._notify_progress_change()
 
                 try:
                     return await downloader.download(
@@ -866,35 +929,25 @@ class DownloadQueueService:
             self._notify_progress_change()
         except asyncio.CancelledError as exc:
             message = str(exc)
-            trace_text = traceback.format_exc()
-            trace_log = self._write_error_trace(trace_text, job.job_id)
             error_message = message or "Download cancelled by user"
-            self.store.mark_failed(
+            self.store.mark_cancelled(
                 job_id=job.job_id,
-                status="cancelled",
                 error=error_message,
-                code="download_cancelled",
-                details=None,
-                trace_log=trace_log,
             )
             self._notify_progress_change()
         except Exception as exc:
             message = str(exc)
-            trace_text = traceback.format_exc()
-            trace_log = self._write_error_trace(trace_text, job.job_id)
 
             if self._is_cancel_requested(job.job_id, cancel_event) or "cancelled" in message.lower():
                 error_message = message or "Download cancelled by user"
-                self.store.mark_failed(
+                self.store.mark_cancelled(
                     job_id=job.job_id,
-                    status="cancelled",
                     error=error_message,
-                    code="download_cancelled",
-                    details=None,
-                    trace_log=trace_log,
                 )
                 self._notify_progress_change()
             else:
+                trace_text = traceback.format_exc()
+                trace_log = self._write_error_trace(trace_text, job.job_id)
                 details = {"trace_log": trace_log} if trace_log else None
                 self.store.mark_failed(
                     job_id=job.job_id,

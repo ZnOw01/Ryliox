@@ -38,8 +38,7 @@ Cola de descargas, progreso en tiempo real y soporte para seleccion de capitulos
 | Herramienta | Version minima |
 |---|---|
 | Python | 3.11 |
-| Node.js | 18 LTS |
-| npm | 9 |
+| Bun | 1.2 |
 | Docker | 24 (opcional) |
 
 **Dependencias de sistema para PDF (WeasyPrint):**
@@ -153,7 +152,7 @@ El endpoint `POST /api/cookies` acepta tres formatos:
 
 > Si la sesion sigue siendo invalida es probable que falten cookies `HttpOnly` que los extension exporters no incluyen. Usa siempre el formato de header crudo desde Network.
 >
-> Las cookies se guardan localmente en disco para reutilizar la sesion. Tratarlas como credenciales en texto plano: no compartas ese archivo ni subas `data/` o `cookies.json` a ningun repositorio.
+> Las cookies se guardan localmente en disco para reutilizar la sesion. Tratarlas como credenciales en texto plano: no compartas ese archivo ni subas el directorio de runtime ni ningun volcado de sesion a un repositorio.
 
 ---
 
@@ -168,14 +167,16 @@ Copia `.env.example` a `.env` y ajusta los valores que necesites. Todas las vari
 | `REQUEST_TIMEOUT` | `30` | Timeout HTTP en segundos |
 | `REQUEST_RETRIES` | `2` | Reintentos en fallo |
 | `REQUEST_RETRY_BACKOFF` | `0.5` | Espera entre reintentos |
-| `OUTPUT_DIR` | `./output` | Directorio de salida |
-| `DATA_DIR` | `./data` | Estado en tiempo de ejecucion |
+| `OUTPUT_DIR` | `./.runtime_output` | Directorio de salida |
+| `DATA_DIR` | `./.runtime_data` | Estado en tiempo de ejecucion |
 | `HOST` | `127.0.0.1` | Interfaz de escucha |
 | `PORT` | `8000` | Puerto del servidor |
 | `LOG_LEVEL` | `INFO` | Nivel de logging |
 | `CORS_ORIGINS` | `http://localhost:8000,http://127.0.0.1:8000` | Origenes CORS permitidos (use `*` para permitir cualquier origen, pero esto expone la API publicamente; usar solo en desarrollo) |
 
 > `HEADERS` no puede sobreescribir `User-Agent`, `Accept`, `Accept-Encoding` ni `Accept-Language`. Usa sus variables dedicadas en su lugar.
+>
+> Si quieres exportaciones visibles fuera del runtime oculto, define `OUTPUT_DIR` explicitamente en `.env`.
 
 ---
 
@@ -204,10 +205,10 @@ La documentacion interactiva completa esta disponible en **http://localhost:8000
 | Problema | Solucion |
 |---|---|
 | `Frontend build not found` | `python -m launcher --rebuild-frontend` |
-| `npm` no encontrado | Instala Node.js 18+ y abre una terminal nueva |
+| `bun` no encontrado | Instala Bun y abre una terminal nueva |
 | `403 forbidden_origin` | Envia el `POST` desde el mismo origen: `http://localhost:8000` |
 | Puerto 8000 ocupado | `python -m launcher --stop` |
-| Cola trabada en `queued` | Reinicia; si persiste, elimina `data/download_jobs.sqlite3` |
+| Cola trabada en `queued` | Reinicia; si persiste, elimina `.runtime_data/download_jobs.sqlite3` |
 | Sesion invalida aun con cookies | Usa el header HTTP crudo desde DevTools en lugar de un exporter |
 
 ---

@@ -11,7 +11,8 @@ from plugins.book import BookPlugin
 pytestmark = pytest.mark.unit
 
 
-def test_book_search_query_is_encoded():
+@pytest.mark.asyncio
+async def test_book_search_query_is_encoded():
     captured: list[str] = []
 
     class DummyHttp:
@@ -21,7 +22,7 @@ def test_book_search_query_is_encoded():
 
     plugin = BookPlugin()
     plugin.kernel = SimpleNamespace(http=DummyHttp())
-    asyncio.run(plugin.search("python clean code", limit=10))
+    await plugin.search("python clean code", limit=10)
 
     search_urls = [url for url in captured if "/search/?" in url]
     assert search_urls
@@ -30,7 +31,8 @@ def test_book_search_query_is_encoded():
     assert params.get("query") == ["python clean code"]
 
 
-def test_book_search_falls_back_to_direct_fetch_for_archive_id(monkeypatch):
+@pytest.mark.asyncio
+async def test_book_search_falls_back_to_direct_fetch_for_archive_id(monkeypatch):
     plugin = BookPlugin()
     plugin.kernel = SimpleNamespace(http=SimpleNamespace())
 
@@ -51,7 +53,7 @@ def test_book_search_falls_back_to_direct_fetch_for_archive_id(monkeypatch):
     plugin.http.get_json = fake_get_json  # type: ignore[method-assign]
     monkeypatch.setattr(plugin, "fetch", fake_fetch)
 
-    results = asyncio.run(plugin.search("9781098181642"))
+    results = await plugin.search("9781098181642")
 
     assert results == [
         {
@@ -64,7 +66,8 @@ def test_book_search_falls_back_to_direct_fetch_for_archive_id(monkeypatch):
     ]
 
 
-def test_book_search_falls_back_when_query_is_oreilly_url(monkeypatch):
+@pytest.mark.asyncio
+async def test_book_search_falls_back_when_query_is_oreilly_url(monkeypatch):
     plugin = BookPlugin()
     plugin.kernel = SimpleNamespace(http=SimpleNamespace())
 
@@ -84,14 +87,15 @@ def test_book_search_falls_back_when_query_is_oreilly_url(monkeypatch):
     plugin.http.get_json = fake_get_json  # type: ignore[method-assign]
     monkeypatch.setattr(plugin, "fetch", fake_fetch)
 
-    results = asyncio.run(
-        plugin.search("https://learning.oreilly.com/library/view/aprender-java-6a/9781098181642/")
+    results = await plugin.search(
+        "https://learning.oreilly.com/library/view/aprender-java-6a/9781098181642/"
     )
 
     assert results[0]["id"] == "9781098181642"
 
 
-def test_fetch_enriches_sparse_metadata_from_epub_files(monkeypatch):
+@pytest.mark.asyncio
+async def test_fetch_enriches_sparse_metadata_from_epub_files(monkeypatch):
     plugin = BookPlugin()
     plugin.kernel = SimpleNamespace(http=SimpleNamespace())
 
@@ -126,14 +130,15 @@ def test_fetch_enriches_sparse_metadata_from_epub_files(monkeypatch):
     monkeypatch.setattr(plugin, "_fetch_epub", fake_fetch_epub)
     monkeypatch.setattr(plugin, "_fetch_epub_file", fake_fetch_epub_file)
 
-    result = asyncio.run(plugin.fetch("9781098181642"))
+    result = await plugin.fetch("9781098181642")
 
     assert result["authors"] == ["Marc Loy", "Patrick Niemeyer", "Daniel Leuck"]
     assert result["publishers"] == ["O'Reilly Media, Inc."]
     assert result["cover_url"] == "https://learning.oreilly.com/api/v2/epubs/urn:orm:book:9781098181642/files/assets/cover.png"
 
 
-def test_fetch_keeps_partial_results_when_taskgroup_fails(monkeypatch):
+@pytest.mark.asyncio
+async def test_fetch_keeps_partial_results_when_taskgroup_fails(monkeypatch):
     plugin = BookPlugin()
     plugin.kernel = SimpleNamespace(http=SimpleNamespace())
 
@@ -155,57 +160,34 @@ def test_fetch_keeps_partial_results_when_taskgroup_fails(monkeypatch):
         }
         return {}
 
-    class FakeTask:
-        def __init__(self, coro):
-            self._result = None
-            self._exception = None
-            self._done = False
-            self._cancelled = False
-            try:
-                self._result = coro.send(None)
-            except StopIteration as exc:
-                self._result = exc.value
-            except Exception as exc:  # pragma: no cover - exercised by the test
-                self._exception = exc
-            finally:
-                self._done = True
-
-        def done(self):
-            return self._done
-
-        def cancelled(self):
-            return self._cancelled
-
-        def result(self):
-            if self._exception is not None:
-                raise self._exception
-            return self._result
-
-    class FakeTaskGroup:
-        def __init__(self):
-            self._tasks = []
-
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, exc_type, exc, tb):
-            errors = [task._exception for task in self._tasks if task._exception is not None]
-            if errors:
-                raise ExceptionGroup("taskgroup failure", errors)
-            return False
-
-        def create_task(self, coro):
-            task = FakeTask(coro)
-            self._tasks.append(task)
-            return task
-
-    monkeypatch.setattr("plugins.book.asyncio.TaskGroup", FakeTaskGroup)
     monkeypatch.setattr(plugin, "_fetch_search", fake_fetch_search)
     monkeypatch.setattr(plugin, "_fetch_epub", fake_fetch_epub)
     monkeypatch.setattr(plugin, "_fetch_epub_fallback_metadata", fake_fallback_metadata)
 
-    result = asyncio.run(plugin.fetch("9781098181642"))
+    result = await plugin.fetch("9781098181642")
 
     assert result["authors"] == ["Marc Loy"]
     assert result["publishers"] == ["O'Reilly"]
     assert result["cover_url"] == "https://example.test/cover.png"
+
+
+@pytest.mark.asyncio
+async def test_book_search_does_not_fallback_to_fetch_for_free_text(monkeypatch):
+    plugin = BookPlugin()
+    plugin.kernel = SimpleNamespace(http=SimpleNamespace())
+    fetched: list[str] = []
+
+    async def fake_get_json(_url: str, **_kwargs):
+        return {"results": []}
+
+    async def fake_fetch(book_id: str):
+        fetched.append(book_id)
+        return {"id": book_id, "title": "Should not happen"}
+
+    plugin.http.get_json = fake_get_json  # type: ignore[method-assign]
+    monkeypatch.setattr(plugin, "fetch", fake_fetch)
+
+    results = await plugin.search("python clean code")
+
+    assert results == []
+    assert fetched == []

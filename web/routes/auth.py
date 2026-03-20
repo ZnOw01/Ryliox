@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import logging
-from typing import Union
 
 from fastapi import APIRouter, Body, Depends, HTTPException, status
 
 from core.kernel import Kernel
-from core.session_store import SessionStore, normalize_cookies_payload
+from core.session_store import (
+    SessionStore,
+    normalize_cookie_records_payload,
+)
 from web.api_utils import ErrorCode
 from web.dependencies import get_kernel, get_session_store, require_same_origin
 from web.schemas import CookiesResponse, SaveCookiesResponse, StatusResponse
@@ -16,11 +18,11 @@ from web.schemas import CookiesResponse, SaveCookiesResponse, StatusResponse
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api", tags=["auth"])
 
-_CookiesBody = Union[dict, list, str, None]
+_CookiesBody = dict | list | str | None
 
 
 def _restore_previous_cookies(
-    session_store: SessionStore, kernel: Kernel, previous_cookies: dict[str, str]
+    session_store: SessionStore, kernel: Kernel, previous_cookies: list[dict]
 ) -> None:
     try:
         session_store.save_cookies(previous_cookies)
@@ -55,8 +57,8 @@ async def save_cookies(
     session_store: SessionStore = Depends(get_session_store),
 ) -> SaveCookiesResponse:
     """Guarda cookies de sesión y verifica que autentiquen correctamente."""
-    payload = normalize_cookies_payload(data)
-    if not payload:
+    cookie_records = normalize_cookie_records_payload(data)
+    if not cookie_records:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail={
@@ -68,10 +70,10 @@ async def save_cookies(
             },
         )
 
-    previous_cookies = session_store.get_cookies()
+    previous_cookies = session_store.get_cookie_records()
 
     try:
-        session_store.save_cookies(payload)
+        session_store.save_cookies(cookie_records)
     except Exception as exc:
         logger.exception("Error al guardar cookies en SessionStore.")
         raise HTTPException(
@@ -94,7 +96,7 @@ async def save_cookies(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail={
                 "error": "Unable to validate cookies right now. Please try again.",
-                "code": "cookies_validation_unavailable",
+                "code": ErrorCode.COOKIES_VALIDATION_UNAVAILABLE,
             },
         ) from exc
 
@@ -107,7 +109,7 @@ async def save_cookies(
                     "Unable to validate cookies because the upstream auth check "
                     "is temporarily unavailable. Previous session was restored."
                 ),
-                "code": "cookies_validation_unavailable",
+                "code": ErrorCode.COOKIES_VALIDATION_UNAVAILABLE,
             },
         )
 

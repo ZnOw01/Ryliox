@@ -25,36 +25,23 @@ class BookPlugin(Plugin):
             if parts:
                 return parts[-1]
 
+        if " " in value:
+            return None
+
         if "/" not in value and "\\" not in value:
             return value
 
         return None
 
     async def fetch(self, book_id: str) -> dict:
-        search_data: dict = {}
-        epub_data: dict = {}
+        search_result, epub_result = await asyncio.gather(
+            self._fetch_search(book_id),
+            self._fetch_epub(book_id),
+            return_exceptions=True,
+        )
 
-        search_task = None
-        epub_task = None
-        try:
-            async with asyncio.TaskGroup() as task_group:
-                search_task = task_group.create_task(self._fetch_search(book_id))
-                epub_task = task_group.create_task(self._fetch_epub(book_id))
-        except* Exception:
-            # Allow partial results to be consumed after a TaskGroup failure.
-            pass
-
-        def _task_result(task: asyncio.Task | None) -> dict:
-            if task is None or not task.done() or task.cancelled():
-                return {}
-            try:
-                result = task.result()
-            except Exception:
-                return {}
-            return result if isinstance(result, dict) else {}
-
-        search_data = _task_result(search_task)
-        epub_data = _task_result(epub_task)
+        search_data = search_result if isinstance(search_result, dict) else {}
+        epub_data = epub_result if isinstance(epub_result, dict) else {}
 
         fallback_metadata = await self._fetch_epub_fallback_metadata(
             book_id,
@@ -280,5 +267,3 @@ class BookPlugin(Plugin):
                 "publishers": fallback_book.get("publishers", []),
             }
         ]
-
-        return results

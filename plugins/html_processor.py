@@ -7,7 +7,7 @@ import html as html_lib
 import re
 from functools import cached_property
 from pathlib import PurePosixPath
-from urllib.parse import unquote, urljoin, urlparse, urlunparse
+from urllib.parse import unquote, urlparse, urlunparse
 
 from bs4 import BeautifulSoup, Tag
 
@@ -19,6 +19,7 @@ except ImportError:
     CSSSanitizer = None
 
 import config
+from core.url_utils import normalize_asset_url
 
 from .base import Plugin
 
@@ -317,10 +318,10 @@ class HtmlProcessorPlugin(Plugin):
     )
 
     @cached_property
-    def _cleaner(self) -> "bleach.Cleaner":
+    def _cleaner(self) -> bleach.Cleaner:
         if bleach is None or CSSSanitizer is None:
             raise RuntimeError(
-                "bleach is required to sanitize processed HTML. Install it with: pip install bleach"
+                "bleach is required to sanitize processed HTML. Install it with: uv sync"
             )
         return bleach.Cleaner(
             tags=self._ALLOWED_HTML_TAGS,
@@ -514,6 +515,9 @@ body{{margin:1em;background-color:transparent!important;}}
         if normalized == "":
             return value, None
 
+        if not self._is_safe_url(normalized, "img", "src"):
+            return value, None
+
         filename = self.image_filename_from_url(normalized)
         if not filename:
             return value, None
@@ -562,20 +566,7 @@ body{{margin:1em;background-color:transparent!important;}}
         return first_part.split()[0]
 
     def _normalize_asset_url(self, base_url: str, asset_url: str) -> str:
-        value = str(asset_url or "").strip()
-        if not value or value.startswith("data:"):
-            return ""
-
-        if value.startswith("//"):
-            return f"https:{value}"
-        if value.startswith(("http://", "https://")):
-            return value
-        if value.startswith("/"):
-            return f"{config.BASE_URL.rstrip('/')}{value}"
-
-        if base_url:
-            return urljoin(base_url, value)
-        return value
+        return normalize_asset_url(base_url or config.BASE_URL, asset_url)
 
     def _rewrite_href(self, href: str, book_id: str) -> str:
         value = (href or "").strip()
@@ -591,6 +582,13 @@ body{{margin:1em;background-color:transparent!important;}}
         parsed = urlparse(value)
 
         if parsed.scheme in {"http", "https"}:
+            try:
+                base_host = (urlparse(config.BASE_URL).hostname or "").lower()
+            except ValueError:
+                base_host = ""
+            parsed_host = (parsed.hostname or "").lower()
+            if not base_host or parsed_host != base_host:
+                return value
             if not book_id or book_id not in parsed.path:
                 return value
             relative_path = self._extract_book_relative_path(parsed.path, book_id)

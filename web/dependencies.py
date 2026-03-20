@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Callable
+from collections.abc import Callable
 from urllib.parse import urlparse
 
 from fastapi import FastAPI, Request, status
@@ -39,7 +39,11 @@ def _build_download_queue() -> DownloadQueueService:
         error_log_dir=DOWNLOAD_ERROR_LOG_DIR,
         poll_interval_seconds=QUEUE_POLL_INTERVAL_SECONDS,
     )
-    queue.start()
+    try:
+        queue.start()
+    except Exception:
+        logger.exception("Failed to start DownloadQueueService.")
+        raise
     return queue
 
 
@@ -122,9 +126,21 @@ def _is_same_origin(request: Request) -> bool:
         logger.warning("Blocked Origin header with invalid port: %r", origin)
         return False
 
-    request_scheme = request.url.scheme.lower()
-    request_host = _normalize_host(request.url.hostname or "")
-    request_port = request.url.port or _default_port_for_scheme(request_scheme)
+    forwarded_proto = request.headers.get("x-forwarded-proto", "").split(",", 1)[0].strip().lower()
+    forwarded_host = request.headers.get("x-forwarded-host", "").split(",", 1)[0].strip()
+    request_scheme = forwarded_proto or request.url.scheme.lower()
+    request_host_raw = forwarded_host or (request.url.hostname or "")
+    request_host = _normalize_host(request_host_raw.split(":", 1)[0])
+    forwarded_port_raw = request.headers.get("x-forwarded-port", "").split(",", 1)[0].strip()
+    try:
+        forwarded_port = int(forwarded_port_raw) if forwarded_port_raw else None
+    except ValueError:
+        logger.warning("Blocked invalid X-Forwarded-Port header: %r", forwarded_port_raw)
+        return False
+    if forwarded_port is not None and not (1 <= forwarded_port <= 65535):
+        logger.warning("Blocked out-of-range X-Forwarded-Port header: %r", forwarded_port_raw)
+        return False
+    request_port = forwarded_port or request.url.port or _default_port_for_scheme(request_scheme)
     if not request_host or origin_port is None or request_port is None:
         return False
 

@@ -14,9 +14,10 @@ import type { ProgressResponse } from "../lib/types";
 import { useBookStore } from "../store/book-store";
 
 const ACTIVE_STATES = new Set(["queued", "running"]);
-const TERMINAL_STATES = new Set(["completed", "error"]);
+const TERMINAL_STATES = new Set(["completed", "error", "cancelled", "canceled"]);
 
 const RECONNECT_DELAY_MS = 2500;
+const PROGRESS_POLL_INTERVAL_MS = 8000;
 
 export type SseStatus = "idle" | "connecting" | "connected" | "reconnecting" | "error";
 
@@ -57,7 +58,7 @@ export function useDownloadManager() {
     enabled: true,
     refetchInterval: ({ state }) => {
       const next = state.data as ProgressResponse | undefined;
-      return next && !isTerminalProgress(next) ? 8000 : false;
+      return next && !isTerminalProgress(next) ? PROGRESS_POLL_INTERVAL_MS : false;
     },
   });
 
@@ -96,6 +97,8 @@ export function useDownloadManager() {
         setSseStatus("connected");
       } else if (progressStatus === "error") {
         setSseStatus("error");
+      } else if (progressStatus === "cancelled" || progressStatus === "canceled") {
+        setSseStatus("idle");
       } else if (!progressQuery.data?.job_id) {
         setSseStatus("idle");
       }

@@ -52,7 +52,7 @@ class SystemPlugin(Plugin):
                 process.communicate(),
                 timeout=timeout,
             )
-        except asyncio.TimeoutError:
+        except TimeoutError:
             process.kill()
             await process.communicate()
             logger.warning("Subproceso %r agotó el timeout de %.0fs.", args[0], timeout)

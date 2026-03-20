@@ -36,6 +36,9 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function parseApiErrorPayload(data: unknown, status: number): ApiErrorPayload {
+  if (typeof data === "string" && data.trim()) {
+    return { error: data.trim() };
+  }
   if (!isRecord(data)) {
     return { error: `Request failed with status ${status}` };
   }
@@ -48,10 +51,14 @@ function parseApiErrorPayload(data: unknown, status: number): ApiErrorPayload {
 }
 
 async function parseResponseBody(response: Response): Promise<unknown> {
-  try {
-    return await response.json();
-  } catch {
+  const text = await response.text();
+  if (!text) {
     return {};
+  }
+  try {
+    return JSON.parse(text);
+  } catch {
+    return text;
   }
 }
 
@@ -142,6 +149,9 @@ export function subscribeProgress(
   },
   jobId?: string | null,
 ): () => void {
+  if (jobId && !/^[a-zA-Z0-9_-]+$/.test(jobId)) {
+    throw new Error("Invalid job id for progress subscription.");
+  }
   const suffix = jobId ? `?job_id=${encodeURIComponent(jobId)}` : "";
   const source = new EventSource(`${SSE_BASE}/api/progress/stream${suffix}`);
   const { onProgress, onError, onOpen } = handlers;

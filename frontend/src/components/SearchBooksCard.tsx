@@ -16,6 +16,11 @@ const SEARCH_SCOPES: Array<{ value: SearchScope; label: string }> = [
   { value: "author", label: "Autor" },
   { value: "publisher", label: "Editorial" },
 ];
+const SEARCH_DEBOUNCE_MS = 350;
+
+function isLikelyBookId(value: string): boolean {
+  return /^[a-zA-Z0-9_-]{3,128}$/.test(value);
+}
 
 function extractBookIdCandidate(query: string): string | null {
   const value = query.trim();
@@ -27,14 +32,18 @@ function extractBookIdCandidate(query: string): string | null {
     try {
       const url = new URL(value);
       const parts = url.pathname.split("/").filter(Boolean);
-      return parts.length > 0 ? parts[parts.length - 1] : null;
+      if (parts.length === 0) {
+        return null;
+      }
+      const candidate = parts[parts.length - 1];
+      return isLikelyBookId(candidate) ? candidate : null;
     } catch {
       return null;
     }
   }
 
   if (!/[\\/]/.test(value)) {
-    return value;
+    return isLikelyBookId(value) ? value : null;
   }
 
   return null;
@@ -92,7 +101,7 @@ export function SearchBooksCard() {
   const [activeResultIndex, setActiveResultIndex] = useState(0);
   const resultsListRef = useRef<HTMLUListElement | null>(null);
   const normalizedQuery = queryInput.trim();
-  const debouncedQuery = useDebouncedValue(normalizedQuery, 350);
+  const debouncedQuery = useDebouncedValue(normalizedQuery, SEARCH_DEBOUNCE_MS);
 
   const searchQuery = useQuery({
     queryKey: queryKeys.search(debouncedQuery),
@@ -206,6 +215,7 @@ export function SearchBooksCard() {
           </svg>
           <input
             id="search-query"
+            role="combobox"
             value={queryInput}
             onChange={(event) => setQueryInput(event.target.value)}
             onKeyDown={(event) => {
@@ -244,6 +254,7 @@ export function SearchBooksCard() {
             aria-autocomplete="list"
             aria-controls="search-results"
             aria-expanded={visibleResults.length > 0}
+            aria-haspopup="listbox"
             className="min-w-0 w-full rounded-lg border border-slate-300 py-2 pl-9 pr-3 text-sm outline-none transition focus:border-brand/70 focus:ring-2 focus:ring-brand/25"
           />
         </div>
@@ -315,20 +326,21 @@ export function SearchBooksCard() {
         aria-busy={isSearching}
         role="listbox"
       >
-        {visibleResults.map((book) => {
+        {visibleResults.map((book, index) => {
           const isSelected = selectedBookId === book.id;
-          const isActive = visibleResults[activeResultIndex]?.id === book.id;
+          const isActive = activeResultIndex === index;
           return (
-            <li key={book.id}>
+            <li
+              key={book.id}
+              id={`search-result-${book.id}`}
+              data-result-index={index}
+              role="option"
+              aria-selected={isActive}
+            >
               <button
                 type="button"
                 onClick={() => setSelectedBook(book)}
-                onMouseEnter={() => setActiveResultIndex(visibleResults.findIndex((item) => item.id === book.id))}
-                aria-pressed={isSelected}
-                id={`search-result-${book.id}`}
-                data-result-index={visibleResults.findIndex((item) => item.id === book.id)}
-                role="option"
-                aria-selected={isSelected || isActive}
+                onMouseEnter={() => setActiveResultIndex(index)}
                 className={`group w-full rounded-xl border p-3 text-left transition focus:outline-none focus:ring-2 focus:ring-brand/40 ${
                   isSelected
                   ? "border-brand/30 bg-brand/10 shadow-panel-md"

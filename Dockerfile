@@ -1,12 +1,12 @@
-FROM node:20-bookworm-slim AS frontend-build
+FROM oven/bun:1.2.22 AS frontend-build
 
 WORKDIR /build/frontend
 
-COPY frontend/package*.json ./
-RUN npm ci
+COPY frontend/package.json frontend/bun.lock* ./
+RUN bun install --frozen-lockfile
 
 COPY frontend/ ./
-RUN npm run build
+RUN bun run build
 
 FROM python:3.11-slim
 
@@ -32,8 +32,10 @@ RUN groupadd --gid 1001 appgroup \
 
 WORKDIR /app
 
-COPY requirements.txt ./
-RUN pip install --no-cache-dir --disable-pip-version-check -r requirements.txt
+RUN pip install --no-cache-dir uv==0.10.12
+
+COPY pyproject.toml uv.lock* ./
+RUN uv sync --frozen --no-dev
 
 COPY --chown=appuser:appgroup . ./
 COPY --from=frontend-build /build/frontend/dist /app/frontend/dist

@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 import shutil
 import zipfile
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
 
 from lxml import etree
@@ -167,7 +167,7 @@ class EpubPlugin(Plugin):
         etree.SubElement(metadata, f"{{{_DC_NS}}}identifier", id="bookid").text = isbn
         etree.SubElement(metadata, f"{{{_DC_NS}}}date").text = pub_date
 
-        modified_timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        modified_timestamp = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
         etree.SubElement(metadata, f"{{{_OPF_NS}}}meta", property="dcterms:modified").text = modified_timestamp
 
         manifest = etree.SubElement(package, f"{{{_OPF_NS}}}manifest")

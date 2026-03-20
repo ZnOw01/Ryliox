@@ -3,13 +3,14 @@ import re
 from urllib.parse import quote
 
 import config
-from core.url_utils import sanitize_remote_url
 from core.types import ChapterInfo
+from core.url_utils import sanitize_remote_url
 
 from .base import Plugin
 
 logger = logging.getLogger(__name__)
 _COVER_WORD_RE = re.compile(r"\bcover\b", re.IGNORECASE)
+_MAX_CHAPTER_PAGES = 100
 
 
 class ChaptersPlugin(Plugin):
@@ -21,8 +22,10 @@ class ChaptersPlugin(Plugin):
         url = f"{config.API_V2}/epub-chapters/?epub_identifier=urn:orm:book:{encoded_book_id}"
         chapters: list[ChapterInfo] = []
         seen_urls: set[str] = set()
+        page_count = 0
 
-        while url and url not in seen_urls:
+        while url and url not in seen_urls and page_count < _MAX_CHAPTER_PAGES:
+            page_count += 1
             seen_urls.add(url)
             data = await self.http.get_json(url)
             results = data.get("results", [])
@@ -54,7 +57,11 @@ class ChaptersPlugin(Plugin):
                         minutes_required=ch.get("minutes_required"),
                     )
                 )
-            url = data.get("next")
+            next_url = sanitize_remote_url(data.get("next", ""), base_url=url)
+            url = next_url or ""
+
+        if page_count >= _MAX_CHAPTER_PAGES:
+            logger.warning("Stopped chapter pagination for %s after %s pages", book_id, _MAX_CHAPTER_PAGES)
 
         return self._reorder_cover_first(chapters)
 
@@ -125,4 +132,3 @@ class ChaptersPlugin(Plugin):
 
     def _sanitize_remote_url(self, raw_url: str, *, base_url: str = "") -> str:
         return sanitize_remote_url(raw_url, base_url=base_url)
-

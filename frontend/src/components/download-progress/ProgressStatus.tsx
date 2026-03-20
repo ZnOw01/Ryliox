@@ -136,6 +136,15 @@ export function ProgressStatus({ currentLabel, progress, progressPercent }: Prog
             Descarga completada correctamente.
           </p>
         ) : null}
+        {progress?.status === "cancelled" ? (
+          <p className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800">
+            <svg className="h-4 w-4 shrink-0" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.5" />
+              <path d="M5 5l6 6M11 5l-6 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+            </svg>
+            Descarga cancelada.
+          </p>
+        ) : null}
         {typeof progress?.queue_position === "number" && progress.queue_position > 0 ? (
           <p className="flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
             <svg className="h-3.5 w-3.5 shrink-0" viewBox="0 0 16 16" fill="none" aria-hidden="true">

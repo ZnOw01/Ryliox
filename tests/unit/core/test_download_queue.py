@@ -6,6 +6,7 @@ from types import SimpleNamespace
 import pytest
 
 from core.download_queue import DownloadJobStore, DownloadQueueService
+from plugins.downloader import DownloadProgress
 
 pytestmark = pytest.mark.unit
 
@@ -72,3 +73,56 @@ def test_download_job_store_snapshot_filter_keeps_zero_and_false(tmp_path):
         "percentage": 0,
         "cancel_requested": False,
     }
+
+
+def test_update_progress_returns_false_when_write_is_throttled(tmp_path):
+    store = DownloadJobStore(
+        db_path=tmp_path / "download_jobs.sqlite3",
+        progress_write_interval_seconds=60.0,
+    )
+    snapshot = store.enqueue_job(
+        book_id="demo",
+        output_dir=tmp_path / "out",
+        formats=["epub"],
+        selected_chapters=None,
+        skip_images=False,
+    )
+    job = store.claim_next_queued_job()
+    assert job is not None
+
+    wrote = store.update_progress(
+        snapshot["job_id"],
+        DownloadProgress(status="running", percentage=10, message="a"),
+    )
+    throttled = store.update_progress(
+        snapshot["job_id"],
+        DownloadProgress(status="running", percentage=10, message="a"),
+    )
+
+    assert wrote is True
+    assert throttled is False
+
+
+def test_mark_cancelled_clears_trace_log(tmp_path):
+    store = DownloadJobStore(db_path=tmp_path / "download_jobs.sqlite3")
+    snapshot = store.enqueue_job(
+        book_id="demo",
+        output_dir=tmp_path / "out",
+        formats=["epub"],
+        selected_chapters=None,
+        skip_images=False,
+    )
+    store.mark_failed(
+        job_id=snapshot["job_id"],
+        status="error",
+        error="boom",
+        code="download_failed",
+        trace_log="trace.log",
+    )
+
+    store.mark_cancelled(job_id=snapshot["job_id"])
+    updated = store.get_job_snapshot(snapshot["job_id"])
+
+    assert updated is not None
+    assert updated["status"] == "cancelled"
+    assert "trace_log" not in updated

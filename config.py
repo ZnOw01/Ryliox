@@ -10,8 +10,8 @@ from __future__ import annotations
 
 import logging
 import os
-import sys
 import secrets
+import sys
 from pathlib import Path
 from types import MappingProxyType, ModuleType
 from typing import Any, Final
@@ -206,7 +206,7 @@ class Settings(BaseSettings):
         return v
 
     @model_validator(mode="after")
-    def _warn_if_env_missing(self) -> "Settings":
+    def _warn_if_env_missing(self) -> Settings:
         env_path = BASE_DIR / ".env"
         if not env_path.exists():
             logger.debug(
@@ -243,13 +243,13 @@ def _resolve_user_agent(settings: Settings) -> str:
 def _build_runtime_values(settings: Settings) -> dict[str, Any]:
     data_dir = _resolve_runtime_dir(
         settings.data_dir,
-        default=BASE_DIR / "data",
+        default=_RUNTIME_DATA_FALLBACK_DIR,
         fallback=_RUNTIME_DATA_FALLBACK_DIR,
         label="DATA_DIR",
     )
     output_dir = _resolve_runtime_dir(
         settings.output_dir,
-        default=BASE_DIR / "output",
+        default=_RUNTIME_OUTPUT_FALLBACK_DIR,
         fallback=_RUNTIME_OUTPUT_FALLBACK_DIR,
         label="OUTPUT_DIR",
     )

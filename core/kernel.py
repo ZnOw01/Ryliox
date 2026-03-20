@@ -1,3 +1,5 @@
+from typing import Any
+
 from .http_client import HttpClient
 
 
@@ -6,11 +8,18 @@ class Kernel:
         self.http = http or HttpClient()
         self._plugins: dict[str, object] = {}
 
-    def register(self, name: str, plugin):
-        plugin.kernel = self
+    def register(self, name: str, plugin: object):
+        if name in self._plugins:
+            raise ValueError(f"Plugin {name!r} is already registered")
+        if not hasattr(type(plugin), "kernel") and not hasattr(plugin, "__dict__"):
+            raise TypeError(f"Plugin {name!r} must expose a 'kernel' attribute")
+        # Plugin objects are intentionally dynamic and share a `kernel` binding at runtime.
+        plugin_obj = plugin  # preserve runtime plugin object
+        cast_plugin: Any = plugin_obj
+        cast_plugin.kernel = self
         self._plugins[name] = plugin
 
-    def get(self, name: str):
+    def get(self, name: str) -> object | None:
         return self._plugins.get(name)
 
     def __getitem__(self, name: str):
@@ -20,16 +29,16 @@ class Kernel:
 def create_default_kernel() -> Kernel:
     """Create a kernel with all standard plugins registered."""
     from plugins import (
+        AssetsPlugin,
         AuthPlugin,
         BookPlugin,
         ChaptersPlugin,
-        AssetsPlugin,
-        HtmlProcessorPlugin,
-        EpubPlugin,
-        PdfPlugin,
-        OutputPlugin,
-        SystemPlugin,
         DownloaderPlugin,
+        EpubPlugin,
+        HtmlProcessorPlugin,
+        OutputPlugin,
+        PdfPlugin,
+        SystemPlugin,
     )
 
     kernel = Kernel()

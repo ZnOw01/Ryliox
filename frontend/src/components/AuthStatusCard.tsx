@@ -83,10 +83,14 @@ export function AuthStatusCard() {
 
   const cookiesMutation = useMutation({
     mutationFn: async (raw: string) => {
+      const trimmed = raw.trim();
       let parsed: unknown;
       try {
         parsed = JSON.parse(raw);
       } catch {
+        if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+          throw new Error("JSON invalido. Revisa el formato antes de guardar.");
+        }
         parsed = raw;
       }
       return saveCookies(parsed);

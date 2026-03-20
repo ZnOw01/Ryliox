@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import time
 from pathlib import Path
+from threading import Lock
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Request, status
 
@@ -23,6 +24,7 @@ from web.schemas import (
 )
 
 router = APIRouter(prefix="/api", tags=["system"])
+_OUTPUT_DIR_UPDATE_LOCK = Lock()
 
 
 def _uptime(request: Request) -> float:
@@ -77,7 +79,7 @@ async def reveal_file(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail={
                 "error": "Path must be inside OUTPUT_DIR",
-                "code": "path_outside_output_dir",
+                "code": ErrorCode.PATH_OUTSIDE_OUTPUT_DIR,
             },
         ) from exc
 
@@ -112,8 +114,15 @@ async def set_output_dir(
     if data.browse:
         selected = await system_plugin.show_folder_picker(config.OUTPUT_DIR)
         if selected:
-            config.OUTPUT_DIR = Path(selected)
-            return SetOutputDirResponse(path=str(selected))
+            success, message, path = output_plugin.validate_dir(selected)
+            if not success:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail={"error": message, "code": ErrorCode.INVALID_OUTPUT_DIR},
+                )
+            with _OUTPUT_DIR_UPDATE_LOCK:
+                config._set_runtime_value("OUTPUT_DIR", path)
+            return SetOutputDirResponse(path=str(path))
         return SetOutputDirResponse(cancelled=True)
 
     if not data.path:
@@ -129,5 +138,6 @@ async def set_output_dir(
             detail={"error": message, "code": ErrorCode.INVALID_OUTPUT_DIR},
         )
 
-    config.OUTPUT_DIR = path
+    with _OUTPUT_DIR_UPDATE_LOCK:
+        config._set_runtime_value("OUTPUT_DIR", path)
     return SetOutputDirResponse(path=str(path))

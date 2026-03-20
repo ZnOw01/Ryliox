@@ -100,7 +100,7 @@ async def book_chapters(
             },
         ) from exc
 
-    return BookChaptersResponse(chapters=chapters)
+    return BookChaptersResponse.model_validate({"chapters": chapters})
 
 
 @router.get("/book/{book_id}", response_model=BookInfoResponse)
@@ -127,4 +127,14 @@ async def book_info(
             },
         ) from exc
 
-    return BookInfoResponse.model_validate(result)
+    try:
+        return BookInfoResponse.model_validate(result)
+    except ValidationError as exc:
+        logger.warning("Datos invalidos recibidos para %r: %s", book_id, exc)
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail={
+                "error": "Invalid book data returned by upstream service.",
+                "code": ErrorCode.BOOK_FETCH_FAILED,
+            },
+        ) from exc

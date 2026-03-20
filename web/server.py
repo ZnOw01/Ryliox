@@ -17,6 +17,8 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from fastapi.staticfiles import StaticFiles
+from pydantic import ValidationError
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from web.api_utils import error_response
 from web.dependencies import (
@@ -151,6 +153,15 @@ def create_app() -> FastAPI:
             details={"detail": detail} if detail is not None else None,
         )
 
+    @app.exception_handler(StarletteHTTPException)
+    async def _handle_starlette_http_exception(
+        request: Request, exc: StarletteHTTPException
+    ) -> Response:
+        return await _handle_http_exception(
+            request,
+            HTTPException(status_code=exc.status_code, detail=exc.detail),
+        )
+
     @app.exception_handler(RequestValidationError)
     async def _handle_request_validation_error(
         _: Request, exc: RequestValidationError
@@ -160,6 +171,24 @@ def create_app() -> FastAPI:
             422,
             code="validation_error",
             details={"errors": jsonable_encoder(exc.errors())},
+        )
+
+    @app.exception_handler(ValidationError)
+    async def _handle_validation_error(_: Request, exc: ValidationError) -> Response:
+        return error_response(
+            "Validation failed",
+            502,
+            code="validation_error",
+            details={"errors": jsonable_encoder(exc.errors())},
+        )
+
+    @app.exception_handler(Exception)
+    async def _handle_unexpected_exception(_: Request, exc: Exception) -> Response:
+        logger.exception("Unhandled application error: %s", exc)
+        return error_response(
+            "Internal server error.",
+            500,
+            code="internal_error",
         )
 
     @app.middleware("http")

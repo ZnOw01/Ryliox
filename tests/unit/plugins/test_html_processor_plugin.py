@@ -51,3 +51,26 @@ def test_rewrite_srcset_value_rewrites_each_candidate():
         "https://learning.oreilly.com/images/cover.png",
         "https://learning.oreilly.com/assets/hero.jpg",
     ]
+
+
+def test_rewrite_image_value_keeps_external_images_remote():
+    plugin = HtmlProcessorPlugin()
+
+    rewritten, original = plugin._rewrite_image_value(
+        "https://example.com/cover.png",
+        base_url="https://learning.oreilly.com/library/view/demo/ch1.xhtml",
+    )
+
+    assert rewritten == "https://example.com/cover.png"
+    assert original is None
+
+
+def test_rewrite_href_does_not_rewrite_external_hosts_even_with_book_id():
+    plugin = HtmlProcessorPlugin()
+
+    href = plugin._rewrite_href(
+        "https://example.com/library/view/9781098181642/ch1.html",
+        "9781098181642",
+    )
+
+    assert href == "https://example.com/library/view/9781098181642/ch1.html"

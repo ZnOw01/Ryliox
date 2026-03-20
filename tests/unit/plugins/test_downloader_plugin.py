@@ -51,7 +51,8 @@ def test_normalize_asset_url_allows_subdomains_of_base_host():
     )
 
 
-def test_download_raises_when_selected_chapters_do_not_match():
+@pytest.mark.asyncio
+async def test_download_raises_when_selected_chapters_do_not_match():
     plugin = DownloaderPlugin(
         book_plugin=DummyBookPlugin(),
         chapters_plugin=DummyChaptersPlugin(),
@@ -61,17 +62,14 @@ def test_download_raises_when_selected_chapters_do_not_match():
         epub_plugin=object(),
     )
 
-    async def run() -> None:
-        with pytest.raises(ValueError, match="Selected chapters did not match"):
-            await plugin.download(
-                book_id="demo-book",
-                output_dir=Path("/tmp/demo-output"),
-                formats=["epub"],
-                selected_chapters=[99],
-                skip_images=True,
-            )
-
-    asyncio.run(run())
+    with pytest.raises(ValueError, match="Selected chapters did not match"):
+        await plugin.download(
+            book_id="demo-book",
+            output_dir=Path("/tmp/demo-output"),
+            formats=["epub"],
+            selected_chapters=[99],
+            skip_images=True,
+        )
 
 
 def test_get_formats_info_hides_redundant_pdf_chapters_option_from_ui():

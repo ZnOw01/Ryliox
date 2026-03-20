@@ -11,8 +11,8 @@ import sys
 import threading
 import time
 import webbrowser
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable
 
 import config
 from core import process_manager
@@ -40,7 +40,7 @@ DOWNLOAD_QUEUE_DB = config.DATA_DIR / "download_jobs.sqlite3"
 DOWNLOAD_ERROR_LOG_DIR = config.DATA_DIR / "logs"
 
 _TIMEOUT_PIP = 300
-_TIMEOUT_NPM = 300
+_TIMEOUT_BUN = 300
 _TIMEOUT_DOCKER = 120
 _TIMEOUT_SUBPROCESS = 60
 
@@ -152,7 +152,7 @@ def _canonical_requirement_name(name: str) -> str:
 
 
 def _parse_requirement_line(line: str) -> str | None:
-    """Extract the requirement name from a single requirements.txt line."""
+    """Extract the requirement name from a single project dependency line."""
     stripped = line.strip()
     if not stripped or stripped.startswith("#"):
         return None
@@ -201,34 +201,47 @@ def _requirement_to_import_names(requirement_name: str) -> list[str]:
     return unique_names
 
 
-def _runtime_requirement_modules(requirements_path: Path) -> list[str]:
+def _runtime_requirement_modules(pyproject_path: Path) -> list[str]:
     """Collect the importable modules needed to boot the app."""
     modules: list[str] = []
     seen: set[str] = set()
 
-    for line in requirements_path.read_text(encoding="utf-8").splitlines():
-        requirement_name = _parse_requirement_line(line)
-        if not requirement_name:
+    # Parse pyproject.toml to extract dependencies
+    pyproject_content = pyproject_path.read_text(encoding="utf-8")
+
+    # Simple extraction of dependencies list
+    in_dependencies = False
+    for line in pyproject_content.splitlines():
+        line_stripped = line.strip()
+
+        if line_stripped.startswith('dependencies'):
+            in_dependencies = True
             continue
 
-        if _canonical_requirement_name(requirement_name) in _OPTIONAL_REQUIREMENTS:
-            continue
-
-        for module_name in _requirement_to_import_names(requirement_name):
-            if module_name in seen:
-                continue
-            seen.add(module_name)
-            modules.append(module_name)
+        if in_dependencies:
+            if line_stripped.startswith(']'):
+                break
+            if line_stripped.startswith('"') or line_stripped.startswith("'"):
+                # Extract requirement from quoted string, e.g., "package~=1.0.0"
+                requirement_name = _parse_requirement_line(line_stripped.strip('\'"",'))
+                if requirement_name:
+                    if _canonical_requirement_name(requirement_name) in _OPTIONAL_REQUIREMENTS:
+                        continue
+                    for module_name in _requirement_to_import_names(requirement_name):
+                        if module_name in seen:
+                            continue
+                        seen.add(module_name)
+                        modules.append(module_name)
 
     return modules
 
 
 def _venv_has_runtime_dependencies(venv_python: Path) -> bool:
     """Verifica dependencias importando los módulos necesarios para arrancar."""
-    requirements_path = REPO_ROOT / "requirements.txt"
-    if not requirements_path.exists():
+    pyproject_path = REPO_ROOT / "pyproject.toml"
+    if not pyproject_path.exists():
         return False
-    modules = _runtime_requirement_modules(requirements_path)
+    modules = _runtime_requirement_modules(pyproject_path)
     if not modules:
         return False
     module_list = repr(modules)
@@ -274,8 +287,18 @@ def _ensure_python_runtime(steps: Steps) -> Path:
                 "install",
                 "--disable-pip-version-check",
                 "--no-input",
-                "-r",
-                "requirements.txt",
+                "uv",
+            ],
+            steps.format("Instalando uv..."),
+            timeout=_TIMEOUT_PIP,
+        )
+        _run_checked(
+            [
+                str(venv_python),
+                "-m",
+                "uv",
+                "sync",
+                "--no-dev",
             ],
             steps.format("Instalando/actualizando dependencias Python..."),
             timeout=_TIMEOUT_PIP,
@@ -320,11 +343,11 @@ _FRONTEND_WATCH_PATHS = [
 ]
 
 
-def _require_npm() -> str:
-    npm = shutil.which("npm")
-    if not npm:
-        raise RuntimeError("npm no encontrado en PATH. Instala Node.js primero.")
-    return npm
+def _require_bun() -> str:
+    bun = shutil.which("bun")
+    if not bun:
+        raise RuntimeError("bun no encontrado en PATH. Instala Bun primero.")
+    return bun
 
 
 def _frontend_source_newer_than_build(frontend_dir: Path, dist_dir: Path) -> bool:
@@ -354,18 +377,32 @@ def _frontend_source_newer_than_build(frontend_dir: Path, dist_dir: Path) -> boo
     return False
 
 
-def _ensure_frontend_dependencies(npm: str, frontend_dir: Path, steps: Steps) -> None:
-    if (frontend_dir / "node_modules").exists():
-        steps.next("Dependencias frontend ya instaladas.")
-        return
-    lockfile = frontend_dir / "package-lock.json"
-    cmd = [npm, "ci" if lockfile.exists() else "install", "--no-audit", "--no-fund"]
-    _run_checked(
-        cmd,
-        steps.format("Instalando dependencias frontend..."),
-        cwd=frontend_dir,
-        timeout=_TIMEOUT_NPM,
-    )
+def _ensure_frontend_dependencies(bun: str, frontend_dir: Path, steps: Steps) -> None:
+    node_modules = frontend_dir / "node_modules"
+    lockfile = frontend_dir / "bun.lock"
+    lockfile_binary = frontend_dir / "bun.lockb"
+
+    if node_modules.exists():
+        lock_candidates = [path for path in (lockfile, lockfile_binary) if path.exists()]
+        if lock_candidates:
+            try:
+                node_modules_mtime = node_modules.stat().st_mtime
+                if all(lock.stat().st_mtime <= node_modules_mtime for lock in lock_candidates):
+                    steps.next("Dependencias frontend ya instaladas.")
+                    return
+            except OSError:
+                pass
+        else:
+            steps.next("Dependencias frontend ya instaladas.")
+            return
+
+        steps.next("Lockfile Bun cambiado; reinstalando dependencias frontend...")
+    else:
+        steps.next("Instalando dependencias frontend...")
+
+    bun_lockfile_exists = lockfile.exists() or lockfile_binary.exists()
+    cmd = [bun, "install", "--frozen-lockfile"] if bun_lockfile_exists else [bun, "install"]
+    _run_checked(cmd, steps.format("Sincronizando dependencias frontend..."), cwd=frontend_dir, timeout=_TIMEOUT_BUN)
 
 
 def _ensure_frontend_build(steps: Steps, rebuild: bool = False) -> None:
@@ -384,8 +421,8 @@ def _ensure_frontend_build(steps: Steps, rebuild: bool = False) -> None:
         steps.next("Build del frontend ya disponible.")
         return
 
-    npm = _require_npm()
-    _ensure_frontend_dependencies(npm, frontend_dir, steps)
+    bun = _require_bun()
+    _ensure_frontend_dependencies(bun, frontend_dir, steps)
     label = (
         "Fuentes modificadas, reconstruyendo bundle..."
         if dist_dir.exists()
@@ -393,14 +430,14 @@ def _ensure_frontend_build(steps: Steps, rebuild: bool = False) -> None:
     )
     try:
         _run_checked(
-            [npm, "run", "build"],
+            [bun, "run", "build"],
             steps.format(label),
             cwd=frontend_dir,
-            timeout=_TIMEOUT_NPM,
+            timeout=_TIMEOUT_BUN,
         )
     except subprocess.CalledProcessError as exc:
         raise RuntimeError(
-            "Build del frontend falló. Revisa los errores de Node/Astro y vuelve a intentar."
+            "Build del frontend falló. Revisa los errores de Bun/Astro y vuelve a intentar."
         ) from exc
 
 

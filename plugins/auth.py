@@ -59,7 +59,7 @@ class AuthPlugin(Plugin):
 
         try:
             data = response.json()
-        except (ValueError, KeyError):
+        except (ValueError, KeyError, TypeError, AttributeError):
             if _html_indicates_authenticated_session(getattr(response, "text", "")):
                 logger.info("HTML /profile/ response accepted as authenticated session.")
                 return {"valid": True, "reason": None}

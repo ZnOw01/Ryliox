@@ -10,7 +10,6 @@ import { formatName } from "./download-progress/utils";
 export function DownloadProgressCard() {
   const manager = useDownloadManager();
   const canForceReconnect = manager.sseStatus === "error";
-  const formatDescriptions = manager.formatsQuery.data?.descriptions;
   const chapters = manager.chaptersQuery.data?.chapters ?? [];
   // Formats that can only download the full book (e.g. epub) cannot use chapter selection
   const chapterSelectable = !manager.bookOnlyFormats.has(manager.format);
@@ -37,7 +36,6 @@ export function DownloadProgressCard() {
         <FormatSelector
           format={manager.format}
           formats={manager.formats}
-          descriptions={formatDescriptions}
           selectedFormatDescription={manager.selectedFormatDescription}
           hasChapterSelection={manager.hasChapterSelection}
           bookOnlyFormats={manager.bookOnlyFormats}
