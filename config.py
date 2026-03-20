@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 BASE_DIR: Final = Path(__file__).resolve().parent
 _RUNTIME_DATA_FALLBACK_DIR: Final[Path] = BASE_DIR / ".runtime_data"
-_RUNTIME_OUTPUT_FALLBACK_DIR: Final[Path] = BASE_DIR / ".runtime_output"
+_RUNTIME_OUTPUT_FALLBACK_DIR: Final[Path] = BASE_DIR / "output"
 
 _FALLBACK_USER_AGENTS: Final[tuple[str, ...]] = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -102,10 +102,12 @@ def _resolve_runtime_dir(
 ) -> Path:
     candidate = _to_absolute_path(configured or default)
     if _dir_is_writable(candidate):
+        candidate.mkdir(parents=True, exist_ok=True)
         return candidate
 
     fallback_path = _to_absolute_path(fallback)
     if _dir_is_writable(fallback_path):
+        fallback_path.mkdir(parents=True, exist_ok=True)
         logger.warning("%s is not writable at %s. Using %s.", label, candidate, fallback_path)
         return fallback_path
 
