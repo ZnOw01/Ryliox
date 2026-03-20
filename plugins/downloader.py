@@ -439,6 +439,7 @@ class DownloaderPlugin(Plugin):
                 output_dir=book_dir,
                 css_files=all_css_urls,
                 cover_image=cover_image_name,
+                cleanup_build_artifacts=True,
             )
             await abort_if_cancelled()
             result.files["epub"] = str(epub_path)
