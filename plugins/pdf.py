@@ -6,6 +6,7 @@ import html
 import logging
 import posixpath
 import re
+import shutil
 from pathlib import Path, PurePosixPath
 from urllib.parse import unquote
 
@@ -65,6 +66,7 @@ def generate_pdf_in_subprocess(
         output_dir=Path(output_dir),
         css_files=css_files,
         cover_image=cover_image,
+        cleanup_build_artifacts=True,
     )
     return str(pdf_path)
 
@@ -84,6 +86,7 @@ def generate_pdf_chapters_in_subprocess(
         chapters=chapters,
         output_dir=Path(output_dir),
         css_files=css_files,
+        cleanup_build_artifacts=True,
     )
     return [str(p) for p in pdf_paths]
 
@@ -98,6 +101,7 @@ class PdfPlugin(Plugin):
         output_dir: Path,
         css_files: list[str],
         cover_image: str | None = None,
+        cleanup_build_artifacts: bool = False,
     ) -> Path:
         """Genera un único PDF con todos los capítulos.
 
@@ -155,6 +159,10 @@ class PdfPlugin(Plugin):
             str(pdf_path)
         )
         logger.info("PDF combinado generado: %s", pdf_path)
+
+        if cleanup_build_artifacts:
+            self._cleanup_build_artifacts(output_dir)
+
         return pdf_path
 
     def generate_chapters(
@@ -163,6 +171,7 @@ class PdfPlugin(Plugin):
         chapters: list[dict],
         output_dir: Path,
         css_files: list[str],
+        cleanup_build_artifacts: bool = False,
     ) -> list[Path]:
         """Genera un PDF individual por capítulo.
 
@@ -223,7 +232,23 @@ class PdfPlugin(Plugin):
                 "Capítulo %d/%d generado: %s", index, len(chapter_entries), pdf_path
             )
 
+        if cleanup_build_artifacts:
+            self._cleanup_build_artifacts(output_dir)
+
         return pdf_paths
+
+    def _cleanup_build_artifacts(self, output_dir: Path) -> None:
+        """Remove intermediate PDF build files after generation."""
+        artifacts = [
+            output_dir / "mimetype",
+            output_dir / "META-INF",
+            output_dir / "OEBPS",
+        ]
+        for artifact in artifacts:
+            if artifact.is_file():
+                artifact.unlink(missing_ok=True)
+            elif artifact.is_dir():
+                shutil.rmtree(artifact, ignore_errors=True)
 
     def _build_combined_html(
         self,
