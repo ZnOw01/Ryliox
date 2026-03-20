@@ -15,7 +15,7 @@ const queryClient = new QueryClient({
 
 function AppContent() {
   return (
-    <div className="grid items-start gap-6 lg:gap-8 lg:grid-cols-[minmax(320px,1fr)_minmax(0,1.25fr)]">
+    <div className="grid items-start gap-6 md:gap-8 md:grid-cols-[minmax(320px,1fr)_minmax(0,1.25fr)]">
       <div className="grid min-w-0 gap-6">
         <AuthStatusCard />
         <SearchBooksCard />

@@ -31,20 +31,29 @@ export function FormatSelector({
         onChange={(event) => onChange(event.target.value)}
         aria-describedby={hasChapterSelection ? "format-helper-text" : undefined}
         disabled={disabled}
+        title="Elige entre EPUB (libro contenido) o PDF (por página o por capítulo)"
         className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/60 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400"
       >
         {isLoading ? <option value="">Cargando formatos...</option> : null}
         {!isLoading && formats.length === 0 ? <option value="">No hay formatos disponibles</option> : null}
         {!isLoading
-          ? formats.map((item) => (
-            <option
-              key={item}
-              value={item}
-              disabled={hasChapterSelection && bookOnlyFormats.has(item)}
-            >
-              {formatName(item)}
-            </option>
-          ))
+          ? formats.map((item) => {
+            const tooltips: Record<string, string> = {
+              epub: "Formato EPUB: libro completo en un archivo e-reader universal",
+              pdf: "PDF completo: todo el libro en un único PDF",
+              "pdf-chapters": "PDF por capítulo: cada capítulo en un PDF separado",
+            };
+            return (
+              <option
+                key={item}
+                value={item}
+                disabled={hasChapterSelection && bookOnlyFormats.has(item)}
+                title={tooltips[item] || ""}
+              >
+                {formatName(item)}
+              </option>
+            );
+          })
           : null}
       </select>
       {hasChapterSelection ? (

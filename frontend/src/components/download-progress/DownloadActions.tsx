@@ -101,7 +101,7 @@ export function DownloadActions({
           </button>
         ) : null}
       </div>
-      {startDisabledReason ? (
+      {startDisabledReason && startDisabledReason !== "Selecciona un libro para comenzar." ? (
         <p id="start-disabled-reason" className="mb-4 text-xs text-amber-700">
           {startDisabledReason}
         </p>

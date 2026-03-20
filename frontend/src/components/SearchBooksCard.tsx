@@ -196,7 +196,10 @@ export function SearchBooksCard() {
   return (
     <section className="soft-rise min-w-0 overflow-hidden rounded-2xl border border-slate-200/90 bg-white/95 p-5 shadow-panel backdrop-blur">
       <div className="mb-3 flex items-center justify-between gap-2">
-        <h2 className="text-lg font-semibold text-ink">Buscar libros</h2>
+        <h2 className="inline-flex items-center gap-2 text-lg font-semibold leading-tight tracking-tight text-ink">
+          <span className="h-2 w-2 rounded-full bg-brand" aria-hidden="true" />
+          Buscar libros
+        </h2>
         {normalizedQuery && !isSearching && resultCount > 0 ? (
           <span className="rounded-full bg-brand/10 px-2.5 py-0.5 text-xs font-semibold text-brand-deep">
             {resultCount} resultado{resultCount === 1 ? "" : "s"}

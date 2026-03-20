@@ -55,19 +55,12 @@ import App from "../components/App";
   </head>
   <body>
     <div class="mx-auto flex min-h-screen w-full max-w-6xl flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
-      <header class="soft-rise rounded-2xl border border-brand/20 bg-white/90 px-6 py-4 shadow-panel backdrop-blur">
-        <div class="flex min-w-0 items-center gap-5">
-          <div class="relative flex-none">
-            <div class="grid h-16 w-16 place-items-center rounded-2xl bg-gradient-to-br from-brand to-brand-deep text-3xl font-bold tracking-tight text-white shadow-md select-none">
-              R
-            </div>
-            <span class="absolute -right-1 -top-1 h-3.5 w-3.5 rounded-full border-2 border-white bg-emerald-400 shadow-sm" aria-hidden="true"></span>
-            <span class="sr-only">Servicio activo</span>
-          </div>
-          <div class="min-w-0">
-            <h1 class="text-4xl font-bold leading-[1.1] tracking-tight text-ink sm:text-6xl">Ryliox</h1>
-            <p class="mt-1 text-sm text-slate-500">Descargador de libros O'Reilly</p>
-          </div>
+      <header class="soft-rise relative overflow-hidden rounded-2xl border border-brand/20 bg-white/90 px-8 py-6 shadow-panel backdrop-blur sm:px-12 sm:py-8">
+        <div class="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_12%,rgba(220,38,38,0.16),transparent_46%)]" aria-hidden="true"></div>
+        <div class="pointer-events-none absolute -left-5 -top-6 h-20 w-20 rounded-full bg-brand/15 blur-2xl" aria-hidden="true"></div>
+        <div class="pointer-events-none absolute -right-8 top-0 h-24 w-24 rounded-full bg-brand-deep/10 blur-2xl" aria-hidden="true"></div>
+        <div class="relative">
+          <h1 class="bg-gradient-to-r from-ink via-brand-deep to-brand bg-clip-text text-5xl font-bold leading-loose tracking-tight text-transparent sm:text-6xl lg:text-7xl">Ryliox</h1>
         </div>
       </header>
       <main>

@@ -15,7 +15,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import Response
+from fastapi.responses import RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import ValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -49,9 +49,7 @@ _NO_CACHE_HEADERS: Final[dict[str, str]] = {
     "Expires": "0",
 }
 
-_SW_UNREGISTER_SCRIPT: Final[
-    str
-] = """\
+_SW_UNREGISTER_SCRIPT: Final[bytes] = b"""\
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', (event) => {
   event.waitUntil((async () => {
@@ -74,9 +72,28 @@ def _warn_if_wildcard_cors() -> None:
         )
 
 
-def _no_cache_response(content: str, media_type: str) -> Response:
+def _no_cache_response(content: bytes, media_type: str) -> Response:
     """Devuelve una respuesta con cabeceras que deshabilitan el caché."""
     return Response(content=content, media_type=media_type, headers=_NO_CACHE_HEADERS)
+
+
+def _parse_http_detail(
+    detail: dict,
+) -> tuple[str, str, dict[str, Any] | None]:
+    """Extrae message, code y details de un dict de detalle HTTP."""
+    message = str(detail.get("error") or detail.get("detail") or "Request failed")
+    code = str(detail.get("code") or "http_error")
+    details: dict[str, Any] | None = None
+    if isinstance(detail.get("details"), dict):
+        details = dict(detail["details"])
+    extra = {
+        key: value
+        for key, value in detail.items()
+        if key not in {"error", "code", "details", "detail"}
+    }
+    if extra:
+        details = {**(details or {}), **extra}
+    return message, code, details
 
 
 @asynccontextmanager
@@ -109,12 +126,15 @@ def create_app() -> FastAPI:
         lifespan=_lifespan,
     )
 
+    # CORS global para UI local y herramientas.
     app.add_middleware(
         CORSMiddleware,
         allow_origins=_CORS_ORIGINS,
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    bound_host = os.getenv("HOST", "localhost").strip() or "localhost"
 
     @app.exception_handler(ForbiddenOriginError)
     async def _handle_forbidden_origin(
@@ -128,19 +148,9 @@ def create_app() -> FastAPI:
         if not 400 <= status_code < 600:
             status_code = 500
         detail = exc.detail
+
         if isinstance(detail, dict):
-            message = str(detail.get("error") or detail.get("detail") or "Request failed")
-            code = str(detail.get("code") or "http_error")
-            details: dict[str, Any] | None = None
-            if isinstance(detail.get("details"), dict):
-                details = dict(detail["details"])
-            extra = {
-                key: value
-                for key, value in detail.items()
-                if key not in {"error", "code", "details", "detail"}
-            }
-            if extra:
-                details = {**(details or {}), **extra}
+            message, code, details = _parse_http_detail(detail)
             return error_response(message, status_code, code=code, details=details)
 
         if isinstance(detail, str):
@@ -192,7 +202,19 @@ def create_app() -> FastAPI:
         )
 
     @app.middleware("http")
-    async def _disable_html_cache(request: Request, call_next):
+    async def _canonicalize_localhost(request: Request, call_next) -> Response:
+        """Fuerza localhost como host canónico."""
+        # Evita bucle cuando el servidor corre explícitamente en 127.0.0.1.
+        if request.url.hostname == "127.0.0.1" and bound_host != "127.0.0.1":
+            port = request.url.port
+            target = request.url.replace(
+                netloc="localhost" if port is None else f"localhost:{port}"
+            )
+            return RedirectResponse(url=str(target), status_code=307)
+        return await call_next(request)
+
+    @app.middleware("http")
+    async def _disable_html_cache(request: Request, call_next) -> Response:
         """Deshabilita el caché para archivos HTML."""
         response = await call_next(request)
         path = request.url.path
@@ -212,23 +234,25 @@ def create_app() -> FastAPI:
 
     @app.get("/service-worker.js", include_in_schema=False)
     def _service_worker() -> Response:
+        # Limpia SW/cachés legacy en clientes antiguos.
         return _no_cache_response(_SW_UNREGISTER_SCRIPT, "application/javascript")
 
     @app.get("/app.js", include_in_schema=False)
     def _legacy_app_bundle() -> Response:
         return _no_cache_response(
-            "window.location.replace('/');", "application/javascript"
+            b"window.location.replace('/');", "application/javascript"
         )
 
     @app.get("/style.css", include_in_schema=False)
     def _legacy_stylesheet() -> Response:
-        return _no_cache_response("/* legacy fallback */", "text/css")
+        return _no_cache_response(b"/* legacy fallback */", "text/css")
 
     @app.get("/favicon.ico", include_in_schema=False)
     def _favicon() -> Response:
         return Response(status_code=204)
 
     if FRONTEND_DIST.is_dir():
+        # Sirve SPA precompilada.
         app.mount(
             "/", StaticFiles(directory=str(FRONTEND_DIST), html=True), name="frontend"
         )
@@ -236,7 +260,7 @@ def create_app() -> FastAPI:
         logger.warning("Frontend no encontrado en %s.", FRONTEND_DIST)
 
         @app.get("/", include_in_schema=False)
-        def _no_frontend():
+        def _no_frontend() -> dict[str, str]:
             return {
                 "message": "Frontend build not found.",
                 "hint": "Run `python -m launcher` or build the frontend into frontend/dist.",
@@ -249,28 +273,36 @@ def _configure_stdio_utf8() -> None:
     """Fuerza UTF-8 en terminales Windows para evitar crashes de charmap."""
     for stream in (sys.stdout, sys.stderr):
         try:
-            stream.reconfigure(encoding="utf-8", errors="replace")
+            reconfigure = getattr(stream, "reconfigure", None)
+            if callable(reconfigure):
+                reconfigure(encoding="utf-8", errors="replace")
         except Exception:
             pass
 
 
+def _resolve_port() -> int:
+    """Lee PORT del entorno y lo valida; retorna 8000 como fallback."""
+    raw = os.getenv("PORT", "8000").strip()
+    try:
+        port = int(raw)
+        if 1 <= port <= 65535:
+            return port
+    except ValueError:
+        pass
+    logger.warning("PORT inválido=%r; usando 8000.", raw)
+    return 8000
+
+
 def run_server() -> None:
-    """Configura stdio e inicia la app con Uvicorn de forma estricta."""
+    """Configura stdio e inicia la app con Uvicorn."""
     _configure_stdio_utf8()
     logging.basicConfig(
         level=os.getenv("LOG_LEVEL", "INFO").upper(),
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     )
 
-    host = os.getenv("HOST", "127.0.0.1").strip() or "127.0.0.1"
-    port_raw = os.getenv("PORT", "8000").strip()
-    try:
-        port = int(port_raw)
-        if not 1 <= port <= 65535:
-            raise ValueError
-    except ValueError:
-        logger.warning("PORT inválido=%r; usando 8000.", port_raw)
-        port = 8000
+    host = os.getenv("HOST", "localhost").strip() or "localhost"
+    port = _resolve_port()
 
     logger.info("Servidor iniciando en http://%s:%d", host, port)
 

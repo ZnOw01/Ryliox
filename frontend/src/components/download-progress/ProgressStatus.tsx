@@ -122,7 +122,9 @@ export function ProgressStatus({ currentLabel, progress, progressPercent }: Prog
         aria-valuetext={`${progressPercent}% - ${statusLabel}`}
       >
         <div
-          className={`h-full bg-brand transition-all duration-300 ${isActive ? "progress-bar-active" : ""}`}
+          className={`h-full transition-all duration-300 ${
+            progress?.status === "completed" ? "bg-emerald-500" : "bg-brand"
+          } ${isActive ? "progress-bar-active" : ""}`}
           style={{ width: `${progressPercent}%` }}
         />
       </div>

@@ -60,10 +60,10 @@ export function formatStatusLabel(status: string): string {
 export function formatSseStatusLabel(status: SseStatus): string {
   const labels: Record<SseStatus, string> = {
     connected: "activas",
-    connecting: "iniciando",
-    error: "pausadas",
+    connecting: "conectando",
+    error: "desconectado",
     idle: "en espera",
-    reconnecting: "reintentando",
+    reconnecting: "reconectando",
   };
   return labels[status];
 }

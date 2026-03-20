@@ -174,7 +174,10 @@ export function AuthStatusCard() {
   return (
     <section className="soft-rise min-w-0 self-start overflow-hidden rounded-2xl border border-slate-200/90 bg-white/95 p-5 shadow-panel backdrop-blur">
       <div className="mb-3 flex min-w-0 flex-wrap items-center justify-between gap-3">
-        <h2 className="text-lg font-semibold text-ink">Autenticacion</h2>
+        <h2 className="inline-flex items-center gap-2 text-lg font-semibold leading-tight tracking-tight text-ink">
+          <span className="h-2 w-2 rounded-full bg-brand" aria-hidden="true" />
+          Autenticacion
+        </h2>
         <button
           type="button"
           onClick={() => {
