@@ -15,7 +15,7 @@ export function DownloadProgressCard() {
   const chapterSelectable = !manager.bookOnlyFormats.has(manager.format);
 
   return (
-    <section className="soft-rise min-w-0 overflow-hidden rounded-2xl border border-slate-200/90 bg-white/90 p-5 shadow-panel backdrop-blur">
+    <section className="soft-rise min-w-0 overflow-hidden rounded-2xl border border-slate-200/90 bg-white/95 p-5 shadow-panel backdrop-blur">
       <div className="mb-3 flex flex-wrap items-start justify-between gap-2 sm:items-center">
         <h2 className="text-lg font-semibold text-ink">Descarga y progreso</h2>
         <SseStatusBadge status={manager.sseStatus} />

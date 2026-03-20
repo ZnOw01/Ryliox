@@ -47,4 +47,18 @@ describe("SearchBooksCard", () => {
     expect(screen.getByRole("listbox")).toBeInTheDocument();
     expect(screen.getByRole("option", { name: /python limpio/i })).toBeInTheDocument();
   });
+
+  it("marks the selected option with aria-selected", () => {
+    render(<SearchBooksCard />);
+
+    const input = screen.getByRole("combobox", { name: /buscar libros/i });
+    fireEvent.change(input, { target: { value: "python" } });
+
+    const option = screen.getByRole("option", { name: /python limpio/i });
+    expect(option).toHaveAttribute("aria-selected", "false");
+
+    fireEvent.click(option);
+
+    expect(option).toHaveAttribute("aria-selected", "true");
+  });
 });

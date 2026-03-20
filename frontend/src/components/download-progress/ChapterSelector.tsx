@@ -111,7 +111,7 @@ export function ChapterSelector({
             </div>
           )}
 
-          <div className="chapter-scroll max-h-56 space-y-0.5 overflow-x-hidden overflow-y-auto p-2">
+          <div className="chapter-scroll max-h-56 space-y-0.5 overflow-y-auto p-2">
             {chapters.map((chapter) => {
               const checked = selectable && selectedChapterSet.has(chapter.index);
 

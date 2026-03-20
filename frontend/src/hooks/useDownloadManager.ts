@@ -31,6 +31,53 @@ function isTerminalProgress(progress?: ProgressResponse) {
   return Boolean(status && TERMINAL_STATES.has(status));
 }
 
+function getProgressPercent(status: string, percentage: unknown): number {
+  const clamped = Math.max(0, Math.min(100, Number(percentage ?? 0)));
+  if (status === "completed") {
+    return 100;
+  }
+  if (status === "queued") {
+    return 0;
+  }
+  if (status === "running") {
+    return clamped;
+  }
+  return 0;
+}
+
+function getStartDisabledReason(params: {
+  selectedBook: boolean;
+  formatsDisabled: boolean;
+  invalidFormatWithChapterSelection: boolean;
+  active: boolean;
+  startPending: boolean;
+}): string | null {
+  const {
+    selectedBook,
+    formatsDisabled,
+    invalidFormatWithChapterSelection,
+    active,
+    startPending,
+  } = params;
+
+  if (!selectedBook) {
+    return "Selecciona un libro para comenzar.";
+  }
+  if (formatsDisabled) {
+    return "Esperando formatos disponibles.";
+  }
+  if (invalidFormatWithChapterSelection) {
+    return "El formato actual no acepta seleccion de capitulos.";
+  }
+  if (active) {
+    return "Ya hay una descarga en curso.";
+  }
+  if (startPending) {
+    return "La descarga se esta iniciando...";
+  }
+  return null;
+}
+
 export function useDownloadManager() {
   const queryClient = useQueryClient();
   const selectedBook = useBookStore((state) => state.selectedBook);
@@ -42,6 +89,7 @@ export function useDownloadManager() {
   const [selectedChapters, setSelectedChapters] = useState<number[]>([]);
   const [sseStatus, setSseStatus] = useState<SseStatus>("idle");
   const [reconnectToken, setReconnectToken] = useState(0);
+  const [allowLatestProbe, setAllowLatestProbe] = useState(true);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reconnectAttemptRef = useRef(0);
 
@@ -55,12 +103,25 @@ export function useDownloadManager() {
   const progressQuery = useQuery({
     queryKey: progressQueryKey,
     queryFn: () => getProgress(activeJobId),
-    enabled: true,
+    enabled: Boolean(activeJobId) || allowLatestProbe,
     refetchInterval: ({ state }) => {
       const next = state.data as ProgressResponse | undefined;
       return next && !isTerminalProgress(next) ? PROGRESS_POLL_INTERVAL_MS : false;
     },
   });
+
+  useEffect(() => {
+    if (!allowLatestProbe || activeJobId) {
+      return;
+    }
+    if (!progressQuery.isFetched) {
+      return;
+    }
+    if (progressQuery.data?.job_id) {
+      return;
+    }
+    setAllowLatestProbe(false);
+  }, [activeJobId, allowLatestProbe, progressQuery.data?.job_id, progressQuery.isFetched]);
 
   useEffect(() => {
     const progressJobId = progressQuery.data?.job_id ?? null;
@@ -241,6 +302,7 @@ export function useDownloadManager() {
       });
     },
     onSuccess: async (data) => {
+      setAllowLatestProbe(true);
       setActiveJobId(data.job_id ?? null);
       await queryClient.invalidateQueries({ queryKey: queryKeys.downloadProgressRoot });
     },
@@ -270,34 +332,21 @@ export function useDownloadManager() {
     setSelectedChapters([]);
   }, []);
 
-  const clampedProgressPercent = Math.max(0, Math.min(100, Number(progressQuery.data?.percentage ?? 0)));
-  const progressPercent = progressStatus === "completed"
-    ? 100
-    : progressStatus === "queued"
-      ? 0
-      : progressStatus === "running"
-        ? clampedProgressPercent
-        : 0;
+  const progressPercent = getProgressPercent(progressStatus, progressQuery.data?.percentage);
   const active = isDownloadActive(progressQuery.data);
   const totalChapters = chaptersQuery.data?.total ?? 0;
   const currentLabel = progressStatus;
-  const shouldShowStartHint = currentLabel === "idle" || active;
 
   const formatsDisabled = formatsQuery.isLoading || formats.length === 0;
   const chaptersLoading = Boolean(selectedBook) && !chaptersQuery.data && chaptersQuery.isLoading;
   const chaptersRefreshing = Boolean(selectedBook) && chaptersQuery.isFetching;
-  const startDisabledReasonBase = !selectedBook
-    ? "Selecciona un libro para comenzar."
-    : formatsDisabled
-      ? "Esperando formatos disponibles."
-      : invalidFormatWithChapterSelection
-        ? "El formato actual no acepta seleccion de capitulos."
-        : active
-          ? "Ya hay una descarga en curso."
-          : startMutation.isPending
-            ? "La descarga se esta iniciando..."
-            : null;
-  const startDisabledReason = shouldShowStartHint ? startDisabledReasonBase : null;
+  const startDisabledReason = getStartDisabledReason({
+    selectedBook: Boolean(selectedBook),
+    formatsDisabled,
+    invalidFormatWithChapterSelection,
+    active,
+    startPending: startMutation.isPending,
+  });
 
   return {
     active,

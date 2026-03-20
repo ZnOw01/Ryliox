@@ -20,4 +20,20 @@ describe("ProgressStatus", () => {
     expect(screen.getByText("Descarga cancelada.")).toBeInTheDocument();
     expect(screen.getByText(/estado: cancelado/i)).toBeInTheDocument();
   });
+
+  it("shows a canceled summary state (US spelling)", () => {
+    render(
+      <ProgressStatus
+        currentLabel="canceled"
+        progressPercent={0}
+        progress={{
+          status: "canceled",
+          job_id: "job-2",
+        }}
+      />,
+    );
+
+    expect(screen.getByText("Descarga cancelada.")).toBeInTheDocument();
+    expect(screen.getByText(/estado: cancelado/i)).toBeInTheDocument();
+  });
 });

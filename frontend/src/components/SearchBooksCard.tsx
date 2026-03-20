@@ -191,7 +191,7 @@ export function SearchBooksCard() {
   }, [activeResultIndex, visibleResults.length]);
 
   const activeDescendant =
-    visibleResults.length > 0 ? `search-result-${visibleResults[activeResultIndex]?.id ?? activeResultIndex}` : undefined;
+    visibleResults.length > 0 ? `search-option-${activeResultIndex}` : undefined;
 
   return (
     <section className="soft-rise min-w-0 overflow-hidden rounded-2xl border border-slate-200/90 bg-white/95 p-5 shadow-panel backdrop-blur">
@@ -332,14 +332,18 @@ export function SearchBooksCard() {
           return (
             <li
               key={book.id}
-              id={`search-result-${book.id}`}
+              role="presentation"
               data-result-index={index}
-              role="option"
-              aria-selected={isActive}
             >
               <button
+                id={`search-option-${index}`}
+                role="option"
+                aria-selected={isSelected}
                 type="button"
-                onClick={() => setSelectedBook(book)}
+                onClick={() => {
+                  setActiveResultIndex(index);
+                  setSelectedBook(book);
+                }}
                 onMouseEnter={() => setActiveResultIndex(index)}
                 className={`group w-full rounded-xl border p-3 text-left transition focus:outline-none focus:ring-2 focus:ring-brand/40 ${
                   isSelected

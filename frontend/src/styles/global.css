@@ -50,10 +50,6 @@ body::before {
   opacity: 0.3;
 }
 
-#astro-dev-toolbar {
-  display: none !important;
-}
-
 code,
 pre {
   font-family: "IBM Plex Mono", Consolas, monospace;
