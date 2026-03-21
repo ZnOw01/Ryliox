@@ -35,10 +35,10 @@ export function ChapterSelector({
   totalChapters,
 }: ChapterSelectorProps) {
   return (
-    <div className="mb-4 overflow-hidden rounded-xl border border-slate-200 bg-slate-50/50">
+    <div className="mb-4 overflow-hidden rounded-[1rem] border border-slate-200/80 bg-white/70">
       {/* ── Header ── */}
-      <div className="flex min-w-0 flex-wrap items-center justify-between gap-1.5 border-b border-slate-200 bg-white px-3 py-2">
-        <p className="text-sm font-semibold text-slate-800">Capitulos</p>
+      <div className="flex min-w-0 flex-wrap items-center justify-between gap-1.5 border-b border-slate-200/80 bg-white/80 px-3 py-2.5">
+        <p className="font-display text-sm font-semibold tracking-tight text-slate-800">Capitulos</p>
         {selectable ? (
           <p className="text-xs text-slate-500" role="status" aria-live="polite" aria-atomic="true">
             {selectedChapterIndexes.length}/{totalChapters} seleccionados
@@ -96,7 +96,7 @@ export function ChapterSelector({
                 type="button"
                 onClick={onSelectAll}
                 disabled={chapters.length === 0 || isLoading}
-                className="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 transition hover:border-brand/30 hover:bg-brand/5 hover:text-brand-deep disabled:cursor-not-allowed disabled:opacity-60"
+                className="w-full rounded-full border border-slate-300/80 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 transition hover:border-brand/30 hover:bg-brand/5 hover:text-brand-deep disabled:cursor-not-allowed disabled:opacity-60"
               >
                 Seleccionar todo
               </button>
@@ -104,7 +104,7 @@ export function ChapterSelector({
                 type="button"
                 onClick={onClear}
                 disabled={selectedChapterIndexes.length === 0 || isLoading}
-                className="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 transition hover:border-brand/30 hover:bg-brand/5 hover:text-brand-deep disabled:cursor-not-allowed disabled:opacity-60"
+                className="w-full rounded-full border border-slate-300/80 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 transition hover:border-brand/30 hover:bg-brand/5 hover:text-brand-deep disabled:cursor-not-allowed disabled:opacity-60"
               >
                 Limpiar
               </button>
@@ -121,7 +121,7 @@ export function ChapterSelector({
                 return (
                   <div
                     key={chapter.index}
-                    className="flex min-w-0 items-center gap-2 rounded-lg px-2.5 py-1.5"
+                    className="flex min-w-0 items-center gap-2 rounded-full px-2.5 py-1.5"
                   >
                     <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-slate-300" aria-hidden="true" />
                     <span className="block min-w-0 truncate text-sm text-slate-600">
@@ -137,7 +137,7 @@ export function ChapterSelector({
               return (
                 <label
                   key={chapter.index}
-                  className={`flex min-w-0 cursor-pointer items-start gap-2 rounded-lg px-2.5 py-1.5 text-sm transition hover:bg-white focus-within:ring-2 focus-within:ring-brand/40 ${checked ? "bg-brand/5" : ""}`}
+                  className={`flex min-w-0 cursor-pointer items-start gap-2 rounded-full px-2.5 py-1.5 text-sm transition hover:bg-white focus-within:ring-2 focus-within:ring-brand/40 ${checked ? "bg-brand/5" : ""}`}
                 >
                   <input
                     type="checkbox"

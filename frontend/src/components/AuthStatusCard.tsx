@@ -172,9 +172,9 @@ export function AuthStatusCard() {
   }, [cookiesText, shouldShowCookieEditor]);
 
   return (
-    <section className="soft-rise min-w-0 self-start overflow-hidden rounded-2xl border border-slate-200/90 bg-white/95 p-5 shadow-panel backdrop-blur">
-      <div className="mb-3 flex min-w-0 flex-wrap items-center justify-between gap-3">
-        <h2 className="inline-flex items-center gap-2 text-lg font-semibold leading-tight tracking-tight text-ink">
+    <section className="soft-rise panel-surface-strong min-w-0 self-start overflow-hidden rounded-[1.5rem] p-6 sm:p-7">
+      <div className="mb-4 flex min-w-0 flex-wrap items-center justify-between gap-3">
+        <h2 className="inline-flex items-center gap-2 font-display text-[1.05rem] font-semibold leading-tight tracking-tight text-ink sm:text-[1.1rem]">
           <span className="h-2 w-2 rounded-full bg-brand" aria-hidden="true" />
           Autenticacion
         </h2>
@@ -187,7 +187,7 @@ export function AuthStatusCard() {
               void queryClient.invalidateQueries({ queryKey: queryKeys.storedCookies });
             }
           }}
-          className="flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
+          className="flex items-center gap-1.5 rounded-full border border-slate-300/80 bg-white/70 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
         >
           <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none" aria-hidden="true">
             <path d="M13.5 8A5.5 5.5 0 1 1 8 2.5" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" />
@@ -240,7 +240,7 @@ export function AuthStatusCard() {
             value={cookiesText}
             onChange={(event) => setCookiesText(event.target.value)}
             placeholder='{"cookie": "value"} o "a=1; b=2"'
-            className="w-full resize-none overflow-y-auto rounded-xl border border-slate-700/70 bg-slate-950 p-3 font-mono text-xs leading-5 text-slate-100 outline-none ring-brand placeholder:text-slate-400 focus:border-brand focus:ring-2"
+            className="w-full resize-none overflow-y-auto rounded-[1rem] border border-slate-800/70 bg-slate-950 p-3 font-mono text-xs leading-5 text-slate-100 outline-none ring-brand placeholder:text-slate-400 focus:border-brand focus:ring-2"
           />
 
           <div className="mt-3 grid gap-2 sm:flex sm:flex-wrap sm:items-center sm:gap-3">
@@ -248,7 +248,7 @@ export function AuthStatusCard() {
               type="button"
               onClick={() => cookiesMutation.mutate(cookiesText)}
               disabled={!cookiesText.trim() || cookiesMutation.isPending}
-              className="flex w-full items-center justify-center gap-2 rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/60 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+              className="flex w-full items-center justify-center gap-2 rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/60 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
             >
               {cookiesMutation.isPending ? (
                 <>
@@ -262,7 +262,7 @@ export function AuthStatusCard() {
               <button
                 type="button"
                 onClick={() => setShowCookieEditor(false)}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs font-medium text-slate-700 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40 sm:w-auto"
+                className="w-full rounded-full border border-slate-300/80 bg-white/70 px-3 py-2 text-xs font-medium text-slate-700 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40 sm:w-auto"
               >
                 Ocultar editor
               </button>
@@ -281,7 +281,7 @@ export function AuthStatusCard() {
               setShowCookieEditor(true);
             }}
             aria-expanded={shouldShowCookieEditor}
-              className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-medium text-slate-700 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
+              className="rounded-full border border-slate-300/80 bg-white/70 px-3 py-2 text-xs font-medium text-slate-700 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
           >
               Ver / editar cookies
           </button>

@@ -15,22 +15,22 @@ export function DownloadProgressCard() {
   const chapterSelectable = !manager.bookOnlyFormats.has(manager.format);
 
   return (
-    <section className="soft-rise min-w-0 overflow-hidden rounded-2xl border border-slate-200/90 bg-white/95 p-5 shadow-panel backdrop-blur">
-      <div className="mb-3 flex flex-wrap items-start justify-between gap-2 sm:items-center">
-        <h2 className="inline-flex items-center gap-2 text-lg font-semibold leading-tight tracking-tight text-ink">
+    <section className="soft-rise panel-surface-strong min-w-0 overflow-hidden rounded-[1.5rem] p-6 sm:p-7">
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-2 sm:items-center">
+        <h2 className="inline-flex items-center gap-2 font-display text-[1.05rem] font-semibold leading-tight tracking-tight text-ink sm:text-[1.1rem]">
           <span className="h-2 w-2 rounded-full bg-brand" aria-hidden="true" />
           Descarga y progreso
         </h2>
         <SseStatusBadge status={manager.sseStatus} />
       </div>
 
-      <div className="mb-4 grid gap-3 sm:grid-cols-2">
+        <div className="mb-4 grid gap-3 sm:grid-cols-2">
         <div className="min-w-0 text-sm">
           <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-500">Libro</span>
           <p
             role="status"
             aria-live="polite"
-            className="w-full min-w-0 truncate rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-700"
+            className="w-full min-w-0 truncate rounded-full border border-slate-300/80 bg-white/70 px-3 py-2 text-sm text-slate-700"
           >
             {manager.selectedBook ? manager.selectedBook.title : "Selecciona un libro para comenzar"}
           </p>
@@ -70,7 +70,7 @@ export function DownloadProgressCard() {
       />
 
       {manager.invalidFormatWithChapterSelection ? (
-        <p className="mb-4 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-2.5 text-sm text-amber-700">
+        <p className="mb-4 flex items-start gap-2 rounded-[1rem] border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700">
           <svg className="mt-0.5 h-4 w-4 shrink-0" viewBox="0 0 16 16" fill="none" aria-hidden="true">
             <path d="M8 2L14.5 13H1.5L8 2z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
             <path d="M8 7v3M8 11.5v.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />

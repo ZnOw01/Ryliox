@@ -194,14 +194,14 @@ export function SearchBooksCard() {
     visibleResults.length > 0 ? `search-option-${activeResultIndex}` : undefined;
 
   return (
-    <section className="soft-rise min-w-0 overflow-hidden rounded-2xl border border-slate-200/90 bg-white/95 p-5 shadow-panel backdrop-blur">
-      <div className="mb-3 flex items-center justify-between gap-2">
-        <h2 className="inline-flex items-center gap-2 text-lg font-semibold leading-tight tracking-tight text-ink">
+    <section className="soft-rise panel-surface-strong min-w-0 overflow-hidden rounded-[1.5rem] p-6 sm:p-7">
+      <div className="mb-4 flex items-center justify-between gap-2">
+        <h2 className="inline-flex items-center gap-2 font-display text-[1.05rem] font-semibold leading-tight tracking-tight text-ink sm:text-[1.1rem]">
           <span className="h-2 w-2 rounded-full bg-brand" aria-hidden="true" />
           Buscar libros
         </h2>
         {normalizedQuery && !isSearching && resultCount > 0 ? (
-          <span className="rounded-full bg-brand/10 px-2.5 py-0.5 text-xs font-semibold text-brand-deep">
+          <span className="rounded-full bg-brand/10 px-2.5 py-0.5 text-xs font-semibold text-brand-deep ring-1 ring-brand/10">
             {resultCount} resultado{resultCount === 1 ? "" : "s"}
           </span>
         ) : null}
@@ -258,7 +258,7 @@ export function SearchBooksCard() {
             aria-controls="search-results"
             aria-expanded={visibleResults.length > 0}
             aria-haspopup="listbox"
-            className="min-w-0 w-full rounded-lg border border-slate-300 py-2 pl-9 pr-3 text-sm outline-none transition focus:border-brand/70 focus:ring-2 focus:ring-brand/25"
+            className="min-w-0 w-full rounded-full border border-slate-300/90 bg-white/80 py-2.5 pl-9 pr-3 text-sm outline-none transition focus:border-brand/70 focus:ring-2 focus:ring-brand/20"
           />
         </div>
         {normalizedQuery ? (
@@ -268,7 +268,7 @@ export function SearchBooksCard() {
               setQueryInput("");
               setScope("all");
             }}
-            className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/60 focus-visible:ring-offset-2 sm:w-auto"
+            className="w-full rounded-full border border-slate-300/80 bg-white/70 px-4 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/60 focus-visible:ring-offset-2 sm:w-auto"
           >
             Limpiar
           </button>
@@ -304,7 +304,7 @@ export function SearchBooksCard() {
       </fieldset>
 
       {isSearching ? (
-        <div className="mb-3 flex items-center gap-2 rounded-lg border border-brand/30 bg-brand/5 px-3 py-2 text-sm text-brand" role="status" aria-live="polite">
+        <div className="mb-3 flex items-center gap-2 rounded-full border border-brand/20 bg-brand/5 px-3 py-2 text-sm text-brand" role="status" aria-live="polite">
           <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-brand/30 border-t-brand" />
           {hasStaleResults ? "Actualizando resultados..." : "Buscando libros..."}
         </div>
@@ -348,7 +348,7 @@ export function SearchBooksCard() {
                   setSelectedBook(book);
                 }}
                 onMouseEnter={() => setActiveResultIndex(index)}
-                className={`group w-full rounded-xl border p-3 text-left transition focus:outline-none focus:ring-2 focus:ring-brand/40 ${
+                className={`group w-full rounded-[1rem] border p-3 text-left transition focus:outline-none focus:ring-2 focus:ring-brand/40 ${
                   isSelected
                   ? "border-brand/30 bg-brand/10 shadow-panel-md"
                   : isActive
@@ -358,7 +358,7 @@ export function SearchBooksCard() {
               >
                 <div className="flex min-w-0 items-start justify-between gap-3">
                   <div className="flex min-w-0 gap-3">
-                    <div className="h-20 w-14 flex-none overflow-hidden rounded-md border border-slate-200 bg-slate-100">
+                    <div className="h-20 w-14 flex-none overflow-hidden rounded-lg border border-slate-200 bg-slate-100 shadow-sm">
                       {book.cover_url ? (
                         <img
                           src={book.cover_url}
@@ -375,7 +375,7 @@ export function SearchBooksCard() {
                       )}
                     </div>
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-slate-900">{book.title}</p>
+                      <p className="truncate text-[0.95rem] font-semibold text-slate-900">{book.title}</p>
                       <p className="mt-1 truncate text-xs text-slate-600">{book.authors?.join(", ") || "Autor desconocido"}</p>
                       <p className="truncate text-xs text-slate-500">
                         {book.publishers?.join(", ") || "Editorial desconocida"}
@@ -383,7 +383,7 @@ export function SearchBooksCard() {
                     </div>
                   </div>
                   <span
-                    className={`flex-shrink-0 rounded-md px-2.5 py-1 text-xs font-semibold ${
+                    className={`flex-shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${
                       isSelected
                         ? "bg-brand/15 text-brand-deep"
                         : "bg-slate-100 text-slate-600 group-hover:bg-brand/10 group-hover:text-brand-deep"

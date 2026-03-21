@@ -9,8 +9,8 @@ import App from "../components/App";
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="description" content="Descarga libros de O'Reilly Learning en PDF y EPUB." />
-    <meta name="theme-color" content="#dc2626" />
-    <title>Ryliox — Descargador de libros O'Reilly</title>
+    <meta name="theme-color" content="#991b1b" />
+    <title>Ryliox</title>
     <script is:inline>
       (() => {
         window.addEventListener("load", () => {
@@ -54,19 +54,21 @@ import App from "../components/App";
     </script>
   </head>
   <body>
-    <div class="mx-auto flex min-h-screen w-full max-w-6xl flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
-      <header class="soft-rise relative overflow-hidden rounded-2xl border border-brand/20 bg-white/90 px-8 py-6 shadow-panel backdrop-blur sm:px-12 sm:py-8">
-        <div class="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_12%,rgba(220,38,38,0.16),transparent_46%)]" aria-hidden="true"></div>
-        <div class="pointer-events-none absolute -left-5 -top-6 h-20 w-20 rounded-full bg-brand/15 blur-2xl" aria-hidden="true"></div>
-        <div class="pointer-events-none absolute -right-8 top-0 h-24 w-24 rounded-full bg-brand-deep/10 blur-2xl" aria-hidden="true"></div>
-        <div class="relative">
-          <h1 class="bg-gradient-to-r from-ink via-brand-deep to-brand bg-clip-text text-5xl font-bold leading-loose tracking-tight text-transparent sm:text-6xl lg:text-7xl">Ryliox</h1>
+    <div class="mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-6 px-4 py-5 sm:px-6 sm:py-6 lg:px-8 lg:py-8">
+      <header class="soft-rise panel-surface-strong relative overflow-hidden rounded-[1.75rem] px-6 py-6 sm:px-8 sm:py-7 lg:px-10 lg:py-8">
+        <div class="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_12%,rgba(220,38,38,0.12),transparent_42%),radial-gradient(circle_at_86%_0%,rgba(248,113,113,0.1),transparent_30%)]" aria-hidden="true"></div>
+        <div class="pointer-events-none absolute -left-10 top-0 h-28 w-28 rounded-full bg-brand/10 blur-3xl" aria-hidden="true"></div>
+        <div class="pointer-events-none absolute -right-10 top-6 h-28 w-28 rounded-full bg-brand-deep/10 blur-3xl" aria-hidden="true"></div>
+        <div class="relative flex items-end justify-between">
+          <h1 class="font-display text-4xl font-semibold tracking-tight text-ink sm:text-5xl lg:text-6xl">
+            Ryliox
+          </h1>
         </div>
       </header>
-      <main>
+      <main class="min-w-0">
         <App client:load />
       </main>
-      <footer class="pb-2 text-center text-xs text-slate-400">
+      <footer class="pb-1 text-center text-xs text-slate-400 sm:pb-2">
         Ryliox &mdash; Solo para uso personal
       </footer>
     </div>

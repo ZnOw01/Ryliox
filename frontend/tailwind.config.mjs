@@ -16,12 +16,13 @@ export default {
       },
       fontFamily: {
         sans: ["IBM Plex Sans", ...defaultTheme.fontFamily.sans],
+        display: ["Space Grotesk", ...defaultTheme.fontFamily.sans],
         mono: ["IBM Plex Mono", ...defaultTheme.fontFamily.mono],
       },
       boxShadow: {
-        panel: "0 20px 48px -30px rgba(153, 27, 27, 0.38)",
-        "panel-md": "0 8px 24px -12px rgba(153, 27, 27, 0.28)",
-        "brand-glow": "0 0 0 3px rgba(220, 38, 38, 0.2)",
+        panel: "0 18px 54px -34px rgba(15, 23, 42, 0.32)",
+        "panel-md": "0 10px 26px -16px rgba(15, 23, 42, 0.22)",
+        "brand-glow": "0 0 0 3px rgba(220, 38, 38, 0.18)",
       },
       backgroundImage: {
         "brand-gradient": "linear-gradient(135deg, #dc2626 0%, #991b1b 100%)",

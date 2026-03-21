@@ -11,7 +11,7 @@ export function SseStatusBadge({ status }: SseStatusBadgeProps) {
       role="status"
       aria-live="polite"
       aria-atomic="true"
-      className={`inline-flex max-w-full flex-wrap items-center gap-1.5 break-words rounded-full border px-2.5 py-1 text-xs font-medium ${sseStatusClass(status)}`}
+      className={`inline-flex max-w-full flex-wrap items-center gap-1.5 break-words rounded-full border px-2.5 py-1 text-xs font-medium shadow-sm ${sseStatusClass(status)}`}
       title={status === "error" ? "Las actualizaciones en vivo están desconectadas" : undefined}
     >
       <span

@@ -131,7 +131,7 @@ export function ProgressStatus({ currentLabel, progress, progressPercent }: Prog
 
       <div className="mt-3 space-y-1 text-sm text-slate-600">
         {progress?.status === "completed" ? (
-          <p className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-800">
+          <p className="flex items-center gap-2 rounded-[1rem] border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-800">
             <svg className="h-4 w-4 shrink-0" viewBox="0 0 16 16" fill="none" aria-hidden="true">
               <path d="M3 8l3.5 3.5L13 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
@@ -139,7 +139,7 @@ export function ProgressStatus({ currentLabel, progress, progressPercent }: Prog
           </p>
         ) : null}
         {progress?.status === "cancelled" || progress?.status === "canceled" ? (
-          <p className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800">
+          <p className="flex items-center gap-2 rounded-[1rem] border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800">
             <svg className="h-4 w-4 shrink-0" viewBox="0 0 16 16" fill="none" aria-hidden="true">
               <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.5" />
               <path d="M5 5l6 6M11 5l-6 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
@@ -148,7 +148,7 @@ export function ProgressStatus({ currentLabel, progress, progressPercent }: Prog
           </p>
         ) : null}
         {typeof progress?.queue_position === "number" && progress.queue_position > 0 ? (
-          <p className="flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          <p className="flex items-center gap-1.5 rounded-[1rem] border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
             <svg className="h-3.5 w-3.5 shrink-0" viewBox="0 0 16 16" fill="none" aria-hidden="true">
               <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.75" />
               <path d="M8 5v4l2 2" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
@@ -168,18 +168,18 @@ export function ProgressStatus({ currentLabel, progress, progressPercent }: Prog
         {epubName ? <p className="break-all">EPUB generado: <span className="font-medium text-slate-700">{epubName}</span></p> : null}
         {pdfName ? <p className="break-all">PDF generado: <span className="font-medium text-slate-700">{pdfName}</span></p> : null}
         {revealTargets.length > 0 ? (
-          <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-3">
+          <div className="mt-3 rounded-[1rem] border border-slate-200/80 bg-white/70 px-3 py-3">
             <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Archivos generados</p>
             <div className="space-y-2">
               {revealTargets.map((path) => (
-                <div key={path} className="rounded-lg border border-slate-200 bg-white px-3 py-2">
-                  <p className="break-all text-xs text-slate-500">{path}</p>
+                <div key={path} className="rounded-[0.9rem] border border-slate-200 bg-white px-3 py-2">
+                  <p className="break-all text-xs leading-relaxed text-slate-500">{path}</p>
                   <div className="mt-2 flex flex-wrap gap-2">
                     <button
                       type="button"
                       onClick={() => void handleReveal(path)}
                       disabled={revealingPath === path}
-                      className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                      className="rounded-full border border-slate-300/80 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       {revealingPath === path ? "Abriendo..." : "Abrir ubicacion"}
                     </button>
@@ -187,7 +187,7 @@ export function ProgressStatus({ currentLabel, progress, progressPercent }: Prog
                       type="button"
                       onClick={() => void handleCopy(path)}
                       disabled={!supportsCopy}
-                      className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                      className="rounded-full border border-slate-300/80 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       {supportsCopy ? "Copiar ruta" : "Copia no disponible"}
                     </button>
@@ -204,14 +204,14 @@ export function ProgressStatus({ currentLabel, progress, progressPercent }: Prog
         {actionError ? <p className="text-xs text-red-600">{actionError}</p> : null}
 
         {hasTechnicalDetails ? (
-          <details className="mt-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+          <details className="mt-2 rounded-[1rem] border border-slate-200/80 bg-white/70 px-3 py-2">
             <summary className="cursor-pointer text-xs font-semibold text-slate-600">Detalles tecnicos</summary>
             <div className="mt-2 space-y-1 text-xs text-slate-600">
               {messageLabel ? <p>Mensaje: {messageLabel}</p> : null}
               {progress?.error ? <p className="text-red-600">Error: {progress.error}</p> : null}
               {progress?.code ? <p className="text-red-600">Codigo: {progress.code}</p> : null}
               {progress?.details ? (
-                <pre className="overflow-x-auto whitespace-pre-wrap rounded border border-red-100 bg-red-50 p-2 text-xs text-red-700">
+                <pre className="overflow-x-auto whitespace-pre-wrap rounded-lg border border-red-100 bg-red-50 p-2 text-xs text-red-700">
                   {JSON.stringify(progress.details, null, 2)}
                 </pre>
               ) : null}

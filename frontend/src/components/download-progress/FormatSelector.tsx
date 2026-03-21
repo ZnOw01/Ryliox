@@ -32,7 +32,7 @@ export function FormatSelector({
         aria-describedby={hasChapterSelection ? "format-helper-text" : undefined}
         disabled={disabled}
         title="Elige entre EPUB (libro contenido) o PDF (por página o por capítulo)"
-        className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/60 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400"
+        className="w-full rounded-full border border-slate-300/80 bg-white/80 px-3 py-2.5 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/60 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400"
       >
         {isLoading ? <option value="">Cargando formatos...</option> : null}
         {!isLoading && formats.length === 0 ? <option value="">No hay formatos disponibles</option> : null}
@@ -57,11 +57,11 @@ export function FormatSelector({
           : null}
       </select>
       {hasChapterSelection ? (
-        <p id="format-helper-text" className="mt-1 text-xs text-slate-500">
+        <p id="format-helper-text" className="mt-1 text-xs leading-relaxed text-slate-500">
           EPUB siempre descarga el libro completo. PDF puede usar todos o solo los capitulos elegidos.
         </p>
       ) : null}
-      {selectedFormatDescription ? <p className="mt-1 break-words text-xs text-slate-500">{selectedFormatDescription}</p> : null}
+      {selectedFormatDescription ? <p className="mt-1 break-words text-xs leading-relaxed text-slate-500">{selectedFormatDescription}</p> : null}
     </label>
   );
 }

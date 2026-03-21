@@ -49,7 +49,7 @@ export function DownloadActions({
           onClick={onStart}
           aria-describedby={startDisabledReason ? "start-disabled-reason" : undefined}
           disabled={startDisabled}
-          className="flex w-full items-center justify-center gap-2 rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/60 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+          className="flex w-full items-center justify-center gap-2 rounded-full bg-brand px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/60 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {startPending ? (
             <>
@@ -70,7 +70,7 @@ export function DownloadActions({
           type="button"
           onClick={onCancel}
           disabled={!active || cancelPending}
-          className="flex w-full items-center justify-center gap-2 rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-red-300 hover:bg-red-50 hover:text-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/60 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+          className="flex w-full items-center justify-center gap-2 rounded-full border border-slate-300/80 bg-white/70 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-red-300 hover:bg-red-50 hover:text-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/60 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {cancelPending ? (
             <>
@@ -91,7 +91,7 @@ export function DownloadActions({
           <button
             type="button"
             onClick={onForceReconnect}
-            className="flex w-full items-center justify-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-800 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white hover:bg-amber-100 sm:col-span-2"
+            className="flex w-full items-center justify-center gap-2 rounded-full border border-amber-300 bg-amber-50 px-4 py-2.5 text-sm font-semibold text-amber-800 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white hover:bg-amber-100 sm:col-span-2"
           >
             <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none" aria-hidden="true">
               <path d="M13.5 8A5.5 5.5 0 1 1 8 2.5" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" />
@@ -102,7 +102,7 @@ export function DownloadActions({
         ) : null}
       </div>
       {startDisabledReason && startDisabledReason !== "Selecciona un libro para comenzar." ? (
-        <p id="start-disabled-reason" className="mb-4 text-xs text-amber-700">
+        <p id="start-disabled-reason" className="mb-4 text-xs leading-relaxed text-amber-700">
           {startDisabledReason}
         </p>
       ) : null}
