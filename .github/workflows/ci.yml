@@ -334,7 +334,7 @@ jobs:
           trap cleanup EXIT
 
           for _ in $(seq 1 30); do
-            if curl -fsSL -o /tmp/health.json http://127.0.0.1:8000/api/health; then
+            if curl -4 -fsS -o /tmp/health.json http://localhost:8000/api/health; then
               python -c "import json, pathlib; data=json.loads(pathlib.Path('/tmp/health.json').read_text(encoding='utf-8')); assert data.get('status') == 'ok', data"
               exit 0
             fi
