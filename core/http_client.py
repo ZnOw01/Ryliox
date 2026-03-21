@@ -33,7 +33,11 @@ def _parse_cookie_expires(value: Any) -> int | None:
 
 
 class HttpClient:
-    def __init__(self, cookies_file: Path | None = None):
+    def __init__(
+        self,
+        cookies_file: Path | None = None,
+        session_db_file: Path | None = None,
+    ):
         self.client = httpx.AsyncClient(headers=config.HEADERS)
         self.last_request_time = 0.0
         self._rate_limit_lock = asyncio.Lock()
@@ -42,7 +46,20 @@ class HttpClient:
         self._request_retry_backoff = max(0.0, float(getattr(config.SETTINGS, "request_retry_backoff", 0.5)))
 
         cookies_path = cookies_file or config.COOKIES_FILE
-        self.session_store = SessionStore(legacy_cookies_file=cookies_path)
+        session_db_path = session_db_file
+        if session_db_path is None and cookies_file is not None:
+            try:
+                custom_path = Path(cookies_file).resolve()
+                default_path = Path(config.COOKIES_FILE).resolve()
+                if custom_path != default_path:
+                    session_db_path = custom_path.with_suffix(".sqlite3")
+            except OSError:
+                pass
+
+        self.session_store = SessionStore(
+            db_path=session_db_path,
+            legacy_cookies_file=cookies_path,
+        )
         self._load_cookies_from_store()
 
     def _resolve_cookie_domain(self, base_url: str) -> str:
