@@ -290,14 +290,7 @@ jobs:
 
           for _ in $(seq 1 30); do
             if curl -fsSL http://127.0.0.1:8000/api/health -o /tmp/health.json 2>/dev/null; then
-              python3 - <<'PY'
-                import json
-                import pathlib
-                import sys
-
-                d = json.loads(pathlib.Path('/tmp/health.json').read_text())
-                sys.exit(0 if d.get("status") == "ok" else 1)
-                PY
+              python3 -c "import json,pathlib,sys; d=json.loads(pathlib.Path('/tmp/health.json').read_text()); sys.exit(0 if d.get('status')=='ok' else 1)"
               exit 0
             fi
             sleep 2
