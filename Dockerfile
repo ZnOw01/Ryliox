@@ -36,6 +36,7 @@ RUN pip install --no-cache-dir uv==0.10.12
 
 COPY pyproject.toml uv.lock* ./
 RUN uv sync --frozen --no-dev
+ENV PATH="/app/.venv/bin:$PATH"
 
 COPY --chown=appuser:appgroup . ./
 COPY --from=frontend-build /build/frontend/dist /app/frontend/dist

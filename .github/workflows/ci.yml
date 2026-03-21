@@ -3,6 +3,7 @@ name: CI
 on:
   pull_request:
   push:
+    branches: [main, master, develop]
   workflow_dispatch:
 
 concurrency:
@@ -14,25 +15,25 @@ permissions:
 
 env:
   PYTHONPATH: ${{ github.workspace }}
+  UV_FROZEN: "1"
 
 jobs:
+
   changes:
     name: Detect changed areas
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
-      backend: ${{ steps.filter.outputs.backend }}
+      backend:  ${{ steps.filter.outputs.backend }}
       frontend: ${{ steps.filter.outputs.frontend }}
-      ops: ${{ steps.filter.outputs.ops }}
-      ci: ${{ steps.filter.outputs.ci }}
+      ops:      ${{ steps.filter.outputs.ops }}
+      ci:       ${{ steps.filter.outputs.ci }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Filter paths
-        id: filter
+      - id: filter
         uses: dorny/paths-filter@v3
         with:
           filters: |
@@ -57,6 +58,26 @@ jobs:
             ci:
               - '.github/workflows/**'
 
+  backend-lint:
+    name: Backend lint & format
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: changes
+    if: needs.changes.outputs.backend == 'true' || needs.changes.outputs.ci == 'true'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v3
+        with:
+          version: latest
+          enable-cache: true
+
+      - name: Ruff lint
+        run: uvx ruff check core plugins utils web tests launcher.py config.py
+
+      - name: Ruff format check
+        run: uvx ruff format --check core plugins utils web tests launcher.py config.py
+
   backend-sanity:
     name: Backend sanity
     runs-on: ubuntu-latest
@@ -64,29 +85,26 @@ jobs:
     needs: changes
     if: needs.changes.outputs.backend == 'true' || needs.changes.outputs.ci == 'true'
     env:
-      DATA_DIR: ${{ github.workspace }}/.ci-data
+      DATA_DIR:   ${{ github.workspace }}/.ci-data
       OUTPUT_DIR: ${{ github.workspace }}/.ci-output
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Python 3.11
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
-      - name: Setup uv
-        uses: astral-sh/setup-uv@v3
+      - uses: astral-sh/setup-uv@v3
         with:
-          version: "latest"
+          version: latest
+          enable-cache: true
 
-      - name: Install backend dependencies
-        run: uv sync
+      - run: uv sync
 
-      - name: Compile backend sources
+      - name: Compile sources
         run: uv run python -m compileall -q core plugins utils web launcher.py config.py
 
-      - name: Smoke app startup and health/status endpoints
+      - name: Smoke health endpoints
         run: |
           uv run python - <<'PY'
           from fastapi.testclient import TestClient
@@ -94,161 +112,111 @@ jobs:
 
           with TestClient(create_app()) as client:
               for path in ("/api/health", "/api/status"):
-                  response = client.get(path)
-                  assert response.status_code == 200, f"{path} returned {response.status_code}"
+                  r = client.get(path)
+                  assert r.status_code == 200, f"{path} → {r.status_code}"
 
-          print("Backend sanity checks passed")
+          print("Sanity OK")
           PY
 
   backend-unit-tests:
     name: Backend unit tests
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    needs:
-      - changes
-      - backend-sanity
+    needs: [changes, backend-sanity]
     if: needs.changes.outputs.backend == 'true' || needs.changes.outputs.ci == 'true'
     env:
-      DATA_DIR: ${{ github.workspace }}/.ci-data
+      DATA_DIR:   ${{ github.workspace }}/.ci-data
       OUTPUT_DIR: ${{ github.workspace }}/.ci-output
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Python 3.11
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
-      - name: Setup uv
-        uses: astral-sh/setup-uv@v3
+      - uses: astral-sh/setup-uv@v3
         with:
-          version: "latest"
+          version: latest
+          enable-cache: true
 
-      - name: Install backend dependencies
-        run: uv sync
+      - run: uv sync
 
-      - name: Run unit tests
-        run: uv run pytest tests/unit -q
-
-  backend-lint:
-    name: Backend lint
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    needs:
-      - changes
-      - backend-sanity
-    if: needs.changes.outputs.backend == 'true' || needs.changes.outputs.ci == 'true'
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Python 3.11
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Setup uv
-        uses: astral-sh/setup-uv@v3
-        with:
-          version: "latest"
-
-      - name: Run Ruff lint
-        run: uvx ruff check core plugins utils web tests launcher.py config.py
+      - run: uv run pytest tests/unit -q
 
   backend-integration-tests:
     name: Backend integration tests
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    needs:
-      - changes
-      - backend-unit-tests
-      - backend-lint
+    needs: [changes, backend-unit-tests, backend-lint]
     if: needs.changes.outputs.backend == 'true' || needs.changes.outputs.ci == 'true'
     env:
-      DATA_DIR: ${{ github.workspace }}/.ci-data
+      DATA_DIR:   ${{ github.workspace }}/.ci-data
       OUTPUT_DIR: ${{ github.workspace }}/.ci-output
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Python 3.11
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
-      - name: Setup uv
-        uses: astral-sh/setup-uv@v3
+      - uses: astral-sh/setup-uv@v3
         with:
-          version: "latest"
+          version: latest
+          enable-cache: true
 
-      - name: Install backend dependencies
-        run: uv sync
+      - run: uv sync
 
-      - name: Run integration tests
-        run: uv run pytest tests/integration -q
+      - run: uv run pytest tests/integration -q
 
   backend-contract-tests:
     name: Backend contract tests
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    needs:
-      - changes
-      - backend-integration-tests
+    needs: [changes, backend-integration-tests]
     if: needs.changes.outputs.backend == 'true' || needs.changes.outputs.ci == 'true'
     env:
-      DATA_DIR: ${{ github.workspace }}/.ci-data
+      DATA_DIR:   ${{ github.workspace }}/.ci-data
       OUTPUT_DIR: ${{ github.workspace }}/.ci-output
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Python 3.11
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
-      - name: Setup uv
-        uses: astral-sh/setup-uv@v3
+      - uses: astral-sh/setup-uv@v3
         with:
-          version: "latest"
+          version: latest
+          enable-cache: true
 
-      - name: Install backend dependencies
-        run: uv sync
+      - run: uv sync
 
-      - name: Run contract tests
-        run: uv run pytest tests/contract -q
+      - run: uv run pytest tests/contract -q
 
   backend-e2e-tests:
     name: Backend e2e tests
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    needs:
-      - changes
-      - backend-contract-tests
+    needs: [changes, backend-contract-tests]
     if: needs.changes.outputs.backend == 'true' || needs.changes.outputs.ci == 'true'
     env:
-      DATA_DIR: ${{ github.workspace }}/.ci-data
+      DATA_DIR:   ${{ github.workspace }}/.ci-data
       OUTPUT_DIR: ${{ github.workspace }}/.ci-output
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Python 3.11
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
-      - name: Setup uv
-        uses: astral-sh/setup-uv@v3
+      - uses: astral-sh/setup-uv@v3
         with:
-          version: "latest"
+          version: latest
+          enable-cache: true
 
-      - name: Install backend dependencies
-        run: uv sync
+      - run: uv sync
 
-      - name: Run e2e tests
-        run: uv run pytest tests/e2e -q
+      - run: uv run pytest tests/e2e -q
 
   frontend-build-check:
     name: Frontend build and check
@@ -257,66 +225,66 @@ jobs:
     needs: changes
     if: needs.changes.outputs.frontend == 'true' || needs.changes.outputs.ci == 'true'
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
+      - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
 
-      - name: Cache Bun dependencies
-        uses: actions/cache@v4
+      - uses: actions/cache@v4
         with:
           path: ~/.bun/install/cache
           key: ${{ runner.os }}-bun-${{ hashFiles('frontend/bun.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-bun-
+          restore-keys: ${{ runner.os }}-bun-
 
-      - name: Install frontend dependencies
-        run: bun install --frozen-lockfile
+      - run: bun install --frozen-lockfile
         working-directory: frontend
 
-      - name: Run Astro check
-        run: bun run check
+      - run: bun run check
         working-directory: frontend
 
-      - name: Run frontend tests
-        run: bun run test
+      - run: bun run test
         working-directory: frontend
 
-      - name: Build frontend
-        run: bun run build
+      - run: bun run build
         working-directory: frontend
 
   ops-docker-smoke:
-    name: Docker and compose smoke
+    name: Docker smoke
     runs-on: ubuntu-latest
     timeout-minutes: 20
     needs: changes
-    if: needs.changes.outputs.backend == 'true' || needs.changes.outputs.frontend == 'true' || needs.changes.outputs.ops == 'true' || needs.changes.outputs.ci == 'true'
+    if: |
+      needs.changes.outputs.backend  == 'true' ||
+      needs.changes.outputs.frontend == 'true' ||
+      needs.changes.outputs.ops      == 'true' ||
+      needs.changes.outputs.ci       == 'true'
     env:
       COMPOSE_PROJECT_NAME: ryliox-ci
-      DATA_DIR: ${{ github.workspace }}/.ci-data
+      DATA_DIR:   ${{ github.workspace }}/.ci-data
       OUTPUT_DIR: ${{ github.workspace }}/.ci-output
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Prepare runtime directories
-        run: mkdir -p .ci-data .ci-output
+      - run: mkdir -p .ci-data .ci-output
 
-      - name: Validate compose configuration
+      - name: Validate compose config
         run: docker compose config
 
       - name: Build image
-        run: docker build -t ryliox-ci:latest .
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: ryliox-ci:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
-      - name: Start container and smoke health endpoint
+      - name: Smoke health endpoint
         run: |
           set -euo pipefail
 
-          container_id="$(docker run -d \
+          cid=$(docker run -d \
             --name ryliox-ci \
             -p 8000:8000 \
             -e HOST=0.0.0.0 \
@@ -325,21 +293,52 @@ jobs:
             -e OUTPUT_DIR=/app/output \
             -v "${DATA_DIR}:/app/data" \
             -v "${OUTPUT_DIR}:/app/output" \
-            ryliox-ci:latest)"
+            ryliox-ci:latest)
 
-          cleanup() {
-            docker rm -f "${container_id}" >/dev/null 2>&1 || true
-          }
-
-          trap cleanup EXIT
+          trap "docker rm -f ${cid} >/dev/null 2>&1 || true" EXIT
 
           for _ in $(seq 1 30); do
-            if curl -4 -fsS -o /tmp/health.json http://localhost:8000/api/health; then
-              python -c "import json, pathlib; data=json.loads(pathlib.Path('/tmp/health.json').read_text(encoding='utf-8')); assert data.get('status') == 'ok', data"
+            if curl -fsSL http://127.0.0.1:8000/api/health -o /tmp/health.json 2>/dev/null; then
+              python3 - <<'PY'
+import json
+import pathlib
+import sys
+
+d = json.loads(pathlib.Path('/tmp/health.json').read_text())
+sys.exit(0 if d.get("status") == "ok" else 1)
+PY
               exit 0
             fi
             sleep 2
           done
 
-          docker logs "${container_id}"
+          docker logs "${cid}"
           exit 1
+
+  ci-success:
+    name: CI success
+    runs-on: ubuntu-latest
+    if: always()
+    needs:
+      - backend-lint
+      - backend-e2e-tests
+      - frontend-build-check
+      - ops-docker-smoke
+    steps:
+      - name: Verify all required jobs passed or were skipped
+        run: |
+          python3 - <<'PY'
+          import json, sys
+
+          needs = json.loads("""${{ toJson(needs) }}""")
+          failed = [
+              name for name, job in needs.items()
+              if job["result"] not in ("success", "skipped")
+          ]
+
+          if failed:
+              print(f"::error::Failed jobs: {', '.join(failed)}")
+              sys.exit(1)
+
+          print("All jobs passed or were skipped — CI green ✓")
+          PY
