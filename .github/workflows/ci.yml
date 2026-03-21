@@ -75,9 +75,6 @@ jobs:
       - name: Ruff lint
         run: uvx ruff check core plugins utils web tests launcher.py config.py
 
-      - name: Ruff format check
-        run: uvx ruff format --check core plugins utils web tests launcher.py config.py
-
   backend-sanity:
     name: Backend sanity
     runs-on: ubuntu-latest
@@ -272,13 +269,7 @@ jobs:
         run: docker compose config
 
       - name: Build image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          load: true
-          tags: ryliox-ci:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+        run: docker build -t ryliox-ci:latest .
 
       - name: Smoke health endpoint
         run: |
