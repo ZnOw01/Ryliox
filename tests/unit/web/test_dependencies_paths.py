@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import importlib
+from pathlib import Path
+
 import pytest
 from starlette.requests import Request
 
@@ -17,6 +20,25 @@ pytestmark = pytest.mark.unit
 def test_launcher_paths_follow_config_data_dir():
     assert DOWNLOAD_QUEUE_DB == config.DATA_DIR / "download_jobs.sqlite3"
     assert DOWNLOAD_ERROR_LOG_DIR == config.DATA_DIR / "logs"
+
+
+def test_config_runtime_values_are_lazy_until_accessed():
+    reloaded = importlib.reload(config)
+
+    assert getattr(reloaded, "_RUNTIME_VALUES", None) is None
+
+    assert isinstance(reloaded.DATA_DIR, Path)
+    assert getattr(reloaded, "_RUNTIME_VALUES", None) is not None
+
+
+def test_config_output_dir_remains_reassignable(tmp_path):
+    original_output_dir = config.OUTPUT_DIR
+
+    try:
+        config.OUTPUT_DIR = tmp_path
+        assert config.OUTPUT_DIR == tmp_path
+    finally:
+        config.OUTPUT_DIR = original_output_dir
 
 
 def _build_request(
@@ -62,6 +84,21 @@ def test_require_same_origin_allows_matching_origin_header():
             "host": "localhost",
             "origin": "http://localhost",
         }
+    )
+
+    guard(request)
+
+
+def test_require_same_origin_accepts_forwarded_headers_from_proxy():
+    guard = require_same_origin("save_cookies")
+    request = _build_request(
+        {
+            "host": "localhost",
+            "origin": "https://app.example.com",
+            "x-forwarded-host": "app.example.com",
+            "x-forwarded-proto": "https",
+        },
+        method="POST",
     )
 
     guard(request)

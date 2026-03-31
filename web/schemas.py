@@ -180,6 +180,14 @@ class CompletedProgress(_ProgressBase):
         return value
 
 
+class CancelledProgress(_ProgressBase):
+    status: Literal["cancelled"]
+    error: str
+    code: str | None = None
+    details: dict[str, Any] | None = None
+    trace_log: str | None = None
+
+
 class ErrorProgress(_ProgressBase):
     status: Literal["error"]
     error: str
@@ -189,7 +197,7 @@ class ErrorProgress(_ProgressBase):
 
 
 ProgressResponse = Annotated[
-    IdleProgress | QueuedProgress | RunningProgress | CompletedProgress | ErrorProgress,
+    IdleProgress | QueuedProgress | RunningProgress | CompletedProgress | CancelledProgress | ErrorProgress,
     Field(discriminator="status"),
 ]
 

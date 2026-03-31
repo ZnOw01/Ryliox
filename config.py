@@ -9,10 +9,12 @@ Precedence (highest -> lowest):
 from __future__ import annotations
 
 import logging
+import os
 import secrets
+import sys
 from pathlib import Path
-from types import MappingProxyType
-from typing import Final
+from types import MappingProxyType, ModuleType
+from typing import Any, Final
 
 from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -21,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 BASE_DIR: Final = Path(__file__).resolve().parent
 _RUNTIME_DATA_FALLBACK_DIR: Final[Path] = BASE_DIR / ".runtime_data"
-_RUNTIME_OUTPUT_FALLBACK_DIR: Final[Path] = BASE_DIR / ".runtime_output"
+_RUNTIME_OUTPUT_FALLBACK_DIR: Final[Path] = BASE_DIR / "output"
 
 _FALLBACK_USER_AGENTS: Final[tuple[str, ...]] = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -41,11 +43,44 @@ _PROTECTED_HEADERS: Final[frozenset[str]] = frozenset(
         "accept-language",
     }
 )
+_RUNTIME_EXPORTS: Final[frozenset[str]] = frozenset(
+    {
+        "SETTINGS",
+        "OUTPUT_DIR",
+        "DATA_DIR",
+        "COOKIES_FILE",
+        "SESSION_DB_FILE",
+        "BASE_URL",
+        "API_V1",
+        "API_V2",
+        "REQUEST_DELAY",
+        "REQUEST_TIMEOUT",
+        "REQUEST_RETRIES",
+        "REQUEST_RETRY_BACKOFF",
+        "HEADERS",
+    }
+)
+
+_RUNTIME_VALUES: dict[str, Any] | None = None
 
 
 def _to_absolute_path(path: Path) -> Path:
     """Convert relative path to absolute path using BASE_DIR."""
     return path if path.is_absolute() else (BASE_DIR / path)
+
+
+def _nearest_existing_directory(path: Path) -> Path | None:
+    current = path
+    while True:
+        if current.exists():
+            if current.is_dir():
+                return current
+            parent = current.parent
+            return parent if parent != current else None
+        parent = current.parent
+        if parent == current:
+            return None
+        current = parent
 
 
 def _dir_is_writable(path: Path) -> bool:
@@ -60,6 +95,7 @@ def _dir_is_writable(path: Path) -> bool:
         return True
     except OSError:
         return False
+    return os.access(existing_parent, os.W_OK | os.X_OK)
 
 
 def _resolve_runtime_dir(
@@ -72,6 +108,7 @@ def _resolve_runtime_dir(
     """Resolve runtime directory ensuring it is writable, with fallback."""
     candidate = _to_absolute_path(configured or default)
     if _dir_is_writable(candidate):
+        candidate.mkdir(parents=True, exist_ok=True)
         return candidate
 
     fallback_path = _to_absolute_path(fallback)
@@ -268,7 +305,7 @@ class Settings(BaseSettings):
         return v
 
     @model_validator(mode="after")
-    def _warn_if_env_missing(self) -> "Settings":
+    def _warn_if_env_missing(self) -> Settings:
         env_path = BASE_DIR / ".env"
         if not env_path.exists():
             logger.debug(
@@ -278,48 +315,12 @@ class Settings(BaseSettings):
         return self
 
 
-SETTINGS: Final = Settings()
-
-OUTPUT_DIR: Final[Path] = _resolve_runtime_dir(
-    SETTINGS.output_dir,
-    default=BASE_DIR / "output",
-    fallback=_RUNTIME_OUTPUT_FALLBACK_DIR,
-    label="OUTPUT_DIR",
-)
-DATA_DIR: Final[Path] = _resolve_runtime_dir(
-    SETTINGS.data_dir,
-    default=BASE_DIR / "data",
-    fallback=_RUNTIME_DATA_FALLBACK_DIR,
-    label="DATA_DIR",
-)
-COOKIES_FILE: Final[Path] = _resolve_runtime_file(
-    SETTINGS.cookies_file,
-    default=DATA_DIR / "cookies.json",
-    fallback_dir=DATA_DIR,
-    label="COOKIES_FILE",
-)
-SESSION_DB_FILE: Final[Path] = _resolve_runtime_file(
-    SETTINGS.session_db_file,
-    default=DATA_DIR / "session.sqlite3",
-    fallback_dir=DATA_DIR,
-    label="SESSION_DB_FILE",
-)
-
-BASE_URL: Final[str] = SETTINGS.base_url
-API_V1: Final[str] = f"{BASE_URL}/api/v1"
-API_V2: Final[str] = f"{BASE_URL}/api/v2"
-REQUEST_DELAY: Final[float] = SETTINGS.request_delay
-REQUEST_TIMEOUT: Final[int] = SETTINGS.request_timeout
-REQUEST_RETRIES: Final[int] = SETTINGS.request_retries
-REQUEST_RETRY_BACKOFF: Final[float] = SETTINGS.request_retry_backoff
-
-
-def _resolve_user_agent() -> str:
+def _resolve_user_agent(settings: Settings) -> str:
     """Resolve user-agent from explicit value, fake-useragent, or fallback list."""
-    if ua := (SETTINGS.user_agent or "").strip():
+    if ua := (settings.user_agent or "").strip():
         return ua
 
-    if SETTINGS.enable_fake_ua:
+    if settings.enable_fake_ua:
         try:
             from fake_useragent import UserAgent
 

@@ -9,6 +9,25 @@ import httpx
 
 import config
 from core.session_store import SessionStore
+from core.url_utils import normalize_remote_url
+
+logger = logging.getLogger(__name__)
+
+
+def _parse_cookie_expires(value: Any) -> int | None:
+    if value in {None, ""}:
+        return None
+    if isinstance(value, (int, float)):
+        return int(float(value))
+    if isinstance(value, str):
+        stripped = value.strip()
+        if not stripped:
+            return None
+        try:
+            return int(float(stripped))
+        except ValueError:
+            return None
+    return None
 
 logger = logging.getLogger(__name__)
 
@@ -127,23 +146,83 @@ class HttpClient:
         except ValueError:
             return ""
 
-    def _apply_cookies(self, cookies: Mapping[str, str]):
-        for name, value in cookies.items():
-            if self._cookie_domain:
-                self.client.cookies.set(
-                    str(name),
-                    str(value),
-                    domain=self._cookie_domain,
-                )
-            else:
-                self.client.cookies.set(str(name), str(value))
+    def _build_cookie(self, record: Mapping[str, Any]) -> Cookie:
+        domain = str(record.get("domain") or self._cookie_domain or "").strip().lower()
+        path = str(record.get("path") or "/").strip() or "/"
+        secure = bool(record.get("secure"))
+        expires = _parse_cookie_expires(record.get("expires"))
+        rest: dict[str, Any] = {}
+        if record.get("http_only"):
+            rest["HttpOnly"] = True
+        same_site = str(record.get("same_site") or "").strip()
+        if same_site:
+            rest["SameSite"] = same_site
+
+        return Cookie(
+            version=0,
+            name=str(record["name"]),
+            value=str(record["value"]),
+            port=None,
+            port_specified=False,
+            domain=domain,
+            domain_specified=bool(domain),
+            domain_initial_dot=domain.startswith("."),
+            path=path,
+            path_specified=True,
+            secure=secure,
+            expires=expires,
+            discard=expires is None,
+            comment=None,
+            comment_url=None,
+            rest=rest,
+            rfc2109=False,
+        )
+
+    def _apply_cookies(self, cookies: Sequence[Mapping[str, Any]]):
+        for record in cookies:
+            self.client.cookies.jar.set_cookie(self._build_cookie(record))
 
     def _load_cookies_from_store(self):
         try:
-            cookies = self.session_store.load_cookies(migrate_legacy=True)
+            cookies = self.session_store.load_cookie_records(migrate_legacy=True)
         except Exception:
-            cookies = {}
+            logger.exception("Failed to load cookies from SessionStore.")
+            cookies = []
         self._apply_cookies(cookies)
+
+    def _normalize_request_url(self, url: str) -> str:
+        if not url.startswith(("http://", "https://")):
+            url = urljoin(config.BASE_URL, url)
+        normalized = normalize_remote_url(url, base_url=config.BASE_URL)
+        if not normalized:
+            raise ValueError(f"Blocked unsafe request URL: {url!r}")
+        return normalized
+
+    async def _request_with_safe_redirects(self, url: str, **kwargs) -> httpx.Response:
+        max_redirects = 10
+        current_url = url
+        request_kwargs = dict(kwargs)
+        request_kwargs["follow_redirects"] = False
+
+        for _ in range(max_redirects + 1):
+            await self._rate_limit()
+            response = await self.client.get(current_url, **request_kwargs)
+            if not response.is_redirect:
+                return response
+
+            location = response.headers.get("location")
+            if not location:
+                return response
+
+            next_url = urljoin(str(response.request.url), location)
+            normalized_next_url = normalize_remote_url(
+                next_url, base_url=config.BASE_URL
+            )
+            if not normalized_next_url:
+                raise ValueError(f"Blocked unsafe redirect URL: {next_url!r}")
+            current_url = normalized_next_url
+
+        raise RuntimeError("Too many redirects while fetching remote URL")
 
     async def _rate_limit(self):
         async with self._rate_limit_lock:
@@ -157,13 +236,12 @@ class HttpClient:
         if not url.startswith("http"):
             url = config.BASE_URL + url
         if "allow_redirects" in kwargs:
-            kwargs["follow_redirects"] = kwargs.pop("allow_redirects")
+            follow_redirects = bool(kwargs.pop("allow_redirects"))
         kwargs.setdefault("timeout", config.REQUEST_TIMEOUT)
         attempts = self._request_retries + 1
         last_error: Exception | None = None
 
         for attempt in range(attempts):
-            await self._rate_limit()
             try:
                 response = await self.client.get(url, **kwargs)
             except httpx.RequestError as exc:
@@ -182,6 +260,8 @@ class HttpClient:
                     ) from exc
                 await asyncio.sleep(self._request_retry_backoff * (2**attempt))
                 continue
+            except ValueError:
+                raise
 
             if (
                 response.status_code not in RETRYABLE_STATUS_CODES

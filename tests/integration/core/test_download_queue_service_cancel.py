@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import asyncio
-from pathlib import Path
 import shutil
 import threading
-from types import SimpleNamespace
 import uuid
+from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -114,6 +114,7 @@ def test_download_queue_service_cancel_marks_job_cancelled():
         assert cancelled is True
         snapshot = _wait_for_status(service, job_id, "cancelled")
         assert snapshot.get("status") == "cancelled"
+        assert snapshot.get("trace_log") is None
     finally:
         service.stop()
         shutil.rmtree(temp_path, ignore_errors=True)

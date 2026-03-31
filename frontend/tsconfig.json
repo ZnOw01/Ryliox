@@ -8,9 +8,11 @@
       ]
     },
     "types": [
-      "astro/client"
+      "astro/client",
+      "vitest/globals",
+      "@testing-library/jest-dom"
     ],
-    "skipLibCheck": true,
+    "skipLibCheck": false,
     "moduleResolution": "Bundler",
     "allowImportingTsExtensions": true,
     "jsx": "react-jsx",

@@ -13,6 +13,7 @@ ui_*.png
 # Python environments
 # ==============================================================================
 .venv/
+.venv-linux/
 venv/
 env/
 .python-version

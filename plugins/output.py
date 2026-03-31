@@ -40,12 +40,8 @@ class OutputPlugin(Plugin):
         if not resolved.is_dir():
             return False, f"Path is not a directory: {resolved}", None
 
-        try:
-            test_file = resolved / ".write_test"
-            test_file.touch()
-            test_file.unlink()
-        except Exception as exc:
-            logger.warning("Directory is not writable %s: %s", resolved, exc)
+        if not os.access(resolved, os.W_OK | os.X_OK):
+            logger.warning("Directory is not writable %s", resolved)
             return False, "Directory is not writable", None
 
         return True, "Directory is valid", resolved

@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
+import csv
 import os
 import re
 import shutil
 import signal
 import subprocess
 import time
-import csv
 from io import StringIO
 from pathlib import Path
 
