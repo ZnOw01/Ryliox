@@ -28,8 +28,9 @@
 | Herramienta | Versión mínima |
 |---|---|
 | Python | 3.11 |
+| uv | reciente |
 | Node.js | 22.12.0 o 24.x |
-| npm | 9 |
+| Bun | 1.3+ |
 | Docker | 24 (opcional) |
 
 ### Dependencias de PDF
@@ -138,9 +139,10 @@ En el frontend también conviene ejecutar:
 
 ```bash
 cd frontend
-npm run check
-npm run lint
-npm run build
+bun install --frozen-lockfile
+bun run check
+bun run lint
+bun run build
 ```
 
 ## Resolución de problemas

@@ -443,7 +443,7 @@ class VaultBackend:
     """Placeholder for HashiCorp Vault backend.
     
     To use:
-    1. pip install hvac
+    1. uv add hvac
     2. Implement actual methods using hvac.Client
     """
     

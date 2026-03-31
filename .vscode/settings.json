@@ -174,10 +174,9 @@
     "*.ts": "${capture}.test.ts, ${capture}.spec.ts",
     "*.tsx": "${capture}.test.tsx, ${capture}.spec.tsx",
     "*.json": "${capture}.schema.json",
-    "package.json": ".package-lock.json, yarn.lock, pnpm-lock.yaml",
+    "package.json": "bun.lock",
     "Dockerfile": "docker-compose*.yml, .dockerignore",
-    "requirements.txt": "requirements*.txt",
-    "pyproject.toml": "poetry.lock, pdm.lock"
+    "pyproject.toml": "uv.lock, poetry.lock, pdm.lock"
   },
   "sonarlint.connectedMode.project": {
     "connectionId": "ryliox",

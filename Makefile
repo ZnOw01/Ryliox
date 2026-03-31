@@ -20,13 +20,10 @@ help: ## Show this help message
 # Development
 # ==============================================================================
 install: ## Install Python dependencies
-	pip install --upgrade pip
-	pip install -r requirements.txt
+	uv sync --frozen
 
 install-dev: ## Install development dependencies
-	pip install --upgrade pip
-	pip install -r requirements.txt
-	pip install pytest pytest-asyncio pytest-mock pytest-cov black ruff mypy
+	uv sync --frozen --all-extras
 
 dev: ## Start development server with hot reload
 	python -m launcher
@@ -63,16 +60,13 @@ test-coverage-xml: ## Run tests and generate XML coverage report
 # ==============================================================================
 lint: ## Run all linters
 	ruff check .
-	black --check .
 	mypy --ignore-missing-imports core/ plugins/ web/ utils/ config.py launcher.py
 
-format: ## Format code with ruff and black
+format: ## Format code with ruff
 	ruff format .
-	black .
 
 format-check: ## Check code formatting without modifying
 	ruff format --check .
-	black --check .
 
 fix: ## Fix auto-fixable linting issues
 	ruff check --fix .
@@ -80,9 +74,9 @@ fix: ## Fix auto-fixable linting issues
 # ==============================================================================
 # Security
 # ==============================================================================
-security-scan: ## Run security scans (Bandit, Safety)
+security-scan: ## Run security scans (Bandit, pip-audit)
 	bandit -r core/ plugins/ web/ utils/ -ll
-	safety check
+	pip-audit
 
 docker-scan: ## Scan Docker image with Trivy
 	@docker build -t ryliox:scan -f Dockerfile.prod .
@@ -108,7 +102,7 @@ build-multiarch: ## Build multi-arch Docker images (amd64, arm64)
 	docker buildx build --platform linux/amd64,linux/arm64 -t ryliox:latest --push .
 
 frontend-build: ## Build frontend only
-	cd frontend && npm ci && npm run build
+	cd frontend && bun install --frozen-lockfile && bun run build
 
 # ==============================================================================
 # Running

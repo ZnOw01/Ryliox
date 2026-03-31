@@ -24,7 +24,7 @@ def _get_weasyprint():
     except Exception as exc:
         raise RuntimeError(
             "WeasyPrint es necesario para generar PDFs.\n"
-            "Instalar con: pip install weasyprint\n"
+            "Sincroniza dependencias Python con uv.\n"
             "Dependencias del sistema (macOS): brew install pango\n"
             "Dependencias del sistema (Ubuntu): apt install libpango-1.0-0 libharfbuzz0b libpangoft2-1.0-0\n"
             "Dependencias del sistema (Windows): instalar GTK runtime (contiene libgobject-2.0-0)."

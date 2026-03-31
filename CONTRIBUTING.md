@@ -9,8 +9,9 @@
 ### Requisitos
 
 - Python 3.11+
+- uv reciente
 - Node.js 22.12.0+ o 24.x
-- npm 9+
+- Bun 1.3+
 
 ### Instalación
 
@@ -68,7 +69,7 @@ pytest
 pytest --cov=. --cov-report=html
 
 # Frontend
-cd frontend && npm run check && npm run lint && npm run build
+cd frontend && bun install --frozen-lockfile && bun run check && bun run lint && bun run build
 ```
 
 ---

@@ -42,11 +42,11 @@ services:
       - ./launcher.py:/app/launcher.py:ro
       - ./pyproject.toml:/app/pyproject.toml:ro
       - ./pytest.ini:/app/pytest.ini:ro
-      - ./requirements.txt:/app/requirements.txt:ro
       # Mount frontend source for development
       - ./frontend/src:/app/frontend/src:ro
       - ./frontend/public:/app/frontend/public:ro
       - ./frontend/package.json:/app/frontend/package.json:ro
+      - ./frontend/bun.lock:/app/frontend/bun.lock:ro
       - ./frontend/astro.config.mjs:/app/frontend/astro.config.mjs:ro
       # Data volumes (read-write)
       - ./data:/app/data

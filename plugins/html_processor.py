@@ -320,7 +320,7 @@ class HtmlProcessorPlugin(Plugin):
     def _cleaner(self) -> "bleach.Cleaner":
         if bleach is None or CSSSanitizer is None:
             raise RuntimeError(
-                "bleach is required to sanitize processed HTML. Install it with: pip install bleach"
+                "bleach is required to sanitize processed HTML. Sync dependencies with uv."
             )
         return bleach.Cleaner(
             tags=self._ALLOWED_HTML_TAGS,

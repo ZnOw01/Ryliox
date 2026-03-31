@@ -38,8 +38,8 @@ LOG_FILE = RUN_DIR / "web-server.log"
 DOWNLOAD_QUEUE_DB = config.DATA_DIR / "download_jobs.sqlite3"
 DOWNLOAD_ERROR_LOG_DIR = config.DATA_DIR / "logs"
 
-_TIMEOUT_PIP = int(os.getenv("RYLIOX_TIMEOUT_PIP", "300"))
-_TIMEOUT_NPM = int(os.getenv("RYLIOX_TIMEOUT_NPM", "300"))
+_TIMEOUT_UV = int(os.getenv("RYLIOX_TIMEOUT_UV", "300"))
+_TIMEOUT_BUN = int(os.getenv("RYLIOX_TIMEOUT_BUN", "300"))
 _TIMEOUT_DOCKER = int(os.getenv("RYLIOX_TIMEOUT_DOCKER", "120"))
 _TIMEOUT_SUBPROCESS = int(os.getenv("RYLIOX_TIMEOUT_SUBPROCESS", "60"))
 _ASTRO_FALLBACK_NODE_VERSION = "22.20.0"
@@ -131,20 +131,11 @@ def _server_env() -> dict[str, str]:
 
 
 def _venv_has_runtime_dependencies(venv_python: Path) -> bool:
-    """Verifica dependencias importando los paquetes clave del requirements.txt.
-
-    La lista está aquí y no en requirements.txt directamente para evitar
-    parsear el archivo (que puede tener extras, versiones, comentarios).
-    Actualizar esta lista cuando cambie requirements.txt.
-    """
-    # IMPORTANTE: Esta lista debe mantenerse sincronizada con requirements.txt
-    # Si agregas/eliminas dependencias en requirements.txt, actualiza esta lista.
-    # Los paquetes aquí son los mínimos necesarios para que el runtime funcione.
+    """Verifica dependencias importando los paquetes runtime clave del proyecto."""
     result = subprocess.run(
         [
             str(venv_python),
             "-c",
-            # IMPORTANTE: Sincronizar con requirements.txt
             "import fastapi, uvicorn, bleach, lxml, httpx, pydantic_settings, fake_useragent",
         ],
         cwd=REPO_ROOT,
@@ -155,17 +146,25 @@ def _venv_has_runtime_dependencies(venv_python: Path) -> bool:
     return result.returncode == 0
 
 
+def _require_uv() -> str:
+    uv = shutil.which("uv")
+    if not uv:
+        raise RuntimeError(
+            "uv no encontrado en PATH. Instálalo para sincronizar el entorno Python."
+        )
+    return uv
+
+
 def _ensure_python_runtime(steps: Steps) -> Path:
     venv_dir = REPO_ROOT / ".venv"
     venv_python = _venv_python()
+    uv = _require_uv()
 
     if not venv_python.exists():
-        steps.next("Creando entorno virtual .venv...")
-        subprocess.run(
-            [sys.executable, "-m", "venv", str(venv_dir)],
-            cwd=REPO_ROOT,
-            check=True,
-            timeout=_TIMEOUT_SUBPROCESS,
+        _run_checked(
+            [uv, "sync", "--frozen"],
+            steps.format("Creando entorno virtual y sincronizando dependencias con uv..."),
+            timeout=_TIMEOUT_UV,
         )
     else:
         steps.next("Entorno virtual encontrado.")
@@ -174,18 +173,9 @@ def _ensure_python_runtime(steps: Steps) -> Path:
         steps.next("Dependencias Python ya instaladas.")
     else:
         _run_checked(
-            [
-                str(venv_python),
-                "-m",
-                "pip",
-                "install",
-                "--disable-pip-version-check",
-                "--no-input",
-                "-r",
-                "requirements.txt",
-            ],
-            steps.format("Instalando/actualizando dependencias Python..."),
-            timeout=_TIMEOUT_PIP,
+            [uv, "sync", "--frozen"],
+            steps.format("Instalando/actualizando dependencias Python con uv..."),
+            timeout=_TIMEOUT_UV,
         )
     return venv_python
 
@@ -227,11 +217,13 @@ _FRONTEND_WATCH_PATHS = [
 ]
 
 
-def _require_npm() -> str:
-    npm = shutil.which("npm")
-    if not npm:
-        raise RuntimeError("npm no encontrado en PATH. Instala Node.js primero.")
-    return npm
+def _require_bun() -> str:
+    bun = shutil.which("bun")
+    if not bun:
+        raise RuntimeError(
+            "bun no encontrado en PATH. Instálalo para gestionar dependencias y builds del frontend."
+        )
+    return bun
 
 
 def _parse_node_version(version_output: str) -> tuple[int, int, int] | None:
@@ -275,16 +267,16 @@ def _is_supported_astro_node(version: tuple[int, int, int] | None) -> bool:
     return major % 2 == 0
 
 
-def _frontend_build_command(npm: str, frontend_dir: Path) -> list[str]:
+def _frontend_build_command(bun: str) -> list[str]:
     version = _current_node_version()
     if _is_supported_astro_node(version):
-        return [npm, "run", "build"]
+        return [bun, "run", "build"]
 
     npx = shutil.which("npx")
-    astro_entrypoint = frontend_dir / "node_modules" / "astro" / "astro.js"
+    astro_entrypoint = REPO_ROOT / "frontend" / "node_modules" / "astro" / "astro.js"
     if npx and astro_entrypoint.exists():
         print(
-            " - Node actual no compatible con Astro; usando "
+            " - Bun está disponible pero la versión de Node detectada no es compatible; usando "
             f"Node {_ASTRO_FALLBACK_NODE_VERSION} via npx para construir frontend..."
         )
         return [
@@ -329,17 +321,19 @@ def _frontend_source_newer_than_build(frontend_dir: Path, dist_dir: Path) -> boo
     return False
 
 
-def _ensure_frontend_dependencies(npm: str, frontend_dir: Path, steps: Steps) -> None:
+def _ensure_frontend_dependencies(bun: str, frontend_dir: Path, steps: Steps) -> None:
     if (frontend_dir / "node_modules").exists():
         steps.next("Dependencias frontend ya instaladas.")
         return
-    lockfile = frontend_dir / "package-lock.json"
-    cmd = [npm, "ci" if lockfile.exists() else "install", "--no-audit", "--no-fund"]
+    lockfile = frontend_dir / "bun.lock"
+    cmd = [bun, "install"]
+    if lockfile.exists():
+        cmd.append("--frozen-lockfile")
     _run_checked(
         cmd,
         steps.format("Instalando dependencias frontend..."),
         cwd=frontend_dir,
-        timeout=_TIMEOUT_NPM,
+        timeout=_TIMEOUT_BUN,
     )
 
 
@@ -359,20 +353,20 @@ def _ensure_frontend_build(steps: Steps, rebuild: bool = False) -> None:
         steps.next("Build del frontend ya disponible.")
         return
 
-    npm = _require_npm()
-    _ensure_frontend_dependencies(npm, frontend_dir, steps)
+    bun = _require_bun()
+    _ensure_frontend_dependencies(bun, frontend_dir, steps)
     label = (
         "Fuentes modificadas, reconstruyendo bundle..."
         if dist_dir.exists()
         else "Construyendo bundle frontend..."
     )
-    build_command = _frontend_build_command(npm, frontend_dir)
+    build_command = _frontend_build_command(bun)
     try:
         _run_checked(
             build_command,
             steps.format(label),
             cwd=frontend_dir,
-            timeout=_TIMEOUT_NPM,
+            timeout=_TIMEOUT_BUN,
         )
     except subprocess.CalledProcessError as exc:
         raise RuntimeError(

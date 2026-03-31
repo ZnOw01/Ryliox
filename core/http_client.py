@@ -1,9 +1,11 @@
 import asyncio
 import logging
 import time
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
+from http.cookiejar import Cookie
 from pathlib import Path
-from urllib.parse import urlparse
+from typing import Any
+from urllib.parse import urljoin, urlparse
 
 import httpx
 

@@ -95,7 +95,6 @@ def _dir_is_writable(path: Path) -> bool:
         return True
     except OSError:
         return False
-    return os.access(existing_parent, os.W_OK | os.X_OK)
 
 
 def _resolve_runtime_dir(
@@ -341,13 +340,50 @@ def _resolve_user_agent(settings: Settings) -> str:
     return secrets.choice(_FALLBACK_USER_AGENTS)
 
 
+SETTINGS: Final[Settings] = Settings()
+
+BASE_URL: Final[str] = SETTINGS.base_url
+API_V1: Final[str] = "/api"
+API_V2: Final[str] = "/api/v2"
+
+REQUEST_DELAY: Final[float] = SETTINGS.request_delay
+REQUEST_TIMEOUT: Final[int] = SETTINGS.request_timeout
+REQUEST_RETRIES: Final[int] = SETTINGS.request_retries
+REQUEST_RETRY_BACKOFF: Final[float] = SETTINGS.request_retry_backoff
+
+DATA_DIR: Final[Path] = _resolve_runtime_dir(
+    SETTINGS.data_dir,
+    default=BASE_DIR / "data",
+    fallback=_RUNTIME_DATA_FALLBACK_DIR,
+    label="DATA_DIR",
+)
+OUTPUT_DIR: Final[Path] = _resolve_runtime_dir(
+    SETTINGS.output_dir,
+    default=BASE_DIR / "output",
+    fallback=_RUNTIME_OUTPUT_FALLBACK_DIR,
+    label="OUTPUT_DIR",
+)
+COOKIES_FILE: Final[Path] = _resolve_runtime_file(
+    SETTINGS.cookies_file,
+    default=DATA_DIR / "cookies.json",
+    fallback_dir=DATA_DIR,
+    label="COOKIES_FILE",
+)
+SESSION_DB_FILE: Final[Path] = _resolve_runtime_file(
+    SETTINGS.session_db_file,
+    default=DATA_DIR / "session.sqlite3",
+    fallback_dir=DATA_DIR,
+    label="SESSION_DB_FILE",
+)
+
+
 HEADERS: Final[MappingProxyType[str, str]] = MappingProxyType(
     {
         "Accept": SETTINGS.accept,
         "Accept-Encoding": SETTINGS.accept_encoding,
         "Accept-Language": SETTINGS.accept_language,
         "Referer": BASE_URL,
-        "User-Agent": _resolve_user_agent(),
+        "User-Agent": _resolve_user_agent(SETTINGS),
         **(SETTINGS.extra_headers or {}),
     }
 )
@@ -360,3 +396,10 @@ HSTS_MAX_AGE: Final[int] = SETTINGS.hsts_max_age
 CSP_POLICY: Final[str] = SETTINGS.csp_policy
 MAX_REQUEST_SIZE_MB: Final[int] = SETTINGS.max_request_size_mb
 MAX_REQUEST_SIZE_BYTES: Final[int] = MAX_REQUEST_SIZE_MB * 1024 * 1024
+
+
+def reload_runtime_config() -> Settings:
+    """Reload settings and refresh exported runtime constants."""
+    global _RUNTIME_VALUES
+    _RUNTIME_VALUES = None
+    return SETTINGS

@@ -4,7 +4,7 @@
 # Configuración global
 default_language_version:
   python: python3.11
-  node: 18
+  node: 22
 
 # Repositorios de hooks
 repos:
@@ -90,23 +90,15 @@ repos:
         stages: [pre-commit]
         exclude: ^(frontend/|tests/integration/|tests/e2e/|\.venv/)
 
-      # Verificar que no hay dependencias de dev en requirements.txt principal
-      - id: check-requirements
-        name: Check requirements structure
+      # Verificar que el proyecto use pyproject.toml/uv.lock en lugar de requirements.txt
+      - id: check-python-package-management
+        name: Check uv-based Python packaging
         entry: python -c "
+          from pathlib import Path;
           import sys;
-          req_file = 'requirements.txt';
-          dev_markers = ['pytest', 'mypy', 'ruff', 'black', 'flake8', 'isort'];
-          try:
-              with open(req_file) as f:
-                  lines = f.readlines();
-              for i, line in enumerate(lines, 1):
-                  for marker in dev_markers:
-                      if marker in line.lower() and not line.strip().startswith('#'):
-                          print(f'ERROR: Dev dependency {marker} found in {req_file}:{i}');
-                          sys.exit(1);
-          except FileNotFoundError:
-              pass
+          if Path('requirements.txt').exists():
+              print('ERROR: requirements.txt no debe existir; usa pyproject.toml y uv.lock');
+              sys.exit(1)
         "
         language: system
         pass_filenames: false
