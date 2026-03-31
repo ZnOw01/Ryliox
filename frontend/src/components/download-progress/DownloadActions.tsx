@@ -1,3 +1,7 @@
+import { cn } from '../../lib/cn';
+import { Play, X, ArrowClockwise, Image, Spinner, Warning } from '@phosphor-icons/react';
+import { useTranslation } from 'react-i18next';
+
 type DownloadActionsProps = {
   active: boolean;
   cancelPending: boolean;
@@ -12,6 +16,7 @@ type DownloadActionsProps = {
   skipImages: boolean;
   startDisabledReason: string | null;
   startPending: boolean;
+  ariaLabel?: string;
 };
 
 export function DownloadActions({
@@ -28,40 +33,64 @@ export function DownloadActions({
   skipImages,
   startDisabledReason,
   startPending,
+  ariaLabel,
 }: DownloadActionsProps) {
-  const startDisabled = !selectedBook || startPending || active || invalidFormatWithChapterSelection || formatsDisabled;
+  const { t } = useTranslation();
+  const startDisabled =
+    !selectedBook || startPending || active || invalidFormatWithChapterSelection || formatsDisabled;
 
   return (
     <>
-      <label className="mb-3 flex cursor-pointer items-center gap-2 text-sm text-slate-600 transition hover:text-slate-800">
+      <label className="mb-3 flex cursor-pointer items-center gap-3 text-sm text-muted-foreground transition hover:text-foreground min-h-touch group">
+        <div
+          className={cn(
+            'flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 transition-colors',
+            skipImages
+              ? 'border-primary bg-primary text-primary-foreground'
+              : 'border-input bg-background text-transparent group-hover:border-muted-foreground'
+          )}
+        >
+          <Image className="h-3 w-3" weight="regular" aria-hidden="true" />
+        </div>
         <input
           type="checkbox"
           checked={skipImages}
-          onChange={(event) => onSkipImagesChange(event.target.checked)}
-          className="h-4 w-4 rounded border-slate-300 accent-brand"
+          onChange={event => onSkipImagesChange(event.target.checked)}
+          className="sr-only"
+          aria-describedby="skip-images-desc"
         />
-        Omitir imagenes
+        <span id="skip-images-desc">{t('download.actions.skip_images')}</span>
       </label>
 
-      <div className="mb-3 grid gap-2 sm:grid-cols-2">
+      <div
+        className="mb-3 grid gap-3 sm:grid-cols-2"
+        role="group"
+        aria-label={ariaLabel || t('download.actions.aria_label')}
+      >
         <button
           type="button"
           onClick={onStart}
-          aria-describedby={startDisabledReason ? "start-disabled-reason" : undefined}
+          aria-describedby={startDisabledReason ? 'start-disabled-reason' : undefined}
           disabled={startDisabled}
-          className="flex w-full items-center justify-center gap-2 rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/60 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+          className="mobile-full min-h-touch inline-flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground shadow-sm transition hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 sm:py-2"
         >
           {startPending ? (
             <>
-              <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-              Iniciando...
+              <Spinner
+                className="h-4 w-4 animate-spin sm:h-3.5 sm:w-3.5"
+                weight="bold"
+                aria-hidden="true"
+              />
+              <span>{t('download.actions.starting')}</span>
             </>
           ) : (
             <>
-              <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                <path d="M5 3.5l7 4.5-7 4.5V3.5z" fill="currentColor" />
-              </svg>
-              Iniciar descarga
+              <Play
+                className="h-5 w-5 fill-current sm:h-4 sm:w-4"
+                weight="fill"
+                aria-hidden="true"
+              />
+              <span>{t('download.actions.start')}</span>
             </>
           )}
         </button>
@@ -70,19 +99,21 @@ export function DownloadActions({
           type="button"
           onClick={onCancel}
           disabled={!active || cancelPending}
-          className="flex w-full items-center justify-center gap-2 rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-red-300 hover:bg-red-50 hover:text-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/60 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+          className="mobile-full min-h-touch inline-flex w-full items-center justify-center gap-2 rounded-lg border border-border bg-background px-4 py-3 text-sm font-semibold text-foreground transition hover:border-destructive/30 hover:bg-destructive/5 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60 sm:py-2"
         >
           {cancelPending ? (
             <>
-              <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-slate-400/30 border-t-slate-500" />
-              Cancelando...
+              <Spinner
+                className="h-4 w-4 animate-spin sm:h-3.5 sm:w-3.5"
+                weight="bold"
+                aria-hidden="true"
+              />
+              <span>{t('download.actions.cancelling')}</span>
             </>
           ) : (
             <>
-              <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" />
-              </svg>
-                Cancelar
+              <X className="h-5 w-5 sm:h-4 sm:w-4" weight="regular" aria-hidden="true" />
+              <span>{t('download.actions.cancel')}</span>
             </>
           )}
         </button>
@@ -91,20 +122,23 @@ export function DownloadActions({
           <button
             type="button"
             onClick={onForceReconnect}
-            className="flex w-full items-center justify-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-800 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white hover:bg-amber-100 sm:col-span-2"
+            className="mobile-full min-h-touch inline-flex w-full items-center justify-center gap-2 rounded-lg border border-warning bg-warning/10 px-4 py-3 text-sm font-semibold text-warning-foreground transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-warning/20 sm:col-span-2 sm:py-2"
           >
-            <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-              <path d="M13.5 8A5.5 5.5 0 1 1 8 2.5" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" />
-              <path d="M6.5 1.5L8 2.5L6.5 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            Reintentar conexion en vivo
+            <ArrowClockwise className="h-5 w-5 sm:h-4 sm:w-4" weight="regular" aria-hidden="true" />
+            <span>{t('download.actions.reconnect')}</span>
           </button>
         ) : null}
       </div>
+
       {startDisabledReason ? (
-        <p id="start-disabled-reason" className="mb-4 text-xs text-amber-700">
-          {startDisabledReason}
-        </p>
+        <div id="start-disabled-reason" className="mb-4 flex items-start gap-1.5" role="alert">
+          <Warning
+            className="mt-0.5 h-4 w-4 shrink-0 text-warning"
+            weight="regular"
+            aria-hidden="true"
+          />
+          <p className="text-xs text-warning-foreground">{startDisabledReason}</p>
+        </div>
       ) : null}
     </>
   );

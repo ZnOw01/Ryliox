@@ -84,7 +84,9 @@ def normalize_cookies_payload(payload: Any) -> dict[str, str]:
 class SessionStore:
     """Store and load normalized cookies from SQLite, with legacy JSON migration."""
 
-    def __init__(self, db_path: Path | None = None, legacy_cookies_file: Path | None = None):
+    def __init__(
+        self, db_path: Path | None = None, legacy_cookies_file: Path | None = None
+    ):
         self.legacy_cookies_file = Path(legacy_cookies_file or config.COOKIES_FILE)
         self.db_path = Path(db_path) if db_path is not None else config.SESSION_DB_FILE
         self._lock = threading.RLock()
@@ -153,6 +155,7 @@ class SessionStore:
         return len(cookies)
 
     def get_cookies(self) -> dict[str, str]:
+        rows: list[sqlite3.Row] = []
         with self._lock:
             try:
                 with self._connect() as conn:
@@ -168,10 +171,13 @@ class SessionStore:
         return {str(row["name"]): str(row["value"]) for row in rows}
 
     def _count_stored_cookies(self) -> int:
+        row: sqlite3.Row | None = None
         with self._lock:
             try:
                 with self._connect() as conn:
-                    row = conn.execute("SELECT COUNT(*) AS total FROM session_cookies").fetchone()
+                    row = conn.execute(
+                        "SELECT COUNT(*) AS total FROM session_cookies"
+                    ).fetchone()
             except sqlite3.Error:
                 return 0
         return int(row["total"]) if row is not None else 0
@@ -201,6 +207,9 @@ class SessionStore:
             return True
 
         try:
-            return self.legacy_cookies_file.exists() and self.legacy_cookies_file.stat().st_size > 0
+            return (
+                self.legacy_cookies_file.exists()
+                and self.legacy_cookies_file.stat().st_size > 0
+            )
         except OSError:
             return self.legacy_cookies_file.exists()

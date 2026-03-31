@@ -1,221 +1,163 @@
-﻿# Ryliox
+# Ryliox
 
 <div align="center">
 
-[![License: MIT](https://img.shields.io/badge/license-MIT-22c55e?style=flat-square)](./LICENSE)
+[![License: GPLv3+](https://img.shields.io/badge/license-GPLv3%2B-blue?style=flat-square)](./LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.11+-3b82f6?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-backend-009688?style=flat-square&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
 [![Astro](https://img.shields.io/badge/Astro-frontend-ff5d01?style=flat-square&logo=astro&logoColor=white)](https://astro.build/)
-[![GitHub stars](https://img.shields.io/github/stars/ZnOw01/RylioX?style=flat-square&logo=github)](https://github.com/ZnOw01/RylioX/stargazers)
 
-**Busca libros de O'Reilly Learning y exportalos en PDF o EPUB desde un navegador.**
-Cola de descargas, progreso en tiempo real y soporte para seleccion de capitulos.
-
-> [!IMPORTANT]
-> Requiere una suscripcion activa a [O'Reilly Learning](https://learning.oreilly.com).
-> Usa esta herramienta respetando siempre los [terminos de servicio oficiales](https://www.oreilly.com/terms/).
+**Exporta libros de O'Reilly Learning en PDF o EPUB con cola, progreso en tiempo real y selección de capítulos.**
 
 </div>
 
----
+> [!IMPORTANT]
+> Ryliox requiere una suscripción activa a [O'Reilly Learning](https://learning.oreilly.com).
+> Úsalo de forma responsable y respetando los [términos de servicio de O'Reilly](https://www.oreilly.com/terms/).
 
-## Caracteristicas
+## Qué hace
 
-| | |
-|---|---|
-| **Autenticacion** | Login por cookies de sesion (incluye cookies `HttpOnly`) |
-| **Busqueda** | Por titulo, autor, editorial o ISBN con filtros en tiempo real |
-| **Formatos** | EPUB, PDF combinado y PDF por capitulo |
-| **Seleccion** | Elige capitulos especificos para PDF; EPUB siempre descarga el libro completo |
-| **Cola** | Persistente en SQLite — sobrevive reinicios |
-| **Progreso** | Polling (`/api/progress`) y SSE (`/api/progress/stream`) |
-| **Frontend** | UI reactiva con Astro + React + Tailwind CSS |
-
----
+- Busca libros por título, autor, editorial o ISBN.
+- Exporta en EPUB, PDF combinado o PDF por capítulo.
+- Permite seleccionar capítulos específicos para exportaciones PDF.
+- Mantiene una cola persistente de descargas en SQLite.
+- Reporta progreso en tiempo real mediante SSE.
 
 ## Requisitos
 
-| Herramienta | Version minima |
+| Herramienta | Versión mínima |
 |---|---|
 | Python | 3.11 |
-| Node.js | 18 LTS |
+| Node.js | 22.12.0 o 24.x |
 | npm | 9 |
 | Docker | 24 (opcional) |
 
-**Dependencias de sistema para PDF (WeasyPrint):**
+### Dependencias de PDF
 
-<details>
-<summary>Ver instrucciones por OS</summary>
+Ryliox usa WeasyPrint para generar PDF. Instala las librerías del sistema necesarias antes del primer uso:
 
 ```bash
 # macOS
 brew install pango
 
-# Ubuntu / Debian
+# Ubuntu/Debian
 sudo apt install libpango-1.0-0 libharfbuzz0b libpangoft2-1.0-0
 
 # Windows
-# Instala el GTK runtime:
 # https://github.com/tschoonj/GTK-for-Windows-Runtime-Environment-Installer
 ```
 
-</details>
-
----
-
-## Inicio rapido
+## Instalación rápida
 
 ```bash
 git clone https://github.com/ZnOw01/Ryliox.git
 cd Ryliox
-cp .env.example .env          # edita con tus valores si es necesario
+cp .env.example .env
 python -m launcher
 ```
 
-El launcher detecta automaticamente si el entorno virtual, las dependencias Python y el build del frontend estan listos — si no lo estan, los crea en el primer arranque sin ninguna intervencion manual.
+El launcher crea `.venv/`, instala dependencias Python y construye el frontend automáticamente cuando hace falta.
 
-Una vez iniciado, abre **http://localhost:8000** en tu navegador.
+Abre `http://localhost:8000` en tu navegador.
 
----
+## Uso básico
 
-## Launcher
+### 1. Autenticación
 
-Ejecutar `python -m launcher` sin argumentos muestra un **menu interactivo persistente** — puedes cambiar de modo sin salir del launcher.
+1. Abre DevTools en `learning.oreilly.com`.
+2. Ve a la pestaña `Network`.
+3. Copia el encabezado `Cookie` completo de una petición autenticada.
+4. Pégalo en la interfaz de Ryliox.
 
-```
-Selecciona modo:
-  1) Aplicacion unificada en :8000 (recomendado)
-  2) Detener servicios en ejecucion
-  3) Mostrar estado del runtime
-  4) Modo Docker
-  q) Salir
-```
+### 2. Descarga
 
-Tambien acepta flags directos para uso en scripts o CI:
+1. Busca un libro por título o ISBN.
+2. Elige el formato de salida.
+3. Selecciona capítulos si vas a generar PDF.
+4. Inicia la descarga y sigue el estado desde la cola.
 
-| Flag | Descripcion |
-|---|---|
-| *(sin flags)* | Menu interactivo |
-| `--stop` | Detiene el servidor en ejecucion |
-| `--status` | Muestra PID y estado del puerto |
-| `--docker` | Levanta via Docker Compose |
-| `--backend-only` | Arranca solo la API (sin frontend) |
-| `--rebuild-frontend` | Fuerza recompilacion del bundle Astro |
-| `--no-browser` | No abre el navegador automaticamente |
+## Comandos principales
 
-> `python -m web.server` tambien funciona pero no ejecuta las verificaciones del launcher. Usalo solo para debug directo del backend.
-
----
-
-## Formatos de exportacion
-
-| Formato | Valor `format` | Salida | Seleccion de capitulos |
-|---|---|---|---|
-| EPUB | `epub` | Un archivo `.epub` | No — siempre libro completo |
-| PDF combinado | `pdf` | Un archivo `.pdf` | Si |
-| PDF por capitulo | `pdf-chapters` | Carpeta `PDF/` con un `.pdf` por capitulo | Si |
-
-**Notas de la API:**
-- `format` acepta `string` o `array`: `"epub"`, `["epub", "pdf"]`, `"all"`.
-- `"all"` equivale a `["epub", "pdf"]`.
-- `pdf` y `pdf-chapters` se pueden combinar en la misma peticion.
-
-**Ejemplo de peticion de descarga:**
-
-```json
-POST /api/download
-{
-  "book_id": "9781492051367",
-  "format": ["epub", "pdf"],
-  "chapters": [0, 1, 2],
-  "skip_images": false
-}
+```bash
+python -m launcher                    # Inicio recomendado
+python -m launcher --status           # Estado del servidor
+python -m launcher --stop             # Detener servidor
+python -m launcher --backend-only     # Solo API
+python -m launcher --docker           # Docker Compose
+python -m launcher --rebuild-frontend # Forzar rebuild del frontend
+python -m launcher --no-browser       # No abrir navegador automáticamente
 ```
 
----
+## API
 
-## Autenticacion con cookies
+Endpoints principales:
 
-La forma mas fiable de autenticarse es pegar el header `Cookie` directamente desde DevTools:
-
-1. Abre **DevTools -> Network** en `learning.oreilly.com`
-2. Recarga la pagina y selecciona cualquier request
-3. Copia el valor completo del header `Cookie:`
-4. Pegalo en el editor de cookies de la UI (o manda `POST /api/cookies`)
-
-El endpoint `POST /api/cookies` acepta tres formatos:
-
-| Formato | Ejemplo |
-|---|---|
-| Header HTTP crudo **(recomendado)** | `"a=1; b=2; c=3"` |
-| Objeto JSON | `{ "nombre": "valor" }` |
-| Array JSON (EditThisCookie) | `[{ "name": "...", "value": "..." }]` |
-
-> Si la sesion sigue siendo invalida es probable que falten cookies `HttpOnly` que los extension exporters no incluyen. Usa siempre el formato de header crudo desde Network.
-
----
-
-## Configuracion
-
-Copia `.env.example` a `.env` y ajusta los valores que necesites. Todas las variables tambien se pueden pasar como variables de entorno.
-
-| Variable | Default | Descripcion |
-|---|---|---|
-| `BASE_URL` | `https://learning.oreilly.com` | URL base del sitio |
-| `REQUEST_DELAY` | `0.5` | Segundos entre requests |
-| `REQUEST_TIMEOUT` | `30` | Timeout HTTP en segundos |
-| `REQUEST_RETRIES` | `2` | Reintentos en fallo |
-| `REQUEST_RETRY_BACKOFF` | `0.5` | Espera entre reintentos |
-| `OUTPUT_DIR` | `./output` | Directorio de salida |
-| `DATA_DIR` | `./data` | Estado en tiempo de ejecucion |
-| `HOST` | `127.0.0.1` | Interfaz de escucha |
-| `PORT` | `8000` | Puerto del servidor |
-| `LOG_LEVEL` | `INFO` | Nivel de logging |
-| `CORS_ORIGINS` | `*` | Origenes CORS permitidos |
-
-> `HEADERS` no puede sobreescribir `User-Agent`, `Accept`, `Accept-Encoding` ni `Accept-Language`. Usa sus variables dedicadas en su lugar.
-
----
-
-## Referencia de la API
-
-```
-GET  /api/health
+```text
 GET  /api/status
 GET  /api/search?q={query}
-GET  /api/book/{book_id}
-GET  /api/book/{book_id}/chapters
+GET  /api/book/{id}
+GET  /api/book/{id}/chapters
 POST /api/cookies
 POST /api/download
 GET  /api/progress
-GET  /api/progress/stream        <- SSE
+GET  /api/progress/stream
 POST /api/cancel
-GET  /api/openapi.json
 ```
 
-La documentacion interactiva completa esta disponible en **http://localhost:8000/docs** (Swagger UI).
+La documentación OpenAPI está disponible en `http://localhost:8000/docs` cuando la aplicación corre en modo no productivo.
 
----
+## Configuración
 
-## Troubleshooting
+Toda la configuración runtime vive en variables de entorno o en `.env`. Revisa [.env.example](./.env.example) para la referencia completa.
 
-| Problema | Solucion |
+Variables habituales:
+
+| Variable | Default | Descripción |
+|---|---|---|
+| `BASE_URL` | `https://learning.oreilly.com` | URL base del sitio objetivo |
+| `REQUEST_DELAY` | `0.5` | Retardo entre peticiones |
+| `REQUEST_TIMEOUT` | `30` | Timeout HTTP en segundos |
+| `OUTPUT_DIR` | `./output` | Carpeta de exportaciones |
+| `DATA_DIR` | `./data` | Estado runtime y bases SQLite |
+| `PORT` | `8000` | Puerto HTTP local |
+| `ENVIRONMENT` | `development` | Modo de ejecución |
+
+## Desarrollo
+
+Guía de contribución: [CONTRIBUTING.md](./CONTRIBUTING.md)
+
+Validaciones mínimas antes de publicar cambios:
+
+```bash
+curl http://localhost:8000/api/status
+curl "http://localhost:8000/api/search?q=python"
+pytest
+```
+
+En el frontend también conviene ejecutar:
+
+```bash
+cd frontend
+npm run check
+npm run lint
+npm run build
+```
+
+## Resolución de problemas
+
+| Problema | Acción recomendada |
 |---|---|
-| `Frontend build not found` | `python -m launcher --rebuild-frontend` |
-| `npm` no encontrado | Instala Node.js 18+ y abre una terminal nueva |
-| `403 forbidden_origin` | Envia el `POST` desde el mismo origen: `http://localhost:8000` |
-| Puerto 8000 ocupado | `python -m launcher --stop` |
-| Cola trabada en `queued` | Reinicia; si persiste, elimina `data/download_jobs.sqlite3` |
-| Sesion invalida aun con cookies | Usa el header HTTP crudo desde DevTools en lugar de un exporter |
-
----
-
-## Star History
-
-[![Star History Chart](https://api.star-history.com/svg?repos=ZnOw01/Ryliox&type=Date)](https://star-history.com/#ZnOw01/Ryliox&Date)
-
----
+| El frontend no existe o quedó desactualizado | `python -m launcher --rebuild-frontend` |
+| El puerto 8000 está ocupado | `python -m launcher --stop` |
+| La sesión fue rechazada | Vuelve a copiar el header `Cookie` completo desde O'Reilly |
+| La cola quedó en estado inconsistente | Detén la app y elimina `data/download_jobs.sqlite3` |
 
 ## Licencia
 
-Distribuido bajo la licencia **MIT**. Ver [LICENSE](./LICENSE) para mas detalle.
+Ryliox se distribuye bajo la **GNU General Public License v3.0 o posterior**.
+
+- Puedes usar, estudiar, modificar y redistribuir el proyecto bajo los términos de la GPL.
+- Si distribuyes versiones modificadas, debes mantener la misma licencia.
+- El software se entrega **sin garantía**.
+
+Consulta el texto completo en [LICENSE](./LICENSE).

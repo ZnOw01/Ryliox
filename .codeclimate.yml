@@ -1,0 +1,133 @@
+version: "2"
+
+plugins:
+  pep8:
+    enabled: true
+  radon:
+    enabled: true
+    config:
+      threshold: "C"
+  duplication:
+    enabled: true
+    config:
+      languages:
+        python:
+          mass_threshold: 50
+        javascript:
+          mass_threshold: 50
+        typescript:
+          mass_threshold: 50
+  fixme:
+    enabled: true
+    config:
+      strings:
+        - TODO
+        - FIXME
+        - XXX
+        - HACK
+        - BUG
+        - NOTE
+  markdownlint:
+    enabled: true
+  shellcheck:
+    enabled: true
+  git-legal:
+    enabled: true
+
+exclude_patterns:
+  - "**/__pycache__/"
+  - "**/*.pyc"
+  - "**/.venv/"
+  - "**/.git/"
+  - "**/.run/"
+  - "**/data/"
+  - "**/output/"
+  - "**/frontend/dist/"
+  - "**/frontend/node_modules/"
+  - "**/tests/"
+  - "**/*.test.py"
+  - "**/migrations/"
+  - "**/*.md"
+  - "**/*.min.js"
+  - "**/*.min.css"
+
+ratings:
+  paths:
+    - "**/*.py"
+    - "**/*.js"
+    - "**/*.ts"
+    - "**/*.tsx"
+
+# Checks configuration
+checks:
+  # Complexity
+  argument-count:
+    enabled: true
+    config:
+      threshold: 5
+  complex-logic:
+    enabled: true
+    config:
+      threshold: 5
+  file-lines:
+    enabled: true
+    config:
+      threshold: 500
+  method-complexity:
+    enabled: true
+    config:
+      threshold: 10
+  method-count:
+    enabled: true
+    config:
+      threshold: 20
+  method-lines:
+    enabled: true
+    config:
+      threshold: 50
+  nested-control-flow:
+    enabled: true
+    config:
+      threshold: 4
+  return-statements:
+    enabled: true
+    config:
+      threshold: 4
+
+  # Python specific
+  python-imports:
+    enabled: true
+  python-safe-eval:
+    enabled: true
+
+  # Maintainability
+  identical-code:
+    enabled: true
+    config:
+      threshold: 50
+  similar-code:
+    enabled: true
+    config:
+      threshold: 75
+
+  # Documentation
+  method-documentation:
+    enabled: true
+    config:
+      threshold: 1
+  class-documentation:
+    enabled: true
+    config:
+      threshold: 1
+
+# Quality gates
+gates:
+  coverage:
+    enabled: true
+    threshold: 80
+  complexity:
+    enabled: true
+    threshold: 10
+  duplication:
+    enabled: true
+    threshold: 5

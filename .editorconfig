@@ -1,0 +1,91 @@
+# EditorConfig - Consistent coding styles across editors
+# https://editorconfig.org
+
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+indent_style = space
+indent_size = 4
+insert_final_newline = true
+trim_trailing_whitespace = true
+max_line_length = 88
+
+[*.md]
+trim_trailing_whitespace = false
+max_line_length = 120
+
+[*.{yml,yaml}]
+indent_size = 2
+
+[*.{json,js,ts,tsx,astro}]
+indent_size = 2
+max_line_length = 100
+
+[*.toml]
+indent_size = 2
+
+[*.{sh,bash}]
+indent_size = 2
+
+[*.css]
+indent_size = 2
+
+[*.html]
+indent_size = 2
+
+[Makefile]
+indent_style = tab
+
+[*.py]
+indent_size = 4
+
+# Archivos generados - no aplicar reglas
+[frontend/dist/**]
+charset = unset
+end_of_line = unset
+indent_style = unset
+indent_size = unset
+insert_final_newline = unset
+trim_trailing_whitespace = unset
+
+[data/**]
+charset = unset
+end_of_line = unset
+indent_style = unset
+indent_size = unset
+insert_final_newline = unset
+trim_trailing_whitespace = unset
+
+[output/**]
+charset = unset
+end_of_line = unset
+indent_style = unset
+indent_size = unset
+insert_final_newline = unset
+trim_trailing_whitespace = unset
+
+[.run/**]
+charset = unset
+end_of_line = unset
+indent_style = unset
+indent_size = unset
+insert_final_newline = unset
+trim_trailing_whitespace = unset
+
+[.venv/**]
+charset = unset
+end_of_line = unset
+indent_style = unset
+indent_size = unset
+insert_final_newline = unset
+trim_trailing_whitespace = unset
+
+[.git/**]
+charset = unset
+end_of_line = unset
+indent_style = unset
+indent_size = unset
+insert_final_newline = unset
+trim_trailing_whitespace = unset

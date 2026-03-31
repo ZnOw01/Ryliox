@@ -1,0 +1,232 @@
+{
+  "app": {
+    "title": "Ryliox",
+    "subtitle": "O'Reilly Book Downloader",
+    "footer": "Ryliox — For personal use only",
+    "status": {
+      "active": "Service active"
+    }
+  },
+  "auth": {
+    "title": "Authentication",
+    "status": {
+      "checking": "Checking session...",
+      "valid": "Session valid",
+      "cookies_loaded": "Cookies loaded (network unavailable)",
+      "invalid": "Invalid session",
+      "reason": {
+        "network_error": "service unavailable",
+        "not_authenticated": "session not authenticated",
+        "subscription_expired": "subscription expired",
+        "unknown": "unknown"
+      }
+    },
+    "service": {
+      "available": "Service available",
+      "unavailable": "Service unavailable",
+      "checking": "Checking service..."
+    },
+    "cookies": {
+      "saved": "Cookies saved",
+      "label": "Cookies (JSON or HTTP header)",
+      "placeholder": "{\"cookie\": \"value\"} or \"a=1; b=2\"",
+      "save": "Save cookies",
+      "saving": "Saving...",
+      "show_editor": "View / edit cookies",
+      "hide_editor": "Hide editor",
+      "loading": "Loading saved cookies..."
+    },
+    "refresh": "Refresh",
+    "uptime": "Uptime"
+  },
+  "search": {
+    "title": "Search books",
+    "placeholder": "python, ISBN, title...",
+    "clear": "Clear",
+    "results_count": "{{count}} result",
+    "results_count_plural": "{{count}} results",
+    "no_results": "No results for \"{{query}}\".",
+    "start_search": "Type a query to search books.",
+    "loading": "Searching books...",
+    "updating": "Updating results...",
+    "navigation_hint": "Use arrow keys to navigate and Enter to select.",
+    "filter_by": "Filter by",
+    "scopes": {
+      "all": "All fields",
+      "title": "Title",
+      "author": "Author",
+      "publisher": "Publisher"
+    },
+    "book": {
+      "unknown_author": "Unknown author",
+      "unknown_publisher": "Unknown publisher",
+      "no_cover": "No cover",
+      "select": "Select",
+      "selected": "Selected"
+    },
+    "error": {
+      "generic": "Error searching books"
+    }
+  },
+  "download": {
+    "title": "Download & Progress",
+    "book": {
+      "label": "Book",
+      "placeholder": "Select a book to get started"
+    },
+    "format": {
+      "label": "Format",
+      "description": "Download format",
+      "aria_label": "Download format selector",
+      "loading": "Loading formats...",
+      "no_formats": "No formats available",
+      "helper_text": "Some formats may be disabled when chapters are selected.",
+      "epub_single": "EPUB — Complete book",
+      "pdf_combined": "PDF — All in one file",
+      "pdf_separate": "PDF — One file per chapter"
+    },
+    "chapters": {
+      "title": "Chapters",
+      "aria_label": "Chapter selector",
+      "loading": "Loading chapters...",
+      "updating": "Updating chapters...",
+      "error": "Could not load chapters. Check your connection and cookies.",
+      "select_all": "Select all",
+      "clear": "Clear selection",
+      "clear_selection": "Clear",
+      "chapter": "Chapter {{number}}",
+      "not_selectable": "{{format}} does not accept chapter selection. Change format or clear selection.",
+      "selected_count": "{{count}} selected",
+      "total_count": "{{count}} total",
+      "full_book_notice": "This format downloads the complete book. Chapters are displayed for reference only.",
+      "no_book_title": "No book selected",
+      "no_book_description": "Select a book to view available chapters.",
+      "select_chapter_aria": "Select chapter: {{title}}"
+    },
+    "actions": {
+      "aria_label": "Download actions",
+      "start": "Start download",
+      "starting": "Starting...",
+      "cancel": "Cancel",
+      "cancelling": "Cancelling...",
+      "skip_images": "Skip images",
+      "reconnect": "Retry live connection"
+    },
+    "progress": {
+      "title": "Progress",
+      "aria_label": "Download progress",
+      "status_label": "Status",
+      "status_idle": "Idle",
+      "status_queued": "Queued",
+      "status_running": "In progress",
+      "status_completed": "Completed",
+      "status_error": "Error",
+      "queued": "Queued (position {{position}})",
+      "connecting": "Connecting...",
+      "downloading": "Downloading...",
+      "processing": "Processing...",
+      "completed": "Completed",
+      "cancelled": "Cancelled",
+      "error": "Error",
+      "percentage": "{{percent}}%",
+      "percentage_aria": "{{percent}}% — {{status}}",
+      "eta": "Time remaining: {{time}}",
+      "completed_message": "Download completed successfully.",
+      "queue_position": "Queue position: {{position}}",
+      "chapter_label": "Chapter",
+      "time_remaining": "Time remaining",
+      "file_generated": "{{format}} generated",
+      "files_generated": "Generated files",
+      "technical_details": "Technical details",
+      "location_opened": "Location opened in file explorer.",
+      "path_copied": "Path copied to clipboard.",
+      "copy_failed": "Could not copy path.",
+      "open_location": "Open location",
+      "copy_path": "Copy path"
+    },
+    "sse": {
+      "connected": "Connected",
+      "disconnected": "Disconnected",
+      "error": "Connection error",
+      "reconnect": "Reconnect",
+      "aria_label": "Live connection status",
+      "live_updates": "Live updates",
+      "status_connected": "active",
+      "status_connecting": "starting",
+      "status_error": "paused",
+      "status_reconnecting": "retrying"
+    },
+    "notifications": {
+      "download_started": "Download started",
+      "download_completed": "Download completed!",
+      "download_error": "Download error"
+    }
+  },
+  "common": {
+    "close": "Close",
+    "cancel": "Cancel",
+    "save": "Save",
+    "loading": "Loading...",
+    "error": "Error",
+    "success": "Success",
+    "warning": "Warning",
+    "info": "Info",
+    "yes": "Yes",
+    "no": "No",
+    "retry": "Retry",
+    "opening": "Opening...",
+    "open_location": "Open location",
+    "copy_path": "Copy path",
+    "message": "Message",
+    "code": "Code",
+    "page": "page",
+    "pages": "pages",
+    "reading_time_less_than_minute": "<1 min read",
+    "reading_time_minutes": "min read"
+  },
+  "theme": {
+    "toggle": "Toggle theme",
+    "light": "Light mode",
+    "dark": "Dark mode",
+    "system": "System preference"
+  },
+  "keyboard_shortcuts": {
+    "title": "Keyboard shortcuts",
+    "show_help": "Press ? to view keyboard shortcuts",
+    "navigation": "Navigation",
+    "actions": "Actions",
+    "search": "Search",
+    "shortcuts": {
+      "focus_search": "Focus search",
+      "select_book": "Select book",
+      "navigate_results": "Navigate results",
+      "clear_search": "Clear search",
+      "start_download": "Start download",
+      "cancel_download": "Cancel download",
+      "toggle_theme": "Toggle theme",
+      "toggle_help": "Show/hide help"
+    }
+  },
+  "accessibility": {
+    "skip_to_content": "Skip to main content",
+    "high_contrast": "High contrast",
+    "reduced_motion": "Reduce animations",
+    "screen_reader_hints": "Screen reader hints"
+  },
+  "errors": {
+    "network": "Connection error",
+    "network_description": "Could not connect to the server. Check your internet connection.",
+    "timeout": "Request timeout",
+    "timeout_description": "The operation took too long. Please try again.",
+    "unknown": "Unexpected error",
+    "unknown_description": "Something went wrong. If the problem persists, contact support.",
+    "service_unavailable": "Service unavailable",
+    "service_unavailable_description": "No cookies configured. Go to Settings > Cookies to set them up.",
+    "chapters_failed": "Could not load chapters",
+    "chapters_failed_description": "Check your internet connection and that cookies are valid.",
+    "cookies_required": "Cookies required",
+    "cookies_required_description": "You need to configure valid cookies to download books.",
+    "retry": "Retry",
+    "contact_support": "Contact support"
+  }
+}

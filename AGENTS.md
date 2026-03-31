@@ -5,7 +5,7 @@
 | Tool | Minimum version |
 |---|---|
 | Python | 3.11 |
-| Node.js | 18 LTS |
+| Node.js | 22.12.0 or 24.x |
 | npm | 9 |
 | Docker (optional) | 24 |
 
@@ -32,7 +32,6 @@ python -m launcher
 ## Runtime Commands
 
 ```bash
-python -m launcher                    # Interactive menu (default)
 python -m launcher                    # Unified app on :8000 (recommended)
 python -m launcher --stop             # Stop a running server
 python -m launcher --status           # Show PID and port status

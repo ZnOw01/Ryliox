@@ -1,0 +1,413 @@
+/**
+ * Motion Optimizations CSS - Framer Motion 2025-2026
+ * 
+ * Optimizaciones de performance para animaciones:
+ * - will-change automático
+ * - GPU acceleration
+ * - Reduced motion support
+ * - Lazy animation loading patterns
+ */
+
+/* ============================================
+   WILL-CHANGE OPTIMIZATIONS
+   ============================================ */
+
+.will-change-transform {
+  will-change: transform;
+}
+
+.will-change-opacity {
+  will-change: opacity;
+}
+
+.will-change-auto {
+  will-change: auto;
+}
+
+/* Aplicar will-change solo durante animaciones activas */
+[data-framer-motion] {
+  will-change: transform, opacity;
+}
+
+[data-framer-motion='idle'] {
+  will-change: auto;
+}
+
+/* ============================================
+   GPU ACCELERATION
+   ============================================ */
+
+.gpu-accelerated {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  perspective: 1000px;
+}
+
+.hardware-accelerated {
+  -webkit-transform: translate3d(0, 0, 0);
+  -moz-transform: translate3d(0, 0, 0);
+  -ms-transform: translate3d(0, 0, 0);
+  -o-transform: translate3d(0, 0, 0);
+  transform: translate3d(0, 0, 0);
+  -webkit-backface-visibility: hidden;
+  -moz-backface-visibility: hidden;
+  -ms-backface-visibility: hidden;
+  backface-visibility: hidden;
+  -webkit-perspective: 1000;
+  -moz-perspective: 1000;
+  -ms-perspective: 1000;
+  perspective: 1000;
+}
+
+/* ============================================
+   LAYOUT ANIMATION OPTIMIZATIONS
+   ============================================ */
+
+.layout-animation {
+  contain: layout style;
+}
+
+.layout-animation-strict {
+  contain: strict;
+}
+
+.layout-animation-paint {
+  contain: paint;
+}
+
+/* Evitar reflows durante layout animations */
+.layout-container {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.layout-item {
+  flex: 0 0 auto;
+}
+
+/* ============================================
+   REDUCED MOTION SUPPORT
+   ============================================ */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  [data-framer-motion] {
+    will-change: auto !important;
+    transition: none !important;
+    animation: none !important;
+  }
+
+  .motion-reduce-none {
+    animation: none !important;
+    transition: none !important;
+  }
+
+  .progress-bar-active {
+    animation: none !important;
+  }
+}
+
+/* ============================================
+   PROGRESS BAR ANIMATION
+   ============================================ */
+
+@keyframes progress-indeterminate {
+  0% {
+    transform: translateX(-100%);
+  }
+  50% {
+    transform: translateX(0%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.progress-bar-active {
+  background-image: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+  background-size: 200% 100%;
+  animation: progress-indeterminate 1.5s ease-in-out infinite;
+}
+
+/* ============================================
+   SCROLLBAR STYLING FOR SMOOTH SCROLL
+   ============================================ */
+
+.smooth-scroll {
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+}
+
+.chapter-scroll {
+  max-height: 224px;
+  overflow-y: auto;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+}
+
+.chapter-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.chapter-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.chapter-scroll::-webkit-scrollbar-thumb {
+  background-color: #cbd5e1;
+  border-radius: 20px;
+}
+
+.chapter-scroll::-webkit-scrollbar-thumb:hover {
+  background-color: #94a3b8;
+}
+
+/* Dark mode scrollbar */
+@media (prefers-color-scheme: dark) {
+  .chapter-scroll::-webkit-scrollbar-thumb {
+    background-color: #475569;
+  }
+
+  .chapter-scroll::-webkit-scrollbar-thumb:hover {
+    background-color: #64748b;
+  }
+}
+
+/* ============================================
+   LAZY ANIMATION LOADING
+   ============================================ */
+
+.lazy-motion {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 300px;
+}
+
+.motion-paused {
+  animation-play-state: paused;
+}
+
+.motion-playing {
+  animation-play-state: running;
+}
+
+/* ============================================
+   LAYOUT SHIFT PREVENTION
+   ============================================ */
+
+.prevent-layout-shift {
+  min-height: 100px;
+  contain-intrinsic-size: auto 100px;
+}
+
+.aspect-ratio-container {
+  aspect-ratio: 16 / 9;
+}
+
+/* ============================================
+   TOUCH DEVICE OPTIMIZATIONS
+   ============================================ */
+
+@media (pointer: coarse) {
+  .touch-optimized {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .touch-none {
+    touch-action: none;
+  }
+
+  .touch-pan-x {
+    touch-action: pan-x;
+  }
+
+  .touch-pan-y {
+    touch-action: pan-y;
+  }
+}
+
+/* ============================================
+   SAFE AREAS (Notch, Home Indicator)
+   ============================================ */
+
+.safe-area-top {
+  padding-top: env(safe-area-inset-top);
+}
+
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.safe-area-x {
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
+.bottom-nav-safe {
+  padding-bottom: calc(1rem + env(safe-area-inset-bottom));
+}
+
+/* ============================================
+   STICKY HEADER OPTIMIZATION
+   ============================================ */
+
+.sticky-header {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
+
+@supports (backdrop-filter: blur(12px)) {
+  .sticky-header {
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+}
+
+/* ============================================
+   SOFT RISE SHADOW
+   ============================================ */
+
+.soft-rise {
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.08),
+    0 1px 2px rgba(0, 0, 0, 0.06);
+  transition: box-shadow 0.3s ease;
+}
+
+.soft-rise:hover {
+  box-shadow:
+    0 4px 6px rgba(0, 0, 0, 0.08),
+    0 2px 4px rgba(0, 0, 0, 0.06);
+}
+
+/* ============================================
+   PANEL SHADOWS
+   ============================================ */
+
+.shadow-panel {
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.1),
+    0 1px 2px rgba(0, 0, 0, 0.06);
+}
+
+.shadow-panel-md {
+  box-shadow:
+    0 4px 6px rgba(0, 0, 0, 0.08),
+    0 2px 4px rgba(0, 0, 0, 0.04);
+}
+
+.shadow-panel-lg {
+  box-shadow:
+    0 10px 15px rgba(0, 0, 0, 0.1),
+    0 4px 6px rgba(0, 0, 0, 0.05);
+}
+
+/* ============================================
+   ANIMATION CLASSES
+   ============================================ */
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.25s ease-out forwards;
+}
+
+.animate-slideUp {
+  animation: slideUp 0.25s ease-out forwards;
+}
+
+.animate-slideDown {
+  animation: slideDown 0.25s ease-out forwards;
+}
+
+.animate-scaleIn {
+  animation: scaleIn 0.25s ease-out forwards;
+}
+
+/* ============================================
+   UTILITY CLASSES
+   ============================================ */
+
+.gpu-layer {
+  transform: translateZ(0);
+  isolation: isolate;
+}
+
+.perspective-1000 {
+  perspective: 1000px;
+}
+
+.preserve-3d {
+  transform-style: preserve-3d;
+}
+
+/* ============================================
+   MINIMUM TOUCH TARGET
+   ============================================ */
+
+.min-h-touch {
+  min-height: 44px;
+}
+
+.min-w-touch {
+  min-width: 44px;
+}
+
+/* ============================================
+   MOBILE FULL WIDTH
+   ============================================ */
+
+@media (max-width: 640px) {
+  .mobile-full {
+    width: 100%;
+  }
+}

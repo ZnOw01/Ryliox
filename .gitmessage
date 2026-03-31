@@ -1,0 +1,40 @@
+# <type>(<scope>): <subject>
+#
+# |<----   Tipo de cambio (max 100 chars)   ---->|
+#
+# Tipos permitidos:
+#   feat     - Nueva característica
+#   fix      - Corrección de bug
+#   docs     - Documentación
+#   style    - Cambios de estilo (formato, etc)
+#   refactor - Refactorización
+#   perf     - Mejora de performance
+#   test     - Tests
+#   build    - Build system o dependencias
+#   ci       - CI/CD
+#   chore    - Tareas de mantenimiento
+#   revert   - Revertir commit
+#   security - Seguridad
+#   dx       - Developer Experience
+#
+# Ejemplos:
+#   feat(auth): add OAuth2 login
+#   fix(api): resolve null pointer exception
+#   docs(readme): update installation steps
+#
+# [Cuerpo del mensaje - opcional pero recomendado para cambios complejos]
+# - Describe qué y por qué (no cómo)
+# - Cada línea máximo 100 caracteres
+# - Separar párrafos con línea en blanco
+#
+# [Footer - opcional]
+# - Referencias a issues: Fixes #123, Closes #456
+# - Breaking changes: BREAKING CHANGE: description
+#
+# ---
+#
+# Notas:
+# - Usa tiempo presente: "add" no "added"
+# - Usa imperativo: "move cursor" no "moves cursor"
+# - No capitalizar primera letra del subject
+# - No punto final en el subject

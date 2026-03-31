@@ -38,10 +38,11 @@ LOG_FILE = RUN_DIR / "web-server.log"
 DOWNLOAD_QUEUE_DB = config.DATA_DIR / "download_jobs.sqlite3"
 DOWNLOAD_ERROR_LOG_DIR = config.DATA_DIR / "logs"
 
-_TIMEOUT_PIP = 300
-_TIMEOUT_NPM = 300
-_TIMEOUT_DOCKER = 120
-_TIMEOUT_SUBPROCESS = 60
+_TIMEOUT_PIP = int(os.getenv("RYLIOX_TIMEOUT_PIP", "300"))
+_TIMEOUT_NPM = int(os.getenv("RYLIOX_TIMEOUT_NPM", "300"))
+_TIMEOUT_DOCKER = int(os.getenv("RYLIOX_TIMEOUT_DOCKER", "120"))
+_TIMEOUT_SUBPROCESS = int(os.getenv("RYLIOX_TIMEOUT_SUBPROCESS", "60"))
+_ASTRO_FALLBACK_NODE_VERSION = "22.20.0"
 
 
 class Steps:
@@ -136,10 +137,14 @@ def _venv_has_runtime_dependencies(venv_python: Path) -> bool:
     parsear el archivo (que puede tener extras, versiones, comentarios).
     Actualizar esta lista cuando cambie requirements.txt.
     """
+    # IMPORTANTE: Esta lista debe mantenerse sincronizada con requirements.txt
+    # Si agregas/eliminas dependencias en requirements.txt, actualiza esta lista.
+    # Los paquetes aquí son los mínimos necesarios para que el runtime funcione.
     result = subprocess.run(
         [
             str(venv_python),
             "-c",
+            # IMPORTANTE: Sincronizar con requirements.txt
             "import fastapi, uvicorn, bleach, lxml, httpx, pydantic_settings, fake_useragent",
         ],
         cwd=REPO_ROOT,
@@ -229,6 +234,74 @@ def _require_npm() -> str:
     return npm
 
 
+def _parse_node_version(version_output: str) -> tuple[int, int, int] | None:
+    raw = version_output.strip().lstrip("v")
+    parts = raw.split(".")
+    if len(parts) != 3:
+        return None
+    try:
+        return int(parts[0]), int(parts[1]), int(parts[2])
+    except ValueError:
+        return None
+
+
+def _current_node_version() -> tuple[int, int, int] | None:
+    node = shutil.which("node")
+    if not node:
+        return None
+
+    result = subprocess.run(
+        [node, "--version"],
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=10,
+    )
+    if result.returncode != 0:
+        return None
+
+    return _parse_node_version(result.stdout)
+
+
+def _is_supported_astro_node(version: tuple[int, int, int] | None) -> bool:
+    if version is None:
+        return False
+
+    major, minor, patch = version
+    if major < 22:
+        return False
+    if major == 22 and (minor, patch) < (12, 0):
+        return False
+    return major % 2 == 0
+
+
+def _frontend_build_command(npm: str, frontend_dir: Path) -> list[str]:
+    version = _current_node_version()
+    if _is_supported_astro_node(version):
+        return [npm, "run", "build"]
+
+    npx = shutil.which("npx")
+    astro_entrypoint = frontend_dir / "node_modules" / "astro" / "astro.js"
+    if npx and astro_entrypoint.exists():
+        print(
+            " - Node actual no compatible con Astro; usando "
+            f"Node {_ASTRO_FALLBACK_NODE_VERSION} via npx para construir frontend..."
+        )
+        return [
+            npx,
+            "-y",
+            f"node@{_ASTRO_FALLBACK_NODE_VERSION}",
+            str(astro_entrypoint),
+            "build",
+        ]
+
+    found = f"v{version[0]}.{version[1]}.{version[2]}" if version else "desconocida"
+    raise RuntimeError(
+        "Astro 5 requiere una versión par de Node.js >= 22.12.0. "
+        f"Versión detectada: {found}. Instala Node 22/24 o asegúrate de tener npx disponible."
+    )
+
+
 def _frontend_source_newer_than_build(frontend_dir: Path, dist_dir: Path) -> bool:
     """Retorna True si algún fuente es más nuevo que dist/index.html."""
     build_index = dist_dir / "index.html"
@@ -293,9 +366,10 @@ def _ensure_frontend_build(steps: Steps, rebuild: bool = False) -> None:
         if dist_dir.exists()
         else "Construyendo bundle frontend..."
     )
+    build_command = _frontend_build_command(npm, frontend_dir)
     try:
         _run_checked(
-            [npm, "run", "build"],
+            build_command,
             steps.format(label),
             cwd=frontend_dir,
             timeout=_TIMEOUT_NPM,

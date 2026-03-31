@@ -1,0 +1,232 @@
+{
+  "app": {
+    "title": "Ryliox",
+    "subtitle": "Descargador de libros O'Reilly",
+    "footer": "Ryliox — Solo para uso personal",
+    "status": {
+      "active": "Servicio activo"
+    }
+  },
+  "auth": {
+    "title": "Autenticación",
+    "status": {
+      "checking": "Verificando sesión...",
+      "valid": "Sesión válida",
+      "cookies_loaded": "Cookies cargadas (red no disponible)",
+      "invalid": "Sesión inválida",
+      "reason": {
+        "network_error": "servicio no disponible",
+        "not_authenticated": "sesión no autenticada",
+        "subscription_expired": "suscripción expirada",
+        "unknown": "desconocido"
+      }
+    },
+    "service": {
+      "available": "Servicio disponible",
+      "unavailable": "Servicio no disponible",
+      "checking": "Verificando servicio..."
+    },
+    "cookies": {
+      "saved": "Cookies guardadas",
+      "label": "Cookies (JSON o encabezado HTTP)",
+      "placeholder": "{\"cookie\": \"valor\"} o \"a=1; b=2\"",
+      "save": "Guardar cookies",
+      "saving": "Guardando...",
+      "show_editor": "Ver / editar cookies",
+      "hide_editor": "Ocultar editor",
+      "loading": "Cargando cookies guardadas..."
+    },
+    "refresh": "Actualizar",
+    "uptime": "Uptime"
+  },
+  "search": {
+    "title": "Buscar libros",
+    "placeholder": "python, ISBN, título...",
+    "clear": "Limpiar",
+    "results_count": "{{count}} resultado",
+    "results_count_plural": "{{count}} resultados",
+    "no_results": "No hay resultados para \"{{query}}\".",
+    "start_search": "Escribe una consulta para buscar libros.",
+    "loading": "Buscando libros...",
+    "updating": "Actualizando resultados...",
+    "navigation_hint": "Usa flechas para navegar y Enter para seleccionar.",
+    "filter_by": "Filtrar por",
+    "scopes": {
+      "all": "Todos los campos",
+      "title": "Título",
+      "author": "Autor",
+      "publisher": "Editorial"
+    },
+    "book": {
+      "unknown_author": "Autor desconocido",
+      "unknown_publisher": "Editorial desconocida",
+      "no_cover": "Sin portada",
+      "select": "Seleccionar",
+      "selected": "Seleccionado"
+    },
+    "error": {
+      "generic": "Error al buscar libros"
+    }
+  },
+  "download": {
+    "title": "Descarga y progreso",
+    "book": {
+      "label": "Libro",
+      "placeholder": "Selecciona un libro para comenzar"
+    },
+    "format": {
+      "label": "Formato",
+      "description": "Formato de descarga",
+      "aria_label": "Selector de formato de descarga",
+      "loading": "Cargando formatos...",
+      "no_formats": "No hay formatos disponibles",
+      "helper_text": "Algunos formatos pueden quedar deshabilitados al seleccionar capítulos.",
+      "epub_single": "EPUB — Libro completo",
+      "pdf_combined": "PDF — Todo en un archivo",
+      "pdf_separate": "PDF — Un archivo por capítulo"
+    },
+    "chapters": {
+      "title": "Capítulos",
+      "aria_label": "Selector de capítulos",
+      "loading": "Cargando capítulos...",
+      "updating": "Actualizando capítulos...",
+      "error": "No se pudieron cargar los capítulos. Verifica tu conexión y cookies.",
+      "select_all": "Seleccionar todo",
+      "clear": "Limpiar selección",
+      "clear_selection": "Limpiar",
+      "chapter": "Capítulo {{number}}",
+      "not_selectable": "{{format}} no acepta selección de capítulos. Cambia el formato o limpia la selección.",
+      "selected_count": "{{count}} seleccionados",
+      "total_count": "{{count}} en total",
+      "full_book_notice": "Este formato descarga el libro completo. Los capítulos se muestran solo como referencia.",
+      "no_book_title": "Ningún libro seleccionado",
+      "no_book_description": "Selecciona un libro para ver los capítulos disponibles.",
+      "select_chapter_aria": "Seleccionar capítulo: {{title}}"
+    },
+    "actions": {
+      "aria_label": "Acciones de descarga",
+      "start": "Iniciar descarga",
+      "starting": "Iniciando...",
+      "cancel": "Cancelar",
+      "cancelling": "Cancelando...",
+      "skip_images": "Omitir imágenes",
+      "reconnect": "Reintentar conexión en vivo"
+    },
+    "progress": {
+      "title": "Progreso",
+      "aria_label": "Progreso de descarga",
+      "status_label": "Estado",
+      "status_idle": "En espera",
+      "status_queued": "En cola",
+      "status_running": "En progreso",
+      "status_completed": "Completado",
+      "status_error": "Error",
+      "queued": "En cola (posición {{position}})",
+      "connecting": "Conectando...",
+      "downloading": "Descargando...",
+      "processing": "Procesando...",
+      "completed": "Completado",
+      "cancelled": "Cancelado",
+      "error": "Error",
+      "percentage": "{{percent}}%",
+      "percentage_aria": "{{percent}}% — {{status}}",
+      "eta": "Tiempo restante: {{time}}",
+      "completed_message": "Descarga completada correctamente.",
+      "queue_position": "Posición en cola: {{position}}",
+      "chapter_label": "Capítulo",
+      "time_remaining": "Tiempo restante",
+      "file_generated": "{{format}} generado",
+      "files_generated": "Archivos generados",
+      "technical_details": "Detalles técnicos",
+      "location_opened": "Ubicación abierta en el explorador.",
+      "path_copied": "Ruta copiada al portapapeles.",
+      "copy_failed": "No se pudo copiar la ruta.",
+      "open_location": "Abrir ubicación",
+      "copy_path": "Copiar ruta"
+    },
+    "sse": {
+      "connected": "Conectado",
+      "disconnected": "Desconectado",
+      "error": "Error de conexión",
+      "reconnect": "Reconectar",
+      "aria_label": "Estado de conexión en vivo",
+      "live_updates": "Actualizaciones en vivo",
+      "status_connected": "activas",
+      "status_connecting": "iniciando",
+      "status_error": "pausadas",
+      "status_reconnecting": "reintentando"
+    },
+    "notifications": {
+      "download_started": "Descarga iniciada",
+      "download_completed": "¡Descarga completada!",
+      "download_error": "Error en la descarga"
+    }
+  },
+  "common": {
+    "close": "Cerrar",
+    "cancel": "Cancelar",
+    "save": "Guardar",
+    "loading": "Cargando...",
+    "error": "Error",
+    "success": "Éxito",
+    "warning": "Advertencia",
+    "info": "Información",
+    "yes": "Sí",
+    "no": "No",
+    "retry": "Reintentar",
+    "opening": "Abriendo...",
+    "open_location": "Abrir ubicación",
+    "copy_path": "Copiar ruta",
+    "message": "Mensaje",
+    "code": "Código",
+    "page": "página",
+    "pages": "páginas",
+    "reading_time_less_than_minute": "<1 min lectura",
+    "reading_time_minutes": "min lectura"
+  },
+  "theme": {
+    "toggle": "Cambiar tema",
+    "light": "Modo claro",
+    "dark": "Modo oscuro",
+    "system": "Preferencia del sistema"
+  },
+  "keyboard_shortcuts": {
+    "title": "Atajos de teclado",
+    "show_help": "Presiona ? para ver atajos de teclado",
+    "navigation": "Navegación",
+    "actions": "Acciones",
+    "search": "Búsqueda",
+    "shortcuts": {
+      "focus_search": "Foco en búsqueda",
+      "select_book": "Seleccionar libro",
+      "navigate_results": "Navegar resultados",
+      "clear_search": "Limpiar búsqueda",
+      "start_download": "Iniciar descarga",
+      "cancel_download": "Cancelar descarga",
+      "toggle_theme": "Cambiar tema",
+      "toggle_help": "Mostrar/ocultar ayuda"
+    }
+  },
+  "accessibility": {
+    "skip_to_content": "Saltar al contenido principal",
+    "high_contrast": "Alto contraste",
+    "reduced_motion": "Reducir animaciones",
+    "screen_reader_hints": "Pistas para lectores de pantalla"
+  },
+  "errors": {
+    "network": "Error de conexión",
+    "network_description": "No se pudo conectar con el servidor. Verifica tu conexión a internet.",
+    "timeout": "Tiempo de espera agotado",
+    "timeout_description": "La operación tardó demasiado. Inténtalo de nuevo.",
+    "unknown": "Error inesperado",
+    "unknown_description": "Algo salió mal. Si el problema persiste, contacta soporte.",
+    "service_unavailable": "Servicio no disponible",
+    "service_unavailable_description": "No hay cookies configuradas. Ve a Configuración > Cookies para configurarlas.",
+    "chapters_failed": "No se pudieron cargar los capítulos",
+    "chapters_failed_description": "Verifica tu conexión a internet y que las cookies sean válidas.",
+    "cookies_required": "Cookies requeridas",
+    "cookies_required_description": "Necesitas configurar cookies válidas para descargar libros.",
+    "retry": "Reintentar",
+    "contact_support": "Contactar soporte"
+  }
+}

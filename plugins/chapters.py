@@ -1,9 +1,10 @@
-﻿import ipaddress
+import ipaddress
 import logging
 import re
 from urllib.parse import quote, urljoin, urlparse
 
 import config
+from core.cache import get_chapter_list_cache, invalidate_book_cache
 from core.types import ChapterInfo
 
 from .base import Plugin
@@ -15,8 +16,19 @@ _COVER_WORD_RE = re.compile(r"\bcover\b", re.IGNORECASE)
 class ChaptersPlugin(Plugin):
     """Plugin for fetching book chapters and their content."""
 
+    def __init__(self) -> None:
+        super().__init__()
+        self._chapter_cache = get_chapter_list_cache()
+
     async def fetch_list(self, book_id: str) -> list[ChapterInfo]:
-        """Fetch list of chapters for a book."""
+        """Fetch list of chapters for a book with caching."""
+        cache_key = f"chapters:{book_id}"
+
+        # Try cache first
+        cached = await self._chapter_cache.get(cache_key)
+        if cached is not None:
+            return cached
+
         encoded_book_id = quote(str(book_id).strip(), safe="")
         url = f"{config.API_V2}/epub-chapters/?epub_identifier=urn:orm:book:{encoded_book_id}"
         chapters: list[ChapterInfo] = []
@@ -33,7 +45,10 @@ class ChaptersPlugin(Plugin):
             for ch in results:
                 content_url = self._sanitize_remote_url(ch.get("content_url", ""))
                 if not content_url:
-                    logger.warning("Skipping chapter with blocked content_url: %r", ch.get("content_url"))
+                    logger.warning(
+                        "Skipping chapter with blocked content_url: %r",
+                        ch.get("content_url"),
+                    )
                     continue
 
                 chapters.append(
@@ -56,7 +71,11 @@ class ChaptersPlugin(Plugin):
                 )
             url = data.get("next")
 
-        return self._reorder_cover_first(chapters)
+        result = self._reorder_cover_first(chapters)
+
+        # Cache the result
+        await self._chapter_cache.set(cache_key, result)
+        return result
 
     async def fetch_toc(self, book_id: str) -> list[dict]:
         encoded_book_id = quote(str(book_id).strip(), safe="")
@@ -146,6 +165,17 @@ class ChaptersPlugin(Plugin):
             return ""
 
         if host == "localhost" or host.endswith(".local"):
+            return ""
+
+        # S7: Validar que el host pertenezca al dominio permitido (whitelist)
+        base_parsed = urlparse(config.BASE_URL)
+        allowed_hostname = (base_parsed.hostname or "").lower()
+        if allowed_hostname and not (
+            host == allowed_hostname or host.endswith(f".{allowed_hostname}")
+        ):
+            logger.warning(
+                "URL host %r no está en la whitelist de dominios permitidos", host
+            )
             return ""
 
         try:

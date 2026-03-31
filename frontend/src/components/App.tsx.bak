@@ -1,0 +1,114 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { useState, useEffect } from "react";
+import { I18nextProvider } from 'react-i18next';
+
+import { AuthStatusCard } from "./AuthStatusCard";
+import { DownloadProgressCard } from "./DownloadProgressCard";
+import { SearchBooksCard } from "./SearchBooksCard";
+import { LanguageSwitcher } from "./LanguageSwitcher";
+import { ThemeToggle } from "./ThemeToggle";
+import { ToastContainer } from "./ToastNotifications";
+import { KeyboardShortcutsHelp } from "./KeyboardShortcuts";
+import { AriaLiveRegion } from "./AriaLiveRegion";
+import { SkipLink } from "./SkipLink";
+import { MobileNav } from "./MobileNav";
+import i18n from "../i18n/config";
+import { isEnabled } from "../lib/feature-flags";
+import { toast } from "./ToastNotifications";
+import { useTranslation } from "react-i18next";
+import type { ProgressResponse } from "../lib/types";
+
+function AppHeader() {
+  const { t } = useTranslation();
+  
+  return (
+    <header className="safe-area-top sticky-header soft-rise rounded-2xl border border-brand/20 bg-white/90 px-4 py-3 shadow-panel backdrop-blur sm:px-6 sm:py-4">
+      <div className="flex min-w-0 items-center justify-between gap-3 sm:gap-5">
+        <div className="flex min-w-0 items-center gap-3 sm:gap-5">
+          <div className="relative flex-none">
+            <div className="grid h-12 w-12 place-items-center rounded-xl bg-gradient-to-br from-brand to-brand-deep text-2xl font-bold tracking-tight text-white shadow-md select-none sm:h-16 sm:w-16 sm:rounded-2xl sm:text-3xl">
+              R
+            </div>
+            <span className="absolute -right-1 -top-1 h-3 w-3 rounded-full border-2 border-white bg-emerald-400 shadow-sm sm:h-3.5 sm:w-3.5" aria-hidden="true"></span>
+            <span className="sr-only">{t('app.status.active')}</span>
+          </div>
+          <div className="min-w-0">
+            <h1 className="truncate text-3xl font-bold leading-tight tracking-tight text-ink sm:text-4xl md:text-5xl lg:text-6xl">
+              {t('app.title')}
+            </h1>
+            <p className="mt-0.5 truncate text-xs text-slate-500 sm:mt-1 sm:text-sm">
+              {t('app.subtitle')}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          {isEnabled('enable_i18n') && <LanguageSwitcher />}
+          {isEnabled('enable_dark_mode') && <ThemeToggle />}
+        </div>
+      </div>
+    </header>
+  );
+}
+
+function AppContent() {
+  const { t } = useTranslation();
+
+  // Announce download progress changes
+  useEffect(() => {
+    const handleProgressUpdate = (event: Event) => {
+      const customEvent = event as CustomEvent<ProgressResponse>;
+      const data = customEvent.detail;
+      
+      if (data.status === 'completed') {
+        toast.success(t('download.notifications.download_completed'));
+      } else if (data.status === 'error' && data.error) {
+        toast.error(data.error);
+      }
+    };
+
+    window.addEventListener('download-progress', handleProgressUpdate);
+    return () => window.removeEventListener('download-progress', handleProgressUpdate);
+  }, [t]);
+
+  return (
+    <div className="grid items-start gap-4 sm:gap-6 lg:grid-cols-[minmax(320px,1fr)_minmax(0,1.25fr)] lg:gap-8">
+      <div className="grid min-w-0 gap-4 sm:gap-6">
+        <AuthStatusCard />
+        <SearchBooksCard />
+      </div>
+      <div className="min-w-0">
+        <DownloadProgressCard />
+      </div>
+    </div>
+  );
+}
+
+export default function App() {
+  // Use lazy initialization to preserve QueryClient across HMR reloads
+  const [queryClient] = useState(() => new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: 1,
+        refetchOnWindowFocus: false,
+      },
+    },
+  }));
+
+  return (
+    <I18nextProvider i18n={i18n}>
+      <QueryClientProvider client={queryClient}>
+        <SkipLink />
+        <div className="safe-area-x bottom-nav-safe min-h-screen pb-4 sm:pb-6">
+          <AppHeader />
+          <main id="main-content" tabIndex={-1} className="mt-4 sm:mt-6">
+            <AppContent />
+          </main>
+        </div>
+        {isEnabled('enable_toast_notifications') && <ToastContainer />}
+        {isEnabled('enable_keyboard_shortcuts') && <KeyboardShortcutsHelp />}
+        <AriaLiveRegion />
+        <MobileNav />
+      </QueryClientProvider>
+    </I18nextProvider>
+  );
+}

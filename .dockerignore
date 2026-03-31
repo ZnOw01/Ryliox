@@ -1,29 +1,233 @@
+# ==============================================================================
+# Docker Build Context Exclusions
+# Comprehensive .dockerignore to optimize build performance and security
+# ==============================================================================
+
+# ==============================================================================
+# Python Virtual Environments
+# ==============================================================================
 .venv/
-node_modules/
-frontend/node_modules/
-frontend/dist/
-.git/
-.gitignore
+venv/
+env/
+ENV/
+.conda/
+conda-env/
+
+# ==============================================================================
+# Python Cache & Compiled Files
+# ==============================================================================
 __pycache__/
-*.pyc
-*.pyo
-*.pyd
-.pytest_cache/
+**/__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
 *.egg-info/
 dist/
 build/
-data/
-output/
-.run/
+develop-eggs/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg
+*.egg-info/
+.installed.cfg
+*.manifest
+*.spec
+pip-log.txt
+pip-delete-this-directory.txt
+
+# ==============================================================================
+# Node.js / Frontend
+# ==============================================================================
+node_modules/
+frontend/node_modules/
+frontend/dist/
+frontend/.astro/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+.yarn/
+.pnp.*
+
+# ==============================================================================
+# Testing & Coverage
+# ==============================================================================
+.tox/
+.nox/
+.coverage
+.coverage.*
+.pytest_cache/
+.hypothesis/
+.nyc_output/
+coverage.xml
+*.cover
+*.py,cover
+htmlcov/
+.coverage_html/
+.tox/
+
+# ==============================================================================
+# IDEs & Editors
+# ==============================================================================
 .vscode/
 .idea/
 *.swp
 *.swo
+*~
+*.sublime-project
+*.sublime-workspace
+.project
+.pydevproject
+.settings/
+.classpath
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# ==============================================================================
+# OS Generated Files
+# ==============================================================================
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
+Thumbs.db:encryptable
+desktop.ini
+*.stackdump
+
+# ==============================================================================
+# Git & Version Control
+# ==============================================================================
+.git/
+.gitignore
+.gitattributes
+.gitmodules
+.github/
+.gitkeep
+
+# ==============================================================================
+# Environment & Secrets (CRITICAL - NEVER INCLUDE IN BUILDS)
+# ==============================================================================
 .env
 .env.*
 !.env.example
+!.env.template
+secrets/
+secrets.*
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+*.der
+*.priv
+*.private
+private.*
+keyfile.*
+credentials.*
+*.credentials
+.creds/
+
+# ==============================================================================
+# Data & Runtime Directories
+# ==============================================================================
+data/
+output/
+.run/
+.runtime_data/
+.runtime_output/
+*.sqlite3
+*.db
+*.sqlite
+*.log
+logs/
+*.pid
+
+# ==============================================================================
+# Documentation
+# ==============================================================================
 *.md
-.github/
+!README.md
+!CHANGELOG.md
+!LICENSE
 docs/
+CHANGELOG*
+CONTRIBUTING*
+ARCHITECTURE*
+PROJECT_SUMMARY*
+VERIFICACION*
+TRACKING*
+CLAUDE.md
+AGENTS.md
+
+# ==============================================================================
+# Docker & CI/CD
+# ==============================================================================
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+.docker/
+.dockerignore
+.dockerenv
+.ci-data/
+.ci-output/
+
+# ==============================================================================
+# Deployment & Infrastructure
+# ==============================================================================
+scripts/
+!scripts/healthcheck.sh
+kubernetes/
+k8s/
+helm/
+terraform/
+terraform.tfstate*
+.terraform/
+ansible/
+
+# ==============================================================================
+# Temporary & Backup Files
+# ==============================================================================
+*.tmp
+*.temp
+*.bak
+*.backup
+*~
+*.old
+*.orig
+*.save
+*.dump
+
+# ==============================================================================
+# Archive Files
+# ==============================================================================
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.bz2
+*.7z
+*.rar
+
+# ==============================================================================
+# Misc
+# ==============================================================================
+*.drawio
+*.drawio.bkp
+*.puml
+*.plantuml
+*.graphml
+*.mmd
+*.mermaid

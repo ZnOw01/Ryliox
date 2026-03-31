@@ -1,6 +1,5 @@
-"""Download orchestration plugin."""
+"""Download orchestration plugin with observability."""
 
-import ipaddress
 import asyncio
 import logging
 import shutil
@@ -13,10 +12,40 @@ from typing import Awaitable, Callable
 from urllib.parse import urljoin, urlparse
 
 import config
+from core.logging_config import log_context, set_book_id, set_job_id
+from core.metrics import metrics
 from plugins.base import Plugin
 from plugins.pdf import generate_pdf_chapters_in_subprocess, generate_pdf_in_subprocess
 
 logger = logging.getLogger(__name__)
+
+# Progress percentage constants - these define the download workflow stages
+PROGRESS_START = 0  # Initial download start
+PROGRESS_METADATA = 5  # Fetching book metadata
+PROGRESS_CHAPTERS_FETCH = 10  # Fetching chapter list
+PROGRESS_COVER_DOWNLOAD = 12  # Downloading cover image
+PROGRESS_CHAPTERS_START = 15  # Beginning chapter processing (15-80 range)
+PROGRESS_CHAPTERS_RANGE = 65  # Chapter processing spans 65% of total progress
+PROGRESS_ASSETS_START = 80  # Beginning asset downloads (80-90 range)
+PROGRESS_ASSETS_RANGE = 10  # Asset downloads span 10% of total progress
+PROGRESS_GENERATING_EPUB = 90  # Generating EPUB file
+PROGRESS_GENERATING_PDF = 95  # Generating PDF file(s)
+PROGRESS_COMPLETED = 100  # Download fully completed
+
+# Performance and timing constants
+CHAPTER_TIME_SAMPLES = 5  # Number of chapter times to keep for ETA calculation
+ASSET_DOWNLOAD_CONCURRENCY = 8  # Max concurrent asset downloads
+PDF_POLL_INTERVAL_SECONDS = 0.25  # Interval to check PDF generation cancellation
+
+# Cover image detection and priority
+COVER_IMAGE_PREFERRED_EXTENSIONS = (
+    "cover.jpg",
+    "cover.jpeg",
+    "cover.png",
+    "cover.webp",
+    "cover.gif",
+)
+
 
 @dataclass
 class DownloadProgress:
@@ -56,8 +85,7 @@ class DownloaderPlugin(Plugin):
 
     FORMAT_ALIASES: dict[str, str] = {}
 
-    BOOK_ONLY_FORMATS = frozenset(["epub"])
-    ASSET_DOWNLOAD_CONCURRENCY = 8
+    BOOK_ONLY_FORMATS = frozenset(["epub", "pdf"])
 
     def __init__(
         self,
@@ -150,9 +178,13 @@ class DownloaderPlugin(Plugin):
         progress_callback: Callable[[DownloadProgress], None] | None = None,
         cancel_check: Callable[[], bool] | None = None,
     ) -> DownloadResult:
+        """Execute download with observability."""
         if formats is None:
             formats = ["epub"]
         book_dir: Path | None = None
+
+        # Set context for this download
+        set_book_id(book_id)
 
         def report(
             status: str,
@@ -192,18 +224,60 @@ class DownloaderPlugin(Plugin):
         html_processor = self._html_processor_plugin or self.kernel["html_processor"]
         output_plugin = self._output_plugin or self.kernel["output"]
 
-        report("starting", 0)
-        report("fetching_metadata", 5)
+        report("starting", PROGRESS_START)
+
+        logger.info(
+            "Fetching metadata for book: %s",
+            book_id,
+            extra={"book_id": book_id, "stage": "metadata_fetch"},
+        )
+
+        report("fetching_metadata", PROGRESS_METADATA)
         book_info = await book_plugin.fetch(book_id)
 
-        report("fetching_chapters", 10)
+        logger.info(
+            "Book metadata fetched: title=%s, chapters=%s",
+            book_info.get("title", "Unknown"),
+            "unknown",
+            extra={
+                "book_id": book_id,
+                "title": book_info.get("title"),
+                "stage": "metadata_fetched",
+            },
+        )
+
+        report("fetching_chapters", PROGRESS_CHAPTERS_FETCH)
         all_chapters = await chapters_plugin.fetch_list(book_id)
         toc = await chapters_plugin.fetch_toc(book_id)
         await abort_if_cancelled()
 
+        logger.info(
+            "Chapters fetched: count=%d",
+            len(all_chapters),
+            extra={
+                "book_id": book_id,
+                "total_chapters": len(all_chapters),
+                "stage": "chapters_fetched",
+            },
+        )
+
         if selected_chapters is not None:
-            selected_set = set(selected_chapters)
+            total = len(all_chapters)
+            valid_indices = [i for i in selected_chapters if 0 <= i < total]
+            selected_set = set(valid_indices)
             chapters = [ch for i, ch in enumerate(all_chapters) if i in selected_set]
+
+            logger.info(
+                "Chapter selection applied: selected=%d, total=%d",
+                len(chapters),
+                len(all_chapters),
+                extra={
+                    "book_id": book_id,
+                    "selected_chapters": len(chapters),
+                    "total_chapters": len(all_chapters),
+                    "stage": "chapter_selection",
+                },
+            )
         else:
             chapters = all_chapters
         chapters = self._sanitize_chapters_for_output(chapters)
@@ -218,7 +292,7 @@ class DownloaderPlugin(Plugin):
         oebps = output_plugin.get_oebps_dir(book_dir)
 
         if not skip_images:
-            report("downloading_cover", 12)
+            report("downloading_cover", PROGRESS_COVER_DOWNLOAD)
             cover_url = book_info.get("cover_url")
             if cover_url:
                 await abort_if_cancelled()
@@ -231,14 +305,17 @@ class DownloaderPlugin(Plugin):
         all_image_urls = set()
         total_chapters = len(chapters)
 
-        chapter_times = deque(maxlen=5)
+        chapter_times = deque(maxlen=CHAPTER_TIME_SAMPLES)
         chapter_start_time = time.time()
 
         for i, ch in enumerate(chapters):
             await abort_if_cancelled()
 
             chapter_pct = (
-                15 + int((i / total_chapters) * 65) if total_chapters > 0 else 15
+                PROGRESS_CHAPTERS_START
+                + int((i / total_chapters) * PROGRESS_CHAPTERS_RANGE)
+                if total_chapters > 0
+                else PROGRESS_CHAPTERS_START
             )
 
             report(
@@ -313,7 +390,7 @@ class DownloaderPlugin(Plugin):
                     chapter_title=ch.get("title", ""),
                 )
 
-        report("downloading_assets", 80, eta_seconds=None)
+        report("downloading_assets", PROGRESS_ASSETS_START, eta_seconds=None)
 
         image_tasks: list[tuple[str, str]] = []
         seen_image_filenames: set[str] = set()
@@ -348,14 +425,17 @@ class DownloaderPlugin(Plugin):
             img_width = len(str(len(image_jobs) if image_jobs else 1))
             css_completed = 0
             image_completed = 0
-            shared_asset_semaphore = asyncio.Semaphore(self.ASSET_DOWNLOAD_CONCURRENCY)
+            shared_asset_semaphore = asyncio.Semaphore(ASSET_DOWNLOAD_CONCURRENCY)
 
             def css_progress(completed: int, total: int):
                 nonlocal css_completed
                 if total_assets <= 0:
                     return
                 css_completed = completed
-                pct = 80 + int(((css_completed + image_completed) / total_assets) * 10)
+                pct = PROGRESS_ASSETS_START + int(
+                    ((css_completed + image_completed) / total_assets)
+                    * PROGRESS_ASSETS_RANGE
+                )
                 report(
                     "downloading_assets",
                     pct,
@@ -367,7 +447,10 @@ class DownloaderPlugin(Plugin):
                 if total_assets <= 0:
                     return
                 image_completed = completed
-                pct = 80 + int(((css_completed + image_completed) / total_assets) * 10)
+                pct = PROGRESS_ASSETS_START + int(
+                    ((css_completed + image_completed) / total_assets)
+                    * PROGRESS_ASSETS_RANGE
+                )
                 report(
                     "downloading_assets",
                     pct,
@@ -406,7 +489,7 @@ class DownloaderPlugin(Plugin):
         )
 
         if "epub" in formats:
-            report("generating_epub", 90)
+            report("generating_epub", PROGRESS_GENERATING_EPUB)
             epub_plugin = self._epub_plugin or self.kernel["epub"]
             cover_image_name = self._resolve_cover_image_name(oebps)
             await abort_if_cancelled()
@@ -427,7 +510,7 @@ class DownloaderPlugin(Plugin):
             loop = asyncio.get_running_loop()
             with ProcessPoolExecutor(max_workers=1) as process_pool:
                 if "pdf-chapters" in formats:
-                    report("generating_pdf_chapters", 95)
+                    report("generating_pdf_chapters", PROGRESS_GENERATING_PDF)
                     await abort_if_cancelled()
                     future = loop.run_in_executor(
                         process_pool,
@@ -445,7 +528,7 @@ class DownloaderPlugin(Plugin):
                     await abort_if_cancelled()
                     result.files["pdf"] = pdf_paths
                 else:
-                    report("generating_pdf", 95)
+                    report("generating_pdf", PROGRESS_GENERATING_PDF)
                     await abort_if_cancelled()
                     future = loop.run_in_executor(
                         process_pool,
@@ -465,7 +548,25 @@ class DownloaderPlugin(Plugin):
                     await abort_if_cancelled()
                     result.files["pdf"] = pdf_path
 
-        report("completed", 100)
+        report("completed", PROGRESS_COMPLETED)
+
+        # Log successful completion with details
+        logger.info(
+            "Download processing completed: book_id=%s, title=%s, formats=%s, chapters=%d",
+            book_id,
+            book_info.get("title", "Unknown"),
+            formats,
+            total_chapters,
+            extra={
+                "book_id": book_id,
+                "title": book_info.get("title"),
+                "formats": formats,
+                "total_chapters": total_chapters,
+                "files_generated": list(result.files.keys()),
+                "stage": "download_processing_complete",
+            },
+        )
+
         return result
 
     def _cleanup_on_cancel(self, book_dir: Path):
@@ -473,7 +574,9 @@ class DownloaderPlugin(Plugin):
             try:
                 shutil.rmtree(book_dir)
             except Exception as exc:
-                logger.warning("Failed to cleanup cancelled download dir %s: %s", book_dir, exc)
+                logger.warning(
+                    "Failed to cleanup cancelled download dir %s: %s", book_dir, exc
+                )
 
     def _write_chapter_xhtml(self, file_path: Path, xhtml: str) -> None:
         file_path.parent.mkdir(parents=True, exist_ok=True)
@@ -491,9 +594,7 @@ class DownloaderPlugin(Plugin):
         if not jobs:
             return
 
-        worker_semaphore = semaphore or asyncio.Semaphore(
-            self.ASSET_DOWNLOAD_CONCURRENCY
-        )
+        worker_semaphore = semaphore or asyncio.Semaphore(ASSET_DOWNLOAD_CONCURRENCY)
         completed = 0
         total = len(jobs)
 
@@ -531,7 +632,7 @@ class DownloaderPlugin(Plugin):
         future: asyncio.Future,
         cancel_check: Callable[[], bool] | None = None,
         on_cancel: Callable[[], None] | None = None,
-        poll_interval_seconds: float = 0.25,
+        poll_interval_seconds: float = PDF_POLL_INTERVAL_SECONDS,
     ):
         while True:
             try:
@@ -544,7 +645,9 @@ class DownloaderPlugin(Plugin):
                         try:
                             on_cancel()
                         except Exception as exc:
-                            logger.warning("Error cancelling background PDF process: %s", exc)
+                            logger.warning(
+                                "Error cancelling background PDF process: %s", exc
+                            )
                     raise asyncio.CancelledError("Download cancelled by user")
 
     def _terminate_process_pool(self, process_pool: ProcessPoolExecutor) -> None:
@@ -616,7 +719,7 @@ class DownloaderPlugin(Plugin):
         if not images_dir.exists():
             return None
 
-        preferred = ("cover.jpg", "cover.jpeg", "cover.png", "cover.webp", "cover.gif")
+        preferred = COVER_IMAGE_PREFERRED_EXTENSIONS
         for name in preferred:
             if (images_dir / name).exists():
                 return name

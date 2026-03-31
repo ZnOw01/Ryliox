@@ -30,6 +30,8 @@ class AssetsPlugin(Plugin):
             pass
 
         content = await self.http.get_bytes(url)
+        if len(content) > 50 * 1024 * 1024:  # 50MB
+            raise ValueError(f"Asset too large: {len(content)} bytes")
         await asyncio.to_thread(save_path.write_bytes, content)
         return True
 

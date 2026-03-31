@@ -24,7 +24,15 @@ async def auth_status(
     kernel: Kernel = Depends(get_kernel),
     session_store: SessionStore = Depends(get_session_store),
 ) -> StatusResponse:
-    """Retorna el estado de autenticación de la sesión actual."""
+    """Return the current session authentication status.
+
+    Args:
+        kernel: Application kernel with plugin access.
+        session_store: Session store for cookie management.
+
+    Returns:
+        StatusResponse with validity, reason, and cookie presence.
+    """
     auth = kernel["auth"]
     result: dict = await auth.get_status()
     return StatusResponse(
@@ -44,7 +52,19 @@ async def save_cookies(
     kernel: Kernel = Depends(get_kernel),
     session_store: SessionStore = Depends(get_session_store),
 ) -> SaveCookiesResponse:
-    """Guarda cookies de sesión y verifica que autentiquen correctamente."""
+    """Save session cookies and verify they authenticate correctly.
+
+    Args:
+        data: Cookie payload (dict, list, string, or None).
+        kernel: Application kernel with plugin access.
+        session_store: Session store for cookie management.
+
+    Returns:
+        SaveCookiesResponse indicating success.
+
+    Raises:
+        HTTPException: If payload is invalid, save fails, or session remains invalid.
+    """
     payload = normalize_cookies_payload(data)
     if not payload:
         raise HTTPException(
@@ -63,7 +83,7 @@ async def save_cookies(
     try:
         session_store.save_cookies(payload)
     except Exception as exc:
-        logger.exception("Error al guardar cookies en SessionStore.")
+        logger.exception("Error saving cookies to SessionStore.")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail={"error": str(exc), "code": ErrorCode.COOKIES_SAVE_FAILED},
@@ -72,7 +92,7 @@ async def save_cookies(
     try:
         kernel.http.reload_cookies()
     except Exception as exc:
-        logger.warning("reload_cookies falló tras guardar: %s", exc)
+        logger.warning("reload_cookies failed after saving: %s", exc)
 
     auth = kernel["auth"]
     status_result: dict = await auth.get_status()
@@ -86,7 +106,7 @@ async def save_cookies(
             kernel.http.reload_cookies()
         except Exception:
             logger.exception(
-                "No se pudieron restaurar cookies previas tras validacion fallida."
+                "Could not restore previous cookies after failed validation."
             )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -111,5 +131,12 @@ async def save_cookies(
 def get_cookies(
     session_store: SessionStore = Depends(get_session_store),
 ) -> CookiesResponse:
-    """Retorna las cookies de sesión almacenadas actualmente."""
+    """Return the currently stored session cookies.
+
+    Args:
+        session_store: Session store for cookie management.
+
+    Returns:
+        CookiesResponse containing the stored cookies.
+    """
     return CookiesResponse(cookies=session_store.get_cookies())

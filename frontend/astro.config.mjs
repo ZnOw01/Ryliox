@@ -1,6 +1,6 @@
 import { defineConfig, envField } from "astro/config";
 import react from "@astrojs/react";
-import tailwind from "@astrojs/tailwind";
+import tailwindcss from "@tailwindcss/vite";
 
 export default defineConfig({
   devToolbar: {
@@ -17,7 +17,9 @@ export default defineConfig({
   },
   integrations: [
     react(),
-    tailwind()
   ],
+  vite: {
+    plugins: [tailwindcss()],
+  },
   outDir: "./dist",
 });

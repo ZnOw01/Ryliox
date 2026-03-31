@@ -396,12 +396,14 @@ class HtmlProcessorPlugin(Plugin):
                 images.append(original_url)
 
         image_tags = soup.find_all(
-            lambda tag: tag.name == "img"
-            or (
-                tag.name == "source"
-                and (
-                    (tag.parent and tag.parent.name == "picture")
-                    or str(tag.get("type", "")).lower().startswith("image/")
+            lambda tag: (
+                tag.name == "img"
+                or (
+                    tag.name == "source"
+                    and (
+                        (tag.parent and tag.parent.name == "picture")
+                        or str(tag.get("type", "")).lower().startswith("image/")
+                    )
                 )
             )
         )
@@ -666,6 +668,12 @@ body{{margin:1em;background-color:transparent!important;}}
                 return False
 
         if attr_name.startswith(("data-", "aria-")):
+            # Validar que el valor no contenga event handlers
+            if any(
+                script in str(attr_value).lower()
+                for script in ["javascript:", "onerror", "onload"]
+            ):
+                return False
             return True
 
         if attr_name in self._GLOBAL_ALLOWED_ATTRIBUTES:

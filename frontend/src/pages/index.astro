@@ -1,50 +1,101 @@
-﻿---
-import "../styles/global.css";
-import App from "../components/App";
+---
+import '../styles/global.css';
+import App from '../components/App';
 ---
 
 <!doctype html>
-<html lang="es">
+<html lang="es" dir="ltr">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="description" content="Descarga libros de O'Reilly Learning en PDF y EPUB." />
     <meta name="theme-color" content="#dc2626" />
+    <meta name="color-scheme" content="light dark" />
+
+    <!-- PWA -->
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Ryliox" />
+    <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
+
+    <!-- Preconnect -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap"
+    />
+
+    <!-- Icons -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/png" href="/favicon.png" />
+
     <title>Ryliox — Descargador de libros O'Reilly</title>
+
     <script is:inline>
+      // Theme initialization - prevent flash
+      (function () {
+        const theme = localStorage.getItem('theme-preference') || 'system';
+        const isDark =
+          theme === 'dark' ||
+          (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        if (isDark) {
+          document.documentElement.classList.add('dark');
+        }
+      })();
+    </script>
+
+    <script is:inline>
+      // Service Worker registration
+      (function () {
+        if ('serviceWorker' in navigator) {
+          window.addEventListener('load', function () {
+            navigator.serviceWorker
+              .register('/service-worker.js')
+              .then(function (registration) {
+                console.log('ServiceWorker registered:', registration.scope);
+              })
+              .catch(function (error) {
+                console.log('ServiceWorker registration failed:', error);
+              });
+          });
+        }
+      })();
+    </script>
+
+    <script is:inline>
+      // Clear legacy service workers (dev cleanup)
       (() => {
-        window.addEventListener("load", () => {
+        window.addEventListener('load', () => {
           const host = window.location.hostname;
-          const isLocalHost = host === "localhost" || host === "127.0.0.1";
+          const isLocalHost = host === 'localhost' || host === '127.0.0.1';
           if (!isLocalHost) {
             return;
           }
 
           const clearLegacyRuntime = async () => {
             try {
-              if ("serviceWorker" in navigator) {
+              if ('serviceWorker' in navigator) {
                 const registrations = await navigator.serviceWorker.getRegistrations();
-                const ownRegistrations = registrations.filter((registration) => {
+                const ownRegistrations = registrations.filter(registration => {
                   const scriptUrl =
                     registration.active?.scriptURL ||
                     registration.waiting?.scriptURL ||
                     registration.installing?.scriptURL ||
-                    "";
+                    '';
                   const normalized = scriptUrl.toLowerCase();
-                  return normalized.includes("/service-worker.js") || normalized.includes("ryliox");
+                  return normalized.includes('/service-worker.js') || normalized.includes('ryliox');
                 });
-                await Promise.all(ownRegistrations.map((registration) => registration.unregister()));
+                await Promise.all(ownRegistrations.map(registration => registration.unregister()));
               }
 
-              if ("caches" in window) {
+              if ('caches' in window) {
                 const cacheKeys = await caches.keys();
-                const ownCacheKeys = cacheKeys.filter((cacheKey) =>
-                  cacheKey.toLowerCase().startsWith("ryliox"),
+                const ownCacheKeys = cacheKeys.filter(cacheKey =>
+                  cacheKey.toLowerCase().startsWith('ryliox')
                 );
-                await Promise.all(ownCacheKeys.map((cacheKey) => caches.delete(cacheKey)));
+                await Promise.all(ownCacheKeys.map(cacheKey => caches.delete(cacheKey)));
               }
             } catch (_error) {
               // Ignore cleanup failures in local environments.
@@ -57,28 +108,10 @@ import App from "../components/App";
     </script>
   </head>
   <body>
-    <div class="mx-auto flex min-h-screen w-full max-w-6xl flex-col gap-6 overflow-x-hidden px-4 py-8 sm:px-6 lg:px-8">
-      <header class="soft-rise rounded-2xl border border-brand/20 bg-white/90 px-6 py-4 shadow-panel backdrop-blur">
-        <div class="flex min-w-0 items-center gap-5">
-          <div class="relative flex-none">
-            <div class="grid h-16 w-16 place-items-center rounded-2xl bg-gradient-to-br from-brand to-brand-deep text-3xl font-bold tracking-tight text-white shadow-md select-none">
-              R
-            </div>
-            <span class="absolute -right-1 -top-1 h-3.5 w-3.5 rounded-full border-2 border-white bg-emerald-400 shadow-sm" aria-hidden="true"></span>
-            <span class="sr-only">Servicio activo</span>
-          </div>
-          <div class="min-w-0">
-            <h1 class="truncate text-5xl font-bold leading-[1.1] tracking-tight text-ink sm:text-6xl">Ryliox</h1>
-            <p class="mt-1 truncate text-sm text-slate-500">Descargador de libros O'Reilly</p>
-          </div>
-        </div>
-      </header>
-      <main>
-        <App client:load />
-      </main>
-      <footer class="pb-2 text-center text-xs text-slate-400">
-        Ryliox &mdash; Solo para uso personal
-      </footer>
+    <div
+      class="mx-auto flex min-h-screen w-full max-w-6xl flex-col gap-6 overflow-x-hidden px-4 pt-8 pb-[calc(6rem+env(safe-area-inset-bottom,0))] sm:px-6 sm:py-8 lg:px-8"
+    >
+      <App client:load />
     </div>
   </body>
 </html>

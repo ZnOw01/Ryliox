@@ -1,4 +1,5 @@
-import { formatName } from "./utils";
+import { formatName } from './utils';
+import { useTranslation } from 'react-i18next';
 
 type FormatSelectorProps = {
   bookOnlyFormats: Set<string>;
@@ -9,6 +10,8 @@ type FormatSelectorProps = {
   isLoading: boolean;
   onChange: (value: string) => void;
   selectedFormatDescription?: string;
+  /** Accessible label for the format selector */
+  ariaLabel?: string;
 };
 
 export function FormatSelector({
@@ -20,41 +23,64 @@ export function FormatSelector({
   isLoading,
   onChange,
   selectedFormatDescription,
+  ariaLabel,
 }: FormatSelectorProps) {
+  const { t } = useTranslation();
   const disabled = isLoading || formats.length === 0;
-  const selectValue = disabled ? "" : format;
+  const selectValue = disabled ? '' : format;
+  const selectId = 'format-selector';
+  const helperId = hasChapterSelection ? 'format-helper-text' : undefined;
 
   return (
-    <label className="min-w-0 text-sm">
-      <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-500">Formato</span>
-      {isLoading ? <div className="mb-2 h-10 animate-pulse rounded-lg bg-slate-100" /> : null}
-      <select
-        value={selectValue}
-        onChange={(event) => onChange(event.target.value)}
-        aria-describedby={hasChapterSelection ? "format-helper-text" : undefined}
-        disabled={disabled}
-        className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/60 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400"
+    <div className="min-w-0 text-sm leading-tight">
+      <label
+        htmlFor={selectId}
+        className="mb-2 block text-xs font-medium uppercase tracking-wide text-muted-foreground"
       >
-        {isLoading ? <option value="">Cargando formatos...</option> : null}
-        {!isLoading && formats.length === 0 ? <option value="">No hay formatos disponibles</option> : null}
+        {t('download.format.label')}
+      </label>
+      {isLoading ? (
+        <div className="mb-2 h-10 animate-pulse rounded-lg bg-muted" aria-hidden="true" />
+      ) : null}
+      <select
+        id={selectId}
+        value={selectValue}
+        onChange={event => onChange(event.target.value)}
+        aria-label={ariaLabel || t('download.format.aria_label')}
+        aria-describedby={helperId}
+        disabled={disabled}
+        className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm leading-tight text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
+      >
+        {isLoading ? <option value="">{t('download.format.loading')}</option> : null}
+        {!isLoading && formats.length === 0 ? (
+          <option value="">{t('download.format.no_formats')}</option>
+        ) : null}
         {!isLoading
-          ? formats.map((item) => (
-            <option
-              key={item}
-              value={item}
-              disabled={hasChapterSelection && bookOnlyFormats.has(item)}
-            >
-              {formatName(item)}{descriptions?.[item] ? ` - ${descriptions[item]}` : ""}
-            </option>
-          ))
+          ? formats.map(item => (
+              <option
+                key={item}
+                value={item}
+                disabled={hasChapterSelection && bookOnlyFormats.has(item)}
+                aria-disabled={
+                  hasChapterSelection && bookOnlyFormats.has(item) ? 'true' : undefined
+                }
+              >
+                {formatName(item, t)}
+                {descriptions?.[item] ? ` — ${descriptions[item]}` : ''}
+              </option>
+            ))
           : null}
       </select>
       {hasChapterSelection ? (
-        <p id="format-helper-text" className="mt-1 text-xs text-slate-500">
-          Algunos formatos pueden quedar deshabilitados al seleccionar capitulos.
+        <p id="format-helper-text" className="mt-2 text-xs leading-relaxed text-muted-foreground">
+          {t('download.format.helper_text')}
         </p>
       ) : null}
-      {selectedFormatDescription ? <p className="mt-1 break-words text-xs text-slate-500">{selectedFormatDescription}</p> : null}
-    </label>
+      {selectedFormatDescription ? (
+        <p className="mt-2 break-words text-xs leading-relaxed text-muted-foreground">
+          {selectedFormatDescription}
+        </p>
+      ) : null}
+    </div>
   );
 }

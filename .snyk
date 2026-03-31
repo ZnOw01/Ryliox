@@ -1,0 +1,76 @@
+# Snyk Security Configuration
+# This file configures Snyk security scanning for the Ryliox project
+# https://snyk.io/docs/snyk-cli/commands/
+
+# Ignore paths that don't need security scanning
+exclude:
+  - "frontend/dist/**"
+  - "frontend/node_modules/**"
+  - "data/**"
+  - "output/**"
+  - ".run/**"
+  - "**/*.test.py"
+  - "tests/**"
+
+# Language settings
+language-settings:
+  python: "3.11"
+
+# Policy settings
+policy:
+  # Minimum severity to report
+  severity-threshold: medium
+  
+  # Auto-upgrade settings
+  auto-upgrade:
+    enabled: true
+    
+  # Patch settings
+  patches:
+    # Automatically apply patches when available
+    auto-apply: true
+
+# Ignore specific vulnerabilities (use with caution)
+# Format: SNYK-ID: reason:expiration_date
+ignore:
+  # Example (remove when adding real ignores):
+  # 'SNYK-PYTHON-REQUESTS-1234567':
+  #   - '*':
+  #       reason: 'Not exploitable in our use case'
+  #       expires: '2025-12-31T00:00:00.000Z'
+
+# Code analysis settings
+sast:
+  enabled: true
+  
+# Container settings (if using Docker)
+container:
+  enabled: false
+
+# Infrastructure as Code
+iac:
+  enabled: false
+
+# License compliance
+licenses:
+  enabled: true
+  # Whitelist of allowed licenses
+  allowed:
+    - "MIT"
+    - "Apache-2.0"
+    - "BSD-3-Clause"
+    - "BSD-2-Clause"
+    - "ISC"
+    - "Python-2.0"
+    - "PSF-2.0"
+  
+  # Blacklist of prohibited licenses
+  prohibited:
+    - "GPL-2.0"
+    - "GPL-3.0"
+    - "AGPL-3.0"
+    - "LGPL-2.1"
+    - "LGPL-3.0"
+    - "CC-BY-NC-*"
+    - "CC-BY-NC-SA-*"
+    - "CC-BY-NC-ND-*"

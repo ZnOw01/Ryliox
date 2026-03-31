@@ -1,5 +1,5 @@
 services:
-  rylliox:
+  ryliox:
     build:
       context: .
       dockerfile: Dockerfile

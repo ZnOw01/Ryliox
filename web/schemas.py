@@ -1,12 +1,15 @@
-"""Pydantic API contracts for FastAPI endpoints.
+"""Pydantic API contracts for FastAPI endpoints with OWASP validation.
 
 Naming convention:
   - ``*Request``  : inbound request body (validated strictly, no extra fields).
   - ``*Response`` : outbound payload (extra fields ignored on construction).
+
+Implements OWASP A03: Input validation and injection prevention.
 """
 
 from __future__ import annotations
 
+import re
 from typing import Annotated, Any, Literal
 
 from pydantic import (
@@ -17,6 +20,15 @@ from pydantic import (
     field_validator,
     model_validator,
 )
+
+from core.validators import (
+    validate_book_id,
+    validate_filename,
+    validate_user_input,
+    MAX_INPUT_LENGTH,
+    ValidationError,
+)
+
 
 class _RequestModel(BaseModel):
     """Base model for all inbound request payloads."""
@@ -101,7 +113,7 @@ class BookChaptersResponse(_ResponseModel):
     @computed_field  # type: ignore[misc]
     @property
     def total(self) -> int:
-        """Total derivado de la lista; evita desincronización."""
+        """Total derived from the list; avoids desynchronization."""
         return len(self.chapters)
 
 
@@ -124,7 +136,7 @@ class DownloadStartResponse(_ResponseModel):
 
 
 class _ProgressBase(_ResponseModel):
-    """Campos comunes a todos los estados de progreso."""
+    """Common fields for all progress states."""
 
     job_id: str
     book_id: str | None = None
@@ -160,7 +172,7 @@ class CompletedProgress(_ProgressBase):
     @field_validator("pdf", mode="before")
     @classmethod
     def _normalize_pdf(cls, value: Any) -> list[str] | None:
-        """Acepta str o list[str] por compatibilidad con respuestas legacy."""
+        """Accepts str or list[str] for compatibility with legacy responses."""
         if value is None:
             return None
         if isinstance(value, str):
@@ -183,11 +195,36 @@ ProgressResponse = Annotated[
 
 
 class CancelRequest(_RequestModel):
-    job_id: str | None = Field(default=None, min_length=1)
+    job_id: str | None = Field(default=None, min_length=1, max_length=100)
+
+    @field_validator("job_id", mode="after")
+    @classmethod
+    def _validate_job_id(cls, v: str | None) -> str | None:
+        """Validate job_id format for injection prevention."""
+        if v is None:
+            return v
+        # Only allow alphanumeric, hyphen, and underscore
+        if not re.match(r"^[\w\-]+$", v):
+            raise ValueError("job_id contains invalid characters")
+        return v
 
 
 class RevealRequest(_RequestModel):
-    path: str | None = Field(default=None, min_length=1)
+    path: str | None = Field(default=None, min_length=1, max_length=500)
+
+    @field_validator("path", mode="after")
+    @classmethod
+    def _validate_path(cls, v: str | None) -> str | None:
+        """Validate path for path traversal prevention."""
+        if v is None:
+            return v
+        # Check for path traversal attempts
+        if ".." in v or "~" in v:
+            raise ValueError("path contains invalid sequence")
+        # Check for null bytes
+        if "\x00" in v:
+            raise ValueError("path contains null bytes")
+        return v
 
 
 class SetOutputDirResponse(_ResponseModel):
@@ -197,20 +234,45 @@ class SetOutputDirResponse(_ResponseModel):
 
 class OutputDirRequest(_RequestModel):
     browse: bool = False
-    path: str | None = Field(default=None, min_length=1)
+    path: str | None = Field(default=None, min_length=1, max_length=500)
+
+    @field_validator("path", mode="after")
+    @classmethod
+    def _validate_path(cls, v: str | None) -> str | None:
+        """Validate output directory path."""
+        if v is None:
+            return v
+        # Check for path traversal
+        if ".." in v or "~" in v:
+            raise ValueError("path contains invalid sequence")
+        # Check for null bytes
+        if "\x00" in v:
+            raise ValueError("path contains null bytes")
+        return v
 
 
 class DownloadRequest(_RequestModel):
-    book_id: str | None = Field(default=None, min_length=1)
+    book_id: str | None = Field(default=None, min_length=10, max_length=50)
     format: list[str] = Field(default_factory=lambda: ["epub"])
     chapters: list[int] | None = None
-    output_dir: str | None = Field(default=None, min_length=1)
+    output_dir: str | None = Field(default=None, min_length=1, max_length=500)
     skip_images: bool = False
+
+    @field_validator("book_id", mode="after")
+    @classmethod
+    def _validate_book_id(cls, v: str | None) -> str | None:
+        """Validate book_id format (urn:orm:book:*)."""
+        if v is None:
+            return v
+        try:
+            return validate_book_id(v)
+        except ValidationError as exc:
+            raise ValueError(str(exc)) from exc
 
     @field_validator("format", mode="before")
     @classmethod
     def _normalize_format(cls, value: Any) -> list[str]:
-        """Normaliza formato a list[str]; acepta str, tuple, set y list legacy."""
+        """Normalizes format to list[str]; accepts str, tuple, set, and legacy list."""
         if value is None:
             return ["epub"]
         if isinstance(value, str):
@@ -227,13 +289,24 @@ class DownloadRequest(_RequestModel):
             "format must be a string or an array of strings (for example: 'epub' or ['epub','pdf'])"
         )
 
+    @field_validator("output_dir", mode="after")
+    @classmethod
+    def _validate_output_dir(cls, v: str | None) -> str | None:
+        """Validate output directory path."""
+        if v is None:
+            return v
+        # Check for path traversal
+        if ".." in v or "~" in v:
+            raise ValueError("output_dir contains invalid sequence")
+        if "\x00" in v:
+            raise ValueError("output_dir contains null bytes")
+        return v
+
     @model_validator(mode="after")
     def _validate_chapters(self) -> DownloadRequest:
-        """Los índices de capítulo deben ser >= 0 si se proporcionan."""
+        """Chapter indexes must be >= 0 if provided."""
         if self.chapters is not None:
             invalid = [c for c in self.chapters if c < 0]
             if invalid:
-                raise ValueError(
-                    f"Índices de capítulo inválidos (deben ser >= 0): {invalid}"
-                )
+                raise ValueError(f"Invalid chapter indexes (must be >= 0): {invalid}")
         return self

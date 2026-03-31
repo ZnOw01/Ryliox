@@ -1,0 +1,188 @@
+# Production Docker Compose configuration for Ryliox
+# Usage: docker-compose -f docker-compose.prod.yml up -d
+
+version: '3.8'
+
+services:
+  ryliox:
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+      target: runtime
+      args:
+        PYTHON_VERSION: "3.11"
+        APP_USER: appuser
+        APP_UID: 1001
+        APP_GID: 1001
+    image: ryliox:latest
+    container_name: ryliox-app
+    restart: unless-stopped
+    
+    # Ports
+    ports:
+      - "127.0.0.1:8000:8000"
+    
+    # Environment variables from .env file
+    env_file:
+      - .env.production
+    
+    # Environment variables
+    environment:
+      - HOST=0.0.0.0
+      - PORT=8000
+      - PYTHONDONTWRITEBYTECODE=1
+      - PYTHONUNBUFFERED=1
+      - PYTHONUTF8=1
+      - DATA_DIR=/app/data
+      - OUTPUT_DIR=/app/output
+      - LOG_LEVEL=info
+      - WORKERS=4
+    
+    # Health check
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '1.5'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+    
+    # Logging configuration
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"
+        labels: "service_name,environment"
+    
+    # Volumes
+    volumes:
+      - ryliox_data:/app/data
+      - ryliox_output:/app/output
+      - ryliox_logs:/app/data/logs
+    
+    # Networks
+    networks:
+      - ryliox_frontend
+      - ryliox_backend
+    
+    # Security options
+    security_opt:
+      - no-new-privileges:true
+    
+    # Read-only root filesystem (additional security)
+    read_only: false
+    
+    # Capabilities drop
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETGID
+      - SETUID
+    
+    # Ulimits
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+
+  # Nginx reverse proxy (optional but recommended)
+  nginx:
+    image: nginx:alpine
+    container_name: ryliox-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - ryliox_output:/var/www/output:ro
+    depends_on:
+      - ryliox
+    networks:
+      - ryliox_frontend
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  # Redis for caching/session store (optional)
+  redis:
+    image: redis:7-alpine
+    container_name: ryliox-redis
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    networks:
+      - ryliox_backend
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 256M
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  # Watchtower for automatic image updates (optional)
+  watchtower:
+    image: containrrr/watchtower
+    container_name: ryliox-watchtower
+    restart: unless-stopped
+    environment:
+      - WATCHTOWER_CLEANUP=true
+      - WATCHTOWER_POLL_INTERVAL=3600
+      - WATCHTOWER_INCLUDE_STOPPED=true
+      - WATCHTOWER_ROLLING_RESTART=true
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: --interval 3600 ryliox
+    deploy:
+      resources:
+        limits:
+          cpus: '0.1'
+          memory: 128M
+
+# Networks
+networks:
+  ryliox_frontend:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/24
+  ryliox_backend:
+    driver: bridge
+    internal: true
+    ipam:
+      config:
+        - subnet: 172.20.1.0/24
+
+# Volumes
+volumes:
+  ryliox_data:
+    driver: local
+  ryliox_output:
+    driver: local
+  ryliox_logs:
+    driver: local
+  redis_data:
+    driver: local

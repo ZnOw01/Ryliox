@@ -1,4 +1,4 @@
-﻿"""EPUB generator plugin."""
+"""EPUB generator plugin."""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ import shutil
 import zipfile
 from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
+from xml.sax.saxutils import escape
 
 from lxml import etree
 
@@ -57,7 +58,9 @@ class EpubPlugin(Plugin):
 
         chapter_entries = self._collect_existing_chapters(oebps, chapters)
         chapter_hrefs = {entry["href"] for entry in chapter_entries}
-        chapter_titles_by_href = {entry["href"]: entry.get("title") or "" for entry in chapter_entries}
+        chapter_titles_by_href = {
+            entry["href"]: entry.get("title") or "" for entry in chapter_entries
+        }
 
         normalized_toc = self._normalize_toc_items(
             toc or [],
@@ -117,7 +120,9 @@ class EpubPlugin(Plugin):
         (output_dir / "mimetype").write_bytes(b"application/epub+zip")
 
     def _write_container_xml(self, output_dir: Path) -> None:
-        container = etree.Element(f"{{{_CONTAINER_NS}}}container", nsmap={None: _CONTAINER_NS})
+        container = etree.Element(
+            f"{{{_CONTAINER_NS}}}container", nsmap={None: _CONTAINER_NS}
+        )
         container.set("version", "1.0")
         rootfiles = etree.SubElement(container, f"{{{_CONTAINER_NS}}}rootfiles")
         etree.SubElement(
@@ -153,22 +158,32 @@ class EpubPlugin(Plugin):
             attrib={"unique-identifier": "bookid", "version": "3.0"},
         )
         metadata = etree.SubElement(package, f"{{{_OPF_NS}}}metadata")
-        etree.SubElement(metadata, f"{{{_DC_NS}}}title").text = title
+        etree.SubElement(metadata, f"{{{_DC_NS}}}title").text = escape(title)
 
         for author in authors:
             if author:
-                etree.SubElement(metadata, f"{{{_DC_NS}}}creator").text = str(author)
+                etree.SubElement(metadata, f"{{{_DC_NS}}}creator").text = escape(
+                    str(author)
+                )
         for publisher in publishers:
             if publisher:
-                etree.SubElement(metadata, f"{{{_DC_NS}}}publisher").text = str(publisher)
+                etree.SubElement(metadata, f"{{{_DC_NS}}}publisher").text = escape(
+                    str(publisher)
+                )
 
-        etree.SubElement(metadata, f"{{{_DC_NS}}}description").text = description
-        etree.SubElement(metadata, f"{{{_DC_NS}}}language").text = language
-        etree.SubElement(metadata, f"{{{_DC_NS}}}identifier", id="bookid").text = isbn
-        etree.SubElement(metadata, f"{{{_DC_NS}}}date").text = pub_date
+        etree.SubElement(metadata, f"{{{_DC_NS}}}description").text = escape(
+            description
+        )
+        etree.SubElement(metadata, f"{{{_DC_NS}}}language").text = escape(language)
+        etree.SubElement(
+            metadata, f"{{{_DC_NS}}}identifier", id="bookid"
+        ).text = escape(isbn)
+        etree.SubElement(metadata, f"{{{_DC_NS}}}date").text = escape(pub_date)
 
         modified_timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-        etree.SubElement(metadata, f"{{{_OPF_NS}}}meta", property="dcterms:modified").text = modified_timestamp
+        etree.SubElement(
+            metadata, f"{{{_OPF_NS}}}meta", property="dcterms:modified"
+        ).text = modified_timestamp
 
         manifest = etree.SubElement(package, f"{{{_OPF_NS}}}manifest")
         etree.SubElement(
@@ -219,10 +234,14 @@ class EpubPlugin(Plugin):
         cover_image_name = self._resolve_cover_image_name(images_dir, cover_image)
 
         if images_dir.exists():
-            for i, img_file in enumerate(sorted(images_dir.iterdir(), key=lambda p: p.name.lower())):
+            for i, img_file in enumerate(
+                sorted(images_dir.iterdir(), key=lambda p: p.name.lower())
+            ):
                 if not img_file.is_file():
                     continue
-                img_id = self._unique_xml_id(f"img_{img_file.stem}", used_item_ids, f"img{i:03d}")
+                img_id = self._unique_xml_id(
+                    f"img_{img_file.stem}", used_item_ids, f"img{i:03d}"
+                )
                 media_type = self._get_image_media_type(img_file.suffix)
                 image_item_attrs = {
                     "id": img_id,
@@ -251,25 +270,39 @@ class EpubPlugin(Plugin):
     ) -> None:
         title = str(book_info.get("title") or "Unknown")
         isbn = str(book_info.get("isbn") or book_info.get("id") or "unknown")
-        author_values = [str(author) for author in (book_info.get("authors") or []) if author]
+        author_values = [
+            str(author) for author in (book_info.get("authors") or []) if author
+        ]
         authors = ", ".join(author_values) if author_values else "Unknown"
 
-        ncx = etree.Element(f"{{{_NCX_NS}}}ncx", nsmap={None: _NCX_NS}, version="2005-1")
+        ncx = etree.Element(
+            f"{{{_NCX_NS}}}ncx", nsmap={None: _NCX_NS}, version="2005-1"
+        )
         head = etree.SubElement(ncx, f"{{{_NCX_NS}}}head")
         max_depth = self._get_max_depth(toc) if toc else 1
 
-        etree.SubElement(head, f"{{{_NCX_NS}}}meta", content=f"ID:ISBN:{isbn}", name="dtb:uid")
-        etree.SubElement(head, f"{{{_NCX_NS}}}meta", content=str(max_depth), name="dtb:depth")
-        etree.SubElement(head, f"{{{_NCX_NS}}}meta", content="0", name="dtb:totalPageCount")
-        etree.SubElement(head, f"{{{_NCX_NS}}}meta", content="0", name="dtb:maxPageNumber")
+        etree.SubElement(
+            head, f"{{{_NCX_NS}}}meta", content=f"ID:ISBN:{isbn}", name="dtb:uid"
+        )
+        etree.SubElement(
+            head, f"{{{_NCX_NS}}}meta", content=str(max_depth), name="dtb:depth"
+        )
+        etree.SubElement(
+            head, f"{{{_NCX_NS}}}meta", content="0", name="dtb:totalPageCount"
+        )
+        etree.SubElement(
+            head, f"{{{_NCX_NS}}}meta", content="0", name="dtb:maxPageNumber"
+        )
 
         doc_title = etree.SubElement(ncx, f"{{{_NCX_NS}}}docTitle")
-        etree.SubElement(doc_title, f"{{{_NCX_NS}}}text").text = title
+        etree.SubElement(doc_title, f"{{{_NCX_NS}}}text").text = escape(title)
         doc_author = etree.SubElement(ncx, f"{{{_NCX_NS}}}docAuthor")
-        etree.SubElement(doc_author, f"{{{_NCX_NS}}}text").text = authors
+        etree.SubElement(doc_author, f"{{{_NCX_NS}}}text").text = escape(authors)
 
         nav_map = etree.SubElement(ncx, f"{{{_NCX_NS}}}navMap")
-        nav_points, _, _ = self._build_ncx_nav_points(toc, 1, default_href, used_ids=set())
+        nav_points, _, _ = self._build_ncx_nav_points(
+            toc, 1, default_href, used_ids=set()
+        )
 
         if nav_points:
             for nav_point in nav_points:
@@ -283,7 +316,9 @@ class EpubPlugin(Plugin):
             )
             nav_label = etree.SubElement(fallback_nav_point, f"{{{_NCX_NS}}}navLabel")
             etree.SubElement(nav_label, f"{{{_NCX_NS}}}text").text = "Start"
-            etree.SubElement(fallback_nav_point, f"{{{_NCX_NS}}}content", src=str(default_href))
+            etree.SubElement(
+                fallback_nav_point, f"{{{_NCX_NS}}}content", src=str(default_href)
+            )
 
         self._write_xml_document(
             oebps / "toc.ncx",
@@ -318,7 +353,9 @@ class EpubPlugin(Plugin):
 
         if not self._append_nav_ol_items(nav_ol, toc):
             li = etree.SubElement(nav_ol, f"{{{_XHTML_NS}}}li")
-            etree.SubElement(li, f"{{{_XHTML_NS}}}a", href=str(default_href)).text = "Start"
+            etree.SubElement(
+                li, f"{{{_XHTML_NS}}}a", href=str(default_href)
+            ).text = "Start"
 
         self._write_xml_document(
             oebps / "nav.xhtml",
@@ -360,7 +397,10 @@ class EpubPlugin(Plugin):
                 first_href = href
 
             nav_id = self._unique_xml_id(
-                item.get("id") or item.get("href") or item.get("title") or f"navpoint-{current_play_order}",
+                item.get("id")
+                or item.get("href")
+                or item.get("title")
+                or f"navpoint-{current_play_order}",
                 used_ids,
                 f"navpoint-{current_play_order}",
             )
@@ -370,7 +410,9 @@ class EpubPlugin(Plugin):
                 playOrder=str(current_play_order),
             )
             nav_label = etree.SubElement(nav_point, f"{{{_NCX_NS}}}navLabel")
-            etree.SubElement(nav_label, f"{{{_NCX_NS}}}text").text = str(item.get("title") or "")
+            etree.SubElement(nav_label, f"{{{_NCX_NS}}}text").text = escape(
+                str(item.get("title") or "")
+            )
             etree.SubElement(nav_point, f"{{{_NCX_NS}}}content", src=str(href))
 
             for child in child_points:
@@ -380,7 +422,9 @@ class EpubPlugin(Plugin):
 
         return nav_points, play_order, first_href
 
-    def _append_nav_ol_items(self, ol_element: etree._Element, toc_items: list[dict]) -> bool:
+    def _append_nav_ol_items(
+        self, ol_element: etree._Element, toc_items: list[dict]
+    ) -> bool:
         for item in toc_items:
             label = str(item.get("title") or "")
             href = item.get("href")
@@ -388,9 +432,11 @@ class EpubPlugin(Plugin):
 
             li = etree.SubElement(ol_element, f"{{{_XHTML_NS}}}li")
             if href:
-                etree.SubElement(li, f"{{{_XHTML_NS}}}a", href=str(href)).text = label
+                etree.SubElement(li, f"{{{_XHTML_NS}}}a", href=str(href)).text = escape(
+                    label
+                )
             else:
-                etree.SubElement(li, f"{{{_XHTML_NS}}}span").text = label
+                etree.SubElement(li, f"{{{_XHTML_NS}}}span").text = escape(label)
 
             if children:
                 child_ol = etree.SubElement(li, f"{{{_XHTML_NS}}}ol")
@@ -453,7 +499,9 @@ class EpubPlugin(Plugin):
                     with file_path.open("rb") as fh, zf.open(info, "w") as zfh:
                         shutil.copyfileobj(fh, zfh, length=1024 * 64)
 
-    def _collect_existing_chapters(self, oebps: Path, chapters: list[dict]) -> list[dict]:
+    def _collect_existing_chapters(
+        self, oebps: Path, chapters: list[dict]
+    ) -> list[dict]:
         chapter_entries = []
         seen_hrefs = set()
 
@@ -513,7 +561,9 @@ class EpubPlugin(Plugin):
             href_key = href.split("#", 1)[0] if href else ""
             chapter_title = chapter_titles_by_href.get(href_key, "") if href_key else ""
 
-            if chapter_title and (not title or self._is_placeholder_title(title, href or chapter_title)):
+            if chapter_title and (
+                not title or self._is_placeholder_title(title, href or chapter_title)
+            ):
                 title = chapter_title
 
             if not title:
@@ -524,11 +574,13 @@ class EpubPlugin(Plugin):
                 else:
                     continue
 
-            normalized.append({
-                "title": title,
-                "href": href,
-                "children": children,
-            })
+            normalized.append(
+                {
+                    "title": title,
+                    "href": href,
+                    "children": children,
+                }
+            )
 
         return normalized
 
@@ -599,7 +651,9 @@ class EpubPlugin(Plugin):
             normalized = f"{fallback}-{normalized}"
         return normalized
 
-    def _unique_xml_id(self, value: str | None, used_ids: set[str], fallback: str) -> str:
+    def _unique_xml_id(
+        self, value: str | None, used_ids: set[str], fallback: str
+    ) -> str:
         base_id = self._to_xml_id(value, fallback)
         candidate = base_id
         suffix = 2
@@ -627,7 +681,9 @@ class EpubPlugin(Plugin):
 
         return fallback
 
-    def _resolve_cover_image_name(self, images_dir: Path, cover_image: str | None) -> str | None:
+    def _resolve_cover_image_name(
+        self, images_dir: Path, cover_image: str | None
+    ) -> str | None:
         if not images_dir.exists():
             return None
 
@@ -643,7 +699,10 @@ class EpubPlugin(Plugin):
             if candidate.exists() and candidate.is_file():
                 return name
 
-        image_files = sorted([p for p in images_dir.iterdir() if p.is_file()], key=lambda p: p.name.lower())
+        image_files = sorted(
+            [p for p in images_dir.iterdir() if p.is_file()],
+            key=lambda p: p.name.lower(),
+        )
         for image_file in image_files:
             if "cover" in image_file.stem.lower():
                 return image_file.name
@@ -667,7 +726,9 @@ class EpubPlugin(Plugin):
 
         return (2, order)
 
-    def _resolve_chapter_title(self, chapter: dict, chapter_path: Path, href: str) -> str:
+    def _resolve_chapter_title(
+        self, chapter: dict, chapter_path: Path, href: str
+    ) -> str:
         provided = str(chapter.get("title") or "").strip()
         extracted = self._extract_xhtml_title(chapter_path)
 
@@ -717,4 +778,3 @@ class EpubPlugin(Plugin):
             return True
 
         return bool(_PLACEHOLDER_TITLE_RE.match(normalized))
-

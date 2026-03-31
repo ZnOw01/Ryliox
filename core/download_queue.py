@@ -1,9 +1,10 @@
-"""SQLite-backed download queue and progress persistence."""
+"""SQLite-backed download queue and progress persistence with observability."""
 
 from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import sqlite3
 import threading
 import time
@@ -14,10 +15,29 @@ from pathlib import Path
 from typing import Any, Callable
 
 from core.kernel import Kernel
+from core.logging_config import log_context, set_job_id, set_book_id
+from core.metrics import metrics
 from plugins.downloader import DownloadProgress, DownloadResult
+
+logger = logging.getLogger(__name__)
 
 
 TERMINAL_STATES = frozenset(["completed", "error", "cancelled"])
+
+# Database and storage constants
+DEFAULT_TERMINAL_JOB_RETENTION = 500  # Max terminal jobs to keep in DB
+DEFAULT_PROGRESS_WRITE_INTERVAL_SECONDS = (
+    0.25  # Throttle DB writes for progress updates
+)
+DEFAULT_QUEUE_POLL_INTERVAL_SECONDS = 0.5  # Worker polling interval
+
+# SQLite connection settings
+SQLITE_CONNECTION_TIMEOUT_SECONDS = 30  # Connection timeout
+SQLITE_BUSY_TIMEOUT_MILLISECONDS = 30000  # Busy timeout (30 seconds)
+
+# Error handling constants
+WORKER_ERROR_LOG_COOLDOWN_SECONDS = 60.0  # Min seconds between identical error logs
+MIN_QUEUE_POLL_INTERVAL_SECONDS = 0.1  # Minimum allowed poll interval
 
 
 @dataclass(frozen=True)
@@ -65,13 +85,15 @@ class DownloadJobStore:
     def __init__(
         self,
         db_path: Path,
-        terminal_job_retention: int = 500,
-        progress_write_interval_seconds: float = 0.25,
+        terminal_job_retention: int = DEFAULT_TERMINAL_JOB_RETENTION,
+        progress_write_interval_seconds: float = DEFAULT_PROGRESS_WRITE_INTERVAL_SECONDS,
     ):
         self.db_path = Path(db_path)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self.terminal_job_retention = max(0, int(terminal_job_retention))
-        self.progress_write_interval_seconds = max(0.0, float(progress_write_interval_seconds))
+        self.progress_write_interval_seconds = max(
+            0.0, float(progress_write_interval_seconds)
+        )
         self._lock = threading.RLock()
         self._conn: sqlite3.Connection | None = None
         self._last_progress_write_at: dict[str, float] = {}
@@ -80,8 +102,15 @@ class DownloadJobStore:
 
     def _connect(self) -> sqlite3.Connection:
         if self._conn is None:
-            conn = sqlite3.connect(str(self.db_path), timeout=30, check_same_thread=False)
+            conn = sqlite3.connect(
+                str(self.db_path),
+                timeout=SQLITE_CONNECTION_TIMEOUT_SECONDS,
+                check_same_thread=False,
+            )
             conn.row_factory = sqlite3.Row
+            conn.execute("PRAGMA journal_mode=WAL")
+            conn.execute(f"PRAGMA busy_timeout={SQLITE_BUSY_TIMEOUT_MILLISECONDS}")
+            conn.execute("PRAGMA synchronous=NORMAL")
             self._conn = conn
         return self._conn
 
@@ -169,8 +198,29 @@ class DownloadJobStore:
         )
 
     def _ensure_indexes(self, conn: sqlite3.Connection):
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_download_jobs_status_seq ON download_jobs(status, seq)")
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_download_jobs_job_id ON download_jobs(job_id)")
+        """Create indexes for common query patterns."""
+        # Core indexes for job retrieval
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_download_jobs_status_seq ON download_jobs(status, seq)"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_download_jobs_job_id ON download_jobs(job_id)"
+        )
+        # Additional indexes for performance
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_download_jobs_book_id ON download_jobs(book_id)"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_download_jobs_status_updated ON download_jobs(status, updated_at)"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_download_jobs_created_at ON download_jobs(created_at)"
+        )
+        # Composite index for queue position queries
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_download_jobs_queued_seq ON download_jobs(status, seq) WHERE status = 'queued'"
+        )
+        logger.debug("SQLite indexes ensured for download_jobs table")
 
     def _prune_terminal_jobs_conn(self, conn: sqlite3.Connection):
         if self.terminal_job_retention <= 0:
@@ -226,7 +276,9 @@ class DownloadJobStore:
                         job_id,
                         str(book_id),
                         self._json_dumps(formats),
-                        self._json_dumps(selected_chapters) if selected_chapters is not None else None,
+                        self._json_dumps(selected_chapters)
+                        if selected_chapters is not None
+                        else None,
                         str(output_dir),
                         1 if skip_images else 0,
                         "queued",
@@ -238,11 +290,17 @@ class DownloadJobStore:
                 )
                 snapshot = self._get_job_snapshot_conn(conn, job_id)
                 conn.commit()
-                return snapshot or {"job_id": job_id, "status": "queued", "book_id": str(book_id), "percentage": 0}
+                return snapshot or {
+                    "job_id": job_id,
+                    "status": "queued",
+                    "book_id": str(book_id),
+                    "percentage": 0,
+                }
 
     def claim_next_queued_job(self) -> DownloadJob | None:
         with self._lock:
             with self._connect() as conn:
+                conn.execute(f"PRAGMA busy_timeout={SQLITE_BUSY_TIMEOUT_MILLISECONDS}")
                 conn.execute("BEGIN IMMEDIATE")
                 row = conn.execute(
                     """
@@ -444,7 +502,8 @@ class DownloadJobStore:
         now = time.time()
         current_chapter = (
             int(progress.current_chapter)
-            if progress.current_chapter is not None and int(progress.current_chapter) > 0
+            if progress.current_chapter is not None
+            and int(progress.current_chapter) > 0
             else None
         )
         total_chapters = (
@@ -464,7 +523,9 @@ class DownloadJobStore:
         with self._lock:
             previous_payload = self._last_progress_payload.get(job_id)
             previous_at = self._last_progress_write_at.get(job_id, 0.0)
-            status_changed = bool(previous_payload and previous_payload[0] != payload[0])
+            status_changed = bool(
+                previous_payload and previous_payload[0] != payload[0]
+            )
             should_write = (
                 previous_payload is None
                 or status_changed
@@ -585,7 +646,9 @@ class DownloadJobStore:
                 self._last_progress_payload.pop(job_id, None)
                 self._last_progress_write_at.pop(job_id, None)
 
-    def _get_job_snapshot_conn(self, conn: sqlite3.Connection, job_id: str) -> dict[str, Any] | None:
+    def _get_job_snapshot_conn(
+        self, conn: sqlite3.Connection, job_id: str
+    ) -> dict[str, Any] | None:
         row = conn.execute(
             """
             SELECT *
@@ -604,12 +667,18 @@ class DownloadJobStore:
             job_id=str(row["job_id"]),
             book_id=str(row["book_id"]),
             output_dir=Path(str(row["output_dir"])),
-            formats=[str(item) for item in formats] if isinstance(formats, list) else ["epub"],
-            selected_chapters=[int(item) for item in chapters] if isinstance(chapters, list) else None,
+            formats=[str(item) for item in formats]
+            if isinstance(formats, list)
+            else ["epub"],
+            selected_chapters=[int(item) for item in chapters]
+            if isinstance(chapters, list)
+            else None,
             skip_images=bool(row["skip_images"]),
         )
 
-    def _row_to_snapshot(self, conn: sqlite3.Connection, row: sqlite3.Row | None) -> dict[str, Any] | None:
+    def _row_to_snapshot(
+        self, conn: sqlite3.Connection, row: sqlite3.Row | None
+    ) -> dict[str, Any] | None:
         if row is None:
             return None
 
@@ -646,7 +715,9 @@ class DownloadJobStore:
                 """,
                 (row["seq"],),
             ).fetchone()
-            snapshot["queue_position"] = int(queue_position_row["queue_position"]) if queue_position_row else 1
+            snapshot["queue_position"] = (
+                int(queue_position_row["queue_position"]) if queue_position_row else 1
+            )
 
         return {key: value for key, value in snapshot.items() if value is not None}
 
@@ -657,16 +728,20 @@ class DownloadQueueService:
     def __init__(
         self,
         *,
-        kernel_factory: Callable[[], Kernel],
+        kernel_factory: Callable[[], Any],
         db_path: Path,
         error_log_dir: Path,
-        poll_interval_seconds: float = 0.5,
-        terminal_job_retention: int = 500,
+        poll_interval_seconds: float = DEFAULT_QUEUE_POLL_INTERVAL_SECONDS,
+        terminal_job_retention: int = DEFAULT_TERMINAL_JOB_RETENTION,
     ):
         self.kernel_factory = kernel_factory
-        self.store = DownloadJobStore(db_path=db_path, terminal_job_retention=terminal_job_retention)
+        self.store = DownloadJobStore(
+            db_path=db_path, terminal_job_retention=terminal_job_retention
+        )
         self.error_log_dir = Path(error_log_dir)
-        self.poll_interval_seconds = max(0.1, float(poll_interval_seconds))
+        self.poll_interval_seconds = max(
+            MIN_QUEUE_POLL_INTERVAL_SECONDS, float(poll_interval_seconds)
+        )
         self._state_lock = threading.Lock()
         self._wake_event = threading.Event()
         self._progress_condition = threading.Condition()
@@ -677,7 +752,9 @@ class DownloadQueueService:
         self._worker: threading.Thread | None = None
         self._last_worker_error_signature: str | None = None
         self._last_worker_error_logged_at: float = 0.0
-        self._worker_error_log_cooldown_seconds: float = 60.0
+        self._worker_error_log_cooldown_seconds: float = (
+            WORKER_ERROR_LOG_COOLDOWN_SECONDS
+        )
         self.store.requeue_inflight_jobs()
 
     def start(self):
@@ -685,7 +762,9 @@ class DownloadQueueService:
             if self._worker and self._worker.is_alive():
                 return
             self._stop_event.clear()
-            self._worker = threading.Thread(target=self._worker_loop, name="download-queue-worker", daemon=True)
+            self._worker = threading.Thread(
+                target=self._worker_loop, name="download-queue-worker", daemon=True
+            )
             self._worker.start()
 
     def stop(self, timeout_seconds: float = 5.0):
@@ -700,7 +779,7 @@ class DownloadQueueService:
         if active_cancel_event is not None:
             active_cancel_event.set()
         if worker and worker.is_alive():
-            worker.join(timeout=max(0.1, timeout_seconds))
+            worker.join(timeout=max(MIN_QUEUE_POLL_INTERVAL_SECONDS, timeout_seconds))
         if worker is None or not worker.is_alive():
             self.store.close()
 
@@ -713,6 +792,13 @@ class DownloadQueueService:
         selected_chapters: list[int] | None,
         skip_images: bool,
     ) -> dict[str, Any]:
+        """Enqueue a download job and track metrics."""
+        # Set context for logging
+        set_book_id(book_id)
+
+        # Determine primary format for metrics
+        primary_format = formats[0] if formats else "epub"
+
         snapshot = self.store.enqueue_job(
             book_id=book_id,
             output_dir=output_dir,
@@ -720,8 +806,30 @@ class DownloadQueueService:
             selected_chapters=selected_chapters,
             skip_images=skip_images,
         )
+
+        # Record metrics
+        job_id = snapshot.get("job_id")
+        if job_id:
+            set_job_id(job_id)
+            logger.info(
+                "Download enqueued: job_id=%s, book_id=%s, format=%s",
+                job_id,
+                book_id,
+                primary_format,
+                extra={
+                    "job_id": job_id,
+                    "book_id": book_id,
+                    "format": primary_format,
+                    "event": "download_enqueued",
+                },
+            )
+
         self._wake_event.set()
         self._notify_progress_change()
+
+        # Update queue size metric
+        self._update_queue_metrics()
+
         return snapshot
 
     def get_progress(self, job_id: str | None = None) -> dict[str, Any]:
@@ -746,7 +854,10 @@ class DownloadQueueService:
             return True, "Cancel requested"
 
         with self._state_lock:
-            if self._active_job_id == target_job_id and self._active_cancel_event is not None:
+            if (
+                self._active_job_id == target_job_id
+                and self._active_cancel_event is not None
+            ):
                 self._active_cancel_event.set()
         self._notify_progress_change()
         return True, "Cancel requested"
@@ -756,7 +867,9 @@ class DownloadQueueService:
         with self._progress_condition:
             return self._progress_version
 
-    def wait_for_progress_change(self, previous_version: int, timeout_seconds: float) -> int:
+    def wait_for_progress_change(
+        self, previous_version: int, timeout_seconds: float
+    ) -> int:
         """Block until progress version advances or timeout expires."""
         timeout = max(0.0, float(timeout_seconds))
         with self._progress_condition:
@@ -770,6 +883,15 @@ class DownloadQueueService:
             self._progress_version += 1
             self._progress_condition.notify_all()
 
+    def _update_queue_metrics(self) -> None:
+        """Update queue size and active download metrics."""
+        try:
+            with self._state_lock:
+                active_count = 1 if self._active_job_id else 0
+            metrics.set_active_downloads(active_count)
+        except Exception:
+            pass
+
     def _worker_loop(self):
         while not self._stop_event.is_set():
             job: DownloadJob | None = None
@@ -780,16 +902,15 @@ class DownloadQueueService:
                     self._wake_event.clear()
                     continue
                 self._notify_progress_change()
+                self._update_queue_metrics()
                 self._run_job(job)
+                self._update_queue_metrics()
             except Exception as exc:
                 now = time.time()
                 signature = f"{type(exc).__name__}:{exc}"
-                should_log = (
-                    signature != self._last_worker_error_signature
-                    or (
-                        now - self._last_worker_error_logged_at
-                        >= self._worker_error_log_cooldown_seconds
-                    )
+                should_log = signature != self._last_worker_error_signature or (
+                    now - self._last_worker_error_logged_at
+                    >= self._worker_error_log_cooldown_seconds
                 )
                 trace_log: str | None = None
                 if should_log:
@@ -816,6 +937,13 @@ class DownloadQueueService:
                 self._wake_event.clear()
 
     def _run_job(self, job: DownloadJob):
+        """
+        Execute a single download job with metrics and observability.
+        """
+        # Set context for logging
+        set_job_id(job.job_id)
+        set_book_id(job.book_id)
+
         cancel_event = threading.Event()
         with self._state_lock:
             self._active_job_id = job.job_id
@@ -824,9 +952,34 @@ class DownloadQueueService:
         if self.store.is_cancel_requested(job.job_id):
             cancel_event.set()
 
+        # Track job timing and metrics
+        job_start_time = time.time()
+        primary_format = job.formats[0] if job.formats else "epub"
+
+        logger.info(
+            "Starting download job: job_id=%s, book_id=%s, format=%s",
+            job.job_id,
+            job.book_id,
+            primary_format,
+            extra={
+                "job_id": job.job_id,
+                "book_id": job.book_id,
+                "format": primary_format,
+                "event": "download_started",
+            },
+        )
+
+        # Record metrics
+        metrics.record_download_started(primary_format)
+        metrics.set_active_downloads(1)
+
+        loop: asyncio.AbstractEventLoop | None = None
         try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+
             async def run_download() -> DownloadResult:
-                kernel = self.kernel_factory()
+                kernel = await self.kernel_factory()
                 downloader = kernel["downloader"]
 
                 def report_progress(progress: DownloadProgress):
@@ -841,23 +994,53 @@ class DownloadQueueService:
                         selected_chapters=job.selected_chapters,
                         skip_images=job.skip_images,
                         progress_callback=report_progress,
-                        cancel_check=lambda: self._is_cancel_requested(job.job_id, cancel_event),
+                        cancel_check=lambda: self._is_cancel_requested(
+                            job.job_id, cancel_event
+                        ),
                     )
                 finally:
                     try:
-                        await kernel.http.close()
+                        await kernel.__aexit__(None, None, None)
                     except Exception:
                         pass
 
-            result = asyncio.run(run_download())
+            result = loop.run_until_complete(run_download())
+
+            # Calculate duration and record success metrics
+            duration = time.time() - job_start_time
             self.store.mark_completed(job.job_id, result)
+
+            metrics.record_download_completed(primary_format, duration)
+
+            logger.info(
+                "Download completed: job_id=%s, book_id=%s, format=%s, duration=%.2fs",
+                job.job_id,
+                job.book_id,
+                primary_format,
+                duration,
+                extra={
+                    "job_id": job.job_id,
+                    "book_id": job.book_id,
+                    "format": primary_format,
+                    "duration_seconds": duration,
+                    "event": "download_completed",
+                },
+            )
+
             self._notify_progress_change()
+
         except Exception as exc:
             message = str(exc)
             trace_text = traceback.format_exc()
             trace_log = self._write_error_trace(trace_text, job.job_id)
 
-            if self._is_cancel_requested(job.job_id, cancel_event) or "cancelled" in message.lower():
+            error_type = type(exc).__name__
+            duration = time.time() - job_start_time
+
+            if (
+                self._is_cancel_requested(job.job_id, cancel_event)
+                or "cancelled" in message.lower()
+            ):
                 error_message = message or "Download cancelled by user"
                 self.store.mark_failed(
                     job_id=job.job_id,
@@ -867,6 +1050,22 @@ class DownloadQueueService:
                     details=None,
                     trace_log=trace_log,
                 )
+
+                metrics.record_download_cancelled()
+
+                logger.info(
+                    "Download cancelled: job_id=%s, book_id=%s, duration=%.2fs",
+                    job.job_id,
+                    job.book_id,
+                    duration,
+                    extra={
+                        "job_id": job.job_id,
+                        "book_id": job.book_id,
+                        "duration_seconds": duration,
+                        "event": "download_cancelled",
+                    },
+                )
+
                 self._notify_progress_change()
             else:
                 details = {"trace_log": trace_log} if trace_log else None
@@ -878,12 +1077,48 @@ class DownloadQueueService:
                     details=details,
                     trace_log=trace_log,
                 )
+
+                # Record error metrics
+                metrics.record_download_failed(primary_format, error_type)
+                metrics.record_error(error_type, "download_worker")
+
+                logger.error(
+                    "Download failed: job_id=%s, book_id=%s, error=%s, duration=%.2fs",
+                    job.job_id,
+                    job.book_id,
+                    error_type,
+                    duration,
+                    extra={
+                        "job_id": job.job_id,
+                        "book_id": job.book_id,
+                        "error_type": error_type,
+                        "error_message": message,
+                        "duration_seconds": duration,
+                        "event": "download_failed",
+                    },
+                )
+
                 self._notify_progress_change()
         finally:
+            if loop is not None:
+                try:
+                    tasks = [t for t in asyncio.all_tasks(loop) if not t.done()]
+                    if tasks:
+                        for task in tasks:
+                            task.cancel()
+                        loop.run_until_complete(
+                            asyncio.gather(*tasks, return_exceptions=True)
+                        )
+                    loop.close()
+                except Exception:
+                    pass
             with self._state_lock:
                 if self._active_job_id == job.job_id:
                     self._active_job_id = None
                     self._active_cancel_event = None
+
+            metrics.set_active_downloads(0)
+            self._update_queue_metrics()
             self._wake_event.set()
 
     def _is_cancel_requested(self, job_id: str, cancel_event: threading.Event) -> bool:
@@ -901,7 +1136,9 @@ class DownloadQueueService:
         try:
             self.error_log_dir.mkdir(parents=True, exist_ok=True)
             timestamp = int(time.time() * 1000)
-            log_path = self.error_log_dir / f"download-error-{job_id[:8]}-{timestamp}.log"
+            log_path = (
+                self.error_log_dir / f"download-error-{job_id[:8]}-{timestamp}.log"
+            )
             log_path.write_text(trace_text, encoding="utf-8")
             return str(log_path)
         except Exception:

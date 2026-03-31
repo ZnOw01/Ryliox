@@ -1,0 +1,191 @@
+{
+  "python.analysis.typeCheckingMode": "strict",
+  "python.analysis.autoImportCompletions": true,
+  "python.analysis.autoSearchPaths": true,
+  "python.analysis.diagnosticSeverityOverrides": {
+    "reportMissingTypeStubs": "warning",
+    "reportUnknownMemberType": "warning",
+    "reportUnknownVariableType": "error",
+    "reportUnknownArgumentType": "error",
+    "reportGeneralTypeIssues": "error",
+    "reportOptionalSubscript": "error",
+    "reportOptionalMemberAccess": "error",
+    "reportOptionalCall": "error",
+    "reportOptionalIterable": "error",
+    "reportOptionalContextManager": "error",
+    "reportOptionalOperand": "error"
+  },
+  "python.defaultInterpreterPath": "${workspaceFolder}/.venv/Scripts/python.exe",
+  "python.terminal.activateEnvironment": true,
+  "python.analysis.extraPaths": ["${workspaceFolder}"],
+  "python.testing.pytestEnabled": true,
+  "python.testing.pytestArgs": ["-v", "--tb=short"],
+  "python.testing.autoTestDiscoverOnSaveEnabled": true,
+  "python.linting.enabled": true,
+  "python.linting.pylintEnabled": false,
+  "python.linting.flake8Enabled": false,
+  "python.linting.mypyEnabled": false,
+  "ruff.enable": true,
+  "ruff.organizeImports": true,
+  "ruff.fixAll": true,
+  "ruff.lint.run": "onSave",
+  "editor.formatOnSave": true,
+  "editor.formatOnPaste": true,
+  "editor.formatOnType": true,
+  "editor.codeActionsOnSave": {
+    "source.fixAll": "explicit",
+    "source.organizeImports": "explicit"
+  },
+  "editor.rulers": [88, 100, 120],
+  "editor.tabSize": 4,
+  "editor.insertSpaces": true,
+  "editor.detectIndentation": false,
+  "files.eol": "\n",
+  "files.trimTrailingWhitespace": true,
+  "files.insertFinalNewline": true,
+  "files.trimFinalNewlines": true,
+  "files.exclude": {
+    "**/__pycache__": true,
+    "**/*.pyc": true,
+    "**/.venv": true,
+    "**/.run": true,
+    "**/data": true,
+    "**/output": true,
+    "**/frontend/dist": true,
+    "**/frontend/node_modules": true,
+    "**/.mypy_cache": true,
+    "**/.ruff_cache": true,
+    "**/.pytest_cache": true,
+    "**/coverage": true,
+    "**/.coverage": true
+  },
+  "search.exclude": {
+    "**/__pycache__": true,
+    "**/.venv": true,
+    "**/.run": true,
+    "**/data": true,
+    "**/output": true,
+    "**/frontend/dist": true,
+    "**/frontend/node_modules": true,
+    "**/.mypy_cache": true,
+    "**/.ruff_cache": true,
+    "**/.git": true
+  },
+  "typescript.preferences.includePackageJsonAutoImports": "on",
+  "typescript.suggest.autoImports": true,
+  "javascript.format.insertSpaceAfterConstructor": true,
+  "typescript.format.insertSpaceAfterConstructor": true,
+  "emmet.includeLanguages": {
+    "astro": "html"
+  },
+  "[python]": {
+    "editor.defaultFormatter": "charliermarsh.ruff",
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+      "source.fixAll": "explicit",
+      "source.organizeImports": "explicit"
+    },
+    "editor.rulers": [88]
+  },
+  "[javascript]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.formatOnSave": true,
+    "editor.tabSize": 2
+  },
+  "[typescript]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.formatOnSave": true,
+    "editor.tabSize": 2
+  },
+  "[typescriptreact]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.formatOnSave": true,
+    "editor.tabSize": 2
+  },
+  "[astro]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.formatOnSave": true,
+    "editor.tabSize": 2
+  },
+  "[json]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.formatOnSave": true,
+    "editor.tabSize": 2
+  },
+  "[jsonc]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.formatOnSave": true,
+    "editor.tabSize": 2
+  },
+  "[yaml]": {
+    "editor.defaultFormatter": "redhat.vscode-yaml",
+    "editor.formatOnSave": true,
+    "editor.tabSize": 2
+  },
+  "[markdown]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.formatOnSave": true,
+    "editor.wordWrap": "on",
+    "editor.rulers": [100]
+  },
+  "[toml]": {
+    "editor.defaultFormatter": "tamasfe.even-better-toml",
+    "editor.formatOnSave": true,
+    "editor.tabSize": 2
+  },
+  "[shellscript]": {
+    "editor.defaultFormatter": "foxundermoon.shell-format",
+    "editor.formatOnSave": true,
+    "editor.tabSize": 2
+  },
+  "git.enableSmartCommit": true,
+  "git.confirmSync": false,
+  "git.autofetch": true,
+  "git.branchProtection": ["main", "master"],
+  "git.followTagsWhenSync": true,
+  "git.showPushSuccessNotification": true,
+  "terminal.integrated.defaultProfile.windows": "PowerShell",
+  "terminal.integrated.profiles.windows": {
+    "PowerShell": {
+      "source": "PowerShell",
+      "icon": "terminal-powershell",
+      "args": ["-NoExit", "-Command", "${workspaceFolder}/.venv/Scripts/Activate.ps1"]
+    }
+  },
+  "terminal.integrated.env.windows": {
+    "PYTHONPATH": "${workspaceFolder}"
+  },
+  "terminal.integrated.env.linux": {
+    "PYTHONPATH": "${workspaceFolder}"
+  },
+  "terminal.integrated.env.osx": {
+    "PYTHONPATH": "${workspaceFolder}"
+  },
+  "workbench.editor.tabSizing": "shrink",
+  "workbench.editor.enablePreview": false,
+  "workbench.tree.indent": 20,
+  "explorer.confirmDragAndDrop": false,
+  "explorer.confirmDelete": false,
+  "explorer.confirmPasteNative": false,
+  "explorer.sortOrder": "type",
+  "explorer.fileNesting.enabled": true,
+  "explorer.fileNesting.patterns": {
+    "*.py": "${capture}.pyi, test_${capture}.py",
+    "*.ts": "${capture}.test.ts, ${capture}.spec.ts",
+    "*.tsx": "${capture}.test.tsx, ${capture}.spec.tsx",
+    "*.json": "${capture}.schema.json",
+    "package.json": ".package-lock.json, yarn.lock, pnpm-lock.yaml",
+    "Dockerfile": "docker-compose*.yml, .dockerignore",
+    "requirements.txt": "requirements*.txt",
+    "pyproject.toml": "poetry.lock, pdm.lock"
+  },
+  "sonarlint.connectedMode.project": {
+    "connectionId": "ryliox",
+    "projectKey": "ryliox"
+  },
+  "sonarlint.rules": {
+    "python:S100": { "level": "on" },
+    "python:S101": { "level": "on" },
+    "python:S104": { "level": "on" }
+  }
+}

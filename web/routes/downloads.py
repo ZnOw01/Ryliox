@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import time
+from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, Body, Depends, Query, status
+from fastapi import APIRouter, BackgroundTasks, Body, Depends, Query, Request
 from fastapi.responses import StreamingResponse
 from pydantic import TypeAdapter
 
@@ -15,7 +17,12 @@ from core.download_queue import DownloadQueueService
 from core.kernel import Kernel
 from plugins.downloader import DownloaderPlugin
 from web.api_utils import ErrorCode, error_response, sse_comment, sse_event
-from web.dependencies import get_download_queue, get_kernel, require_same_origin
+from web.dependencies import (
+    get_download_queue,
+    get_kernel,
+    get_request_id,
+    require_same_origin,
+)
 from web.schemas import (
     CancelRequest,
     CancelResponse,
@@ -24,6 +31,7 @@ from web.schemas import (
     ProgressResponse,
 )
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api", tags=["downloads"])
 
 SSE_HEARTBEAT_INTERVAL_SECONDS: float = 15.0
@@ -121,6 +129,72 @@ def _progress_payload(snapshot: dict[str, Any] | None) -> dict[str, Any]:
     return _PROGRESS_ADAPTER.validate_python(normalized).model_dump(exclude_none=True)
 
 
+# Background task functions
+async def cleanup_old_files_task(
+    output_dir: Path,
+    max_age_hours: int = 24,
+    file_extensions: tuple[str, ...] = (".pdf", ".epub"),
+) -> None:
+    """Background task to clean up old generated files.
+
+    This helps prevent disk space issues by removing old files periodically.
+    """
+    try:
+        import asyncio
+        from datetime import datetime, timedelta
+
+        if not output_dir.exists():
+            logger.debug(
+                "Output directory does not exist, skipping cleanup: %s", output_dir
+            )
+            return
+
+        cutoff_time = datetime.now() - timedelta(hours=max_age_hours)
+        removed_count = 0
+
+        for ext in file_extensions:
+            for file_path in output_dir.glob(f"*{ext}"):
+                try:
+                    # Get file modification time
+                    stat = await asyncio.to_thread(file_path.stat)
+                    mtime = datetime.fromtimestamp(stat.st_mtime)
+
+                    if mtime < cutoff_time:
+                        await asyncio.to_thread(file_path.unlink)
+                        removed_count += 1
+                        logger.info("Cleaned up old file: %s", file_path)
+                except OSError as exc:
+                    logger.warning("Failed to clean up file %s: %s", file_path, exc)
+
+        if removed_count > 0:
+            logger.info("Cleanup completed: removed %d old files", removed_count)
+    except Exception as exc:
+        logger.exception("Error during file cleanup: %s", exc)
+
+
+async def notify_progress_task(
+    job_id: str,
+    download_queue: DownloadQueueService,
+    request_id: str,
+) -> None:
+    """Background task to log progress notifications.
+
+    Useful for tracking long-running downloads across different request contexts.
+    """
+    try:
+        snapshot = download_queue.get_progress(job_id=job_id)
+        if snapshot:
+            status = snapshot.get("status", "unknown")
+            logger.info(
+                "[%s] Progress notification for job %s: status=%s",
+                request_id,
+                job_id,
+                status,
+            )
+    except Exception as exc:
+        logger.exception("Error in progress notification task: %s", exc)
+
+
 @router.get(
     "/progress",
     response_model=ProgressResponse,
@@ -138,15 +212,42 @@ def progress(
     dependencies=[Depends(require_same_origin("stream_progress"))],
 )
 async def progress_stream(
+    request: Request,
     job_id: str | None = Query(default=None),
     download_queue: DownloadQueueService = Depends(get_download_queue),
+    request_id: str = Depends(get_request_id),
 ) -> StreamingResponse:
+    """Stream download progress with client disconnection handling.
+
+    Implements graceful disconnect detection and proper cleanup.
+    """
+    logger.info("[%s] Starting SSE stream for job_id=%s", request_id, job_id)
+
     async def event_stream():
         last_signature: str | None = None
         last_heartbeat_at = time.monotonic()
         progress_version = download_queue.get_progress_version()
+        max_iterations = 3600  # 1 hour máximo
+        iteration = 0
+        disconnect_check_interval = 0.5  # Check disconnect every 500ms
+        last_disconnect_check = time.monotonic()
+
         try:
-            while True:
+            while iteration < max_iterations:
+                iteration += 1
+
+                # Check for client disconnection periodically
+                now = time.monotonic()
+                if now - last_disconnect_check >= disconnect_check_interval:
+                    last_disconnect_check = now
+                    if await request.is_disconnected():
+                        logger.info(
+                            "[%s] Client disconnected from SSE stream for job_id=%s",
+                            request_id,
+                            job_id,
+                        )
+                        break
+
                 snapshot = download_queue.get_progress(job_id=job_id)
                 payload = _progress_payload(snapshot)
                 signature = json.dumps(payload, sort_keys=True, separators=(",", ":"))
@@ -154,6 +255,15 @@ async def progress_stream(
                 if signature != last_signature:
                     last_signature = signature
                     yield sse_event("progress", payload)
+
+                # Check for disconnection again before sleeping
+                if await request.is_disconnected():
+                    logger.info(
+                        "[%s] Client disconnected during SSE stream for job_id=%s",
+                        request_id,
+                        job_id,
+                    )
+                    break
 
                 now = time.monotonic()
                 wait = max(
@@ -176,7 +286,15 @@ async def progress_stream(
                         {"ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())},
                     )
         except asyncio.CancelledError:
+            logger.debug("[%s] SSE stream cancelled for job_id=%s", request_id, job_id)
             return
+        except Exception as exc:
+            logger.exception(
+                "[%s] Error in SSE stream for job_id=%s: %s", request_id, job_id, exc
+            )
+            raise
+        finally:
+            logger.info("[%s] SSE stream ended for job_id=%s", request_id, job_id)
 
     return StreamingResponse(
         event_stream(),
@@ -185,6 +303,7 @@ async def progress_stream(
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
             "X-Accel-Buffering": "no",
+            "X-Request-ID": request_id,
         },
     )
 
@@ -211,8 +330,10 @@ def cancel_download(
 )
 def download(
     data: DownloadRequest = Body(default_factory=DownloadRequest),
+    background_tasks: BackgroundTasks = None,
     kernel: Kernel = Depends(get_kernel),
     download_queue: DownloadQueueService = Depends(get_download_queue),
+    request_id: str = Depends(get_request_id),
 ) -> DownloadStartResponse:
     if not data.book_id:
         return error_response(
@@ -268,10 +389,36 @@ def download(
         skip_images=data.skip_images,
     )
 
+    job_id = str(queued_job["job_id"])
+
+    # Schedule background tasks if available
+    if background_tasks:
+        # Clean up old files periodically
+        background_tasks.add_task(
+            cleanup_old_files_task,
+            output_dir,
+            max_age_hours=24,
+            file_extensions=(".pdf", ".epub"),
+        )
+
+        # Log progress notification
+        background_tasks.add_task(
+            notify_progress_task,
+            job_id,
+            download_queue,
+            request_id,
+        )
+
+        logger.info(
+            "[%s] Scheduled background tasks for job %s",
+            request_id,
+            job_id,
+        )
+
     return DownloadStartResponse(
         status=str(queued_job.get("status", "queued")),
         book_id=data.book_id,
-        job_id=str(queued_job["job_id"]),
+        job_id=job_id,
         queue_position=(
             int(queued_job["queue_position"])
             if queued_job.get("queue_position") is not None

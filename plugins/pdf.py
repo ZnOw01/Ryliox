@@ -15,6 +15,7 @@ from .base import Plugin
 
 logger = logging.getLogger(__name__)
 
+
 def _get_weasyprint():
     try:
         import weasyprint
@@ -43,7 +44,9 @@ def _get_beautifulsoup():
         )
         return None, False
 
+
 _BeautifulSoup, _BS4_AVAILABLE = _get_beautifulsoup()
+
 
 def generate_pdf_in_subprocess(
     book_info: dict,
@@ -86,6 +89,7 @@ def generate_pdf_chapters_in_subprocess(
         css_files=css_files,
     )
     return [str(p) for p in pdf_paths]
+
 
 class PdfPlugin(Plugin):
     """Genera PDFs a partir del contenido descargado de un libro usando WeasyPrint."""
@@ -196,6 +200,7 @@ class PdfPlugin(Plugin):
             chapter_title_escaped = self._escape_html(
                 entry.get("title") or f"Chapter {index}"
             )
+            body_escaped = html.escape(str(entry.get("body", "")), quote=False)
             chapter_html = (
                 "<!DOCTYPE html>\n<html>\n<head>\n"
                 f'    <meta charset="utf-8">\n'
@@ -205,7 +210,7 @@ class PdfPlugin(Plugin):
                 "</head>\n<body>\n"
                 '    <section class="chapter">\n'
                 f'        <h1 class="chapter-title">{chapter_title_escaped}</h1>\n'
-                f'        {entry["body"]}\n'
+                f"        {body_escaped}\n"
                 "    </section>\n</body>\n</html>"
             )
 
@@ -251,7 +256,8 @@ class PdfPlugin(Plugin):
             f'<section class="{"chapter chapter-first" if i == 0 else "chapter"}" '
             f'id="{entry["anchor_id"]}">\n'
             f'    <h1 class="chapter-title">{self._escape_html(entry.get("title", ""))}</h1>\n'
-            f'    {entry["body"]}\n' "</section>"
+            f"    {entry['body']}\n"
+            "</section>"
             for i, entry in enumerate(chapter_entries)
         )
 
@@ -479,7 +485,10 @@ class PdfPlugin(Plugin):
 
         if css_files:
             for name in css_files:
-                css_path = styles_dir / Path(name).name
+                css_path = (styles_dir / Path(name).name).resolve()
+                if not str(css_path).startswith(str(styles_dir.resolve())):
+                    logger.warning("CSS path traversal detected, skipping: %s", name)
+                    continue
                 if css_path.exists() and css_path.is_file():
                     css_parts.append(css_path.read_text(encoding="utf-8"))
                 else:

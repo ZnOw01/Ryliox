@@ -1,21 +1,23 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 
-import { getCookies, getHealth, getStatus, saveCookies } from "../lib/api";
-import { queryKeys } from "../lib/query-keys";
+import { getCookies, getHealth, getStatus, saveCookies } from '../lib/api';
+import { queryKeys } from '../lib/query-keys';
+import { EnhancedEmptyState } from './ui/EnhancedEmptyState';
 
-type StatusTone = "green" | "amber" | "red";
+type StatusTone = 'green' | 'amber' | 'red';
 
-function formatAuthReason(reason: string | null | undefined): string {
+function formatAuthReason(reason: string | null | undefined, t: (key: string) => string): string {
   if (!reason) {
-    return "desconocido";
+    return t('auth.status.reason.unknown');
   }
   const labels: Record<string, string> = {
-    network_error: "servicio no disponible",
-    not_authenticated: "sesion no autenticada",
-    subscription_expired: "suscripcion expirada",
+    network_error: t('auth.status.reason.network_error'),
+    not_authenticated: t('auth.status.reason.not_authenticated'),
+    subscription_expired: t('auth.status.reason.subscription_expired'),
   };
-  return labels[reason] ?? reason.replace(/_/g, " ");
+  return labels[reason] ?? reason.replace(/_/g, ' ');
 }
 
 function formatUptime(seconds: number): string {
@@ -31,11 +33,12 @@ function formatUptime(seconds: number): string {
 }
 
 export function AuthStatusCard() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
-  const [cookiesText, setCookiesText] = useState("");
+  const [cookiesText, setCookiesText] = useState('');
   const [showCookieEditor, setShowCookieEditor] = useState(false);
-  const [hasPrefilledCookies, setHasPrefilledCookies] = useState(false);
   const cookiesTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const hasPrefilledRef = useRef(false);
 
   const statusQuery = useQuery({
     queryKey: queryKeys.authStatus,
@@ -51,7 +54,7 @@ export function AuthStatusCard() {
   const authStatus = statusQuery.data ?? null;
 
   const sessionHealthy = Boolean(
-    authStatus?.valid || (authStatus?.reason === "network_error" && authStatus?.has_cookies),
+    authStatus?.valid || (authStatus?.reason === 'network_error' && authStatus?.has_cookies)
   );
   const checkingSession = statusQuery.isPending && !authStatus;
   const shouldShowCookieEditor = showCookieEditor || (!checkingSession && !sessionHealthy);
@@ -65,7 +68,7 @@ export function AuthStatusCard() {
 
   useEffect(() => {
     if (!shouldShowCookieEditor) {
-      setHasPrefilledCookies(false);
+      hasPrefilledRef.current = false;
     }
   }, [shouldShowCookieEditor]);
 
@@ -74,12 +77,12 @@ export function AuthStatusCard() {
     if (!storedCookies || Object.keys(storedCookies).length === 0) {
       return;
     }
-    if (cookiesText.trim().length > 0 || hasPrefilledCookies) {
+    if (cookiesText.trim().length > 0 || hasPrefilledRef.current) {
       return;
     }
     setCookiesText(JSON.stringify(storedCookies, null, 2));
-    setHasPrefilledCookies(true);
-  }, [cookiesQuery.data?.cookies, cookiesText, hasPrefilledCookies]);
+    hasPrefilledRef.current = true;
+  }, [cookiesQuery.data?.cookies]);
 
   const cookiesMutation = useMutation({
     mutationFn: async (raw: string) => {
@@ -92,8 +95,8 @@ export function AuthStatusCard() {
       return saveCookies(parsed);
     },
     onSuccess: async () => {
-      setCookiesText("");
-      setHasPrefilledCookies(false);
+      setCookiesText('');
+      hasPrefilledRef.current = false;
       setShowCookieEditor(false);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: queryKeys.authStatus }),
@@ -103,35 +106,41 @@ export function AuthStatusCard() {
   });
 
   const statusLabel = !authStatus
-    ? "Verificando sesion..."
+    ? t('auth.status.checking')
     : authStatus.valid
-      ? "Sesion valida"
-      : authStatus.reason === "network_error" && authStatus.has_cookies
-        ? "Cookies cargadas (red no disponible)"
-        : `Sesion invalida (${formatAuthReason(authStatus.reason)})`;
+      ? t('auth.status.valid')
+      : authStatus.reason === 'network_error' && authStatus.has_cookies
+        ? t('auth.status.cookies_loaded')
+        : `${t('auth.status.invalid')} (${formatAuthReason(authStatus.reason, t)})`;
   const statusTone: StatusTone = !authStatus
-    ? "amber"
+    ? 'amber'
     : authStatus.valid
-      ? "green"
-      : authStatus.reason === "network_error" && authStatus.has_cookies
-        ? "amber"
-        : "red";
+      ? 'green'
+      : authStatus.reason === 'network_error' && authStatus.has_cookies
+        ? 'amber'
+        : 'red';
   const badgeClassName =
-    statusTone === "green"
-      ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-      : statusTone === "amber"
-        ? "border-amber-200 bg-amber-50 text-amber-800"
-        : "border-red-200 bg-red-50 text-red-700";
+    statusTone === 'green'
+      ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+      : statusTone === 'amber'
+        ? 'border-amber-200 bg-amber-50 text-amber-800'
+        : 'border-red-200 bg-red-50 text-red-700';
 
   function StatusIcon() {
-    if (statusTone === "green") {
+    if (statusTone === 'green') {
       return (
         <svg className="h-3.5 w-3.5 shrink-0" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-          <path d="M3 8l3.5 3.5L13 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          <path
+            d="M3 8l3.5 3.5L13 5"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
         </svg>
       );
     }
-    if (statusTone === "amber") {
+    if (statusTone === 'amber') {
       return (
         <svg className="h-3.5 w-3.5 shrink-0" viewBox="0 0 16 16" fill="none" aria-hidden="true">
           <path d="M8 5v4M8 11v.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
@@ -147,7 +156,7 @@ export function AuthStatusCard() {
 
   const persistedCookieCount = useMemo(
     () => Object.keys(cookiesQuery.data?.cookies ?? {}).length,
-    [cookiesQuery.data?.cookies],
+    [cookiesQuery.data?.cookies]
   );
 
   useEffect(() => {
@@ -160,7 +169,7 @@ export function AuthStatusCard() {
       return;
     }
 
-    el.style.height = "auto";
+    el.style.height = 'auto';
     const minHeight = 160;
     const maxHeight = Math.round(window.innerHeight * 0.62);
     const targetHeight = Math.min(maxHeight, Math.max(minHeight, el.scrollHeight + 2));
@@ -168,9 +177,9 @@ export function AuthStatusCard() {
   }, [cookiesText, shouldShowCookieEditor]);
 
   return (
-    <section className="soft-rise min-w-0 self-start overflow-hidden rounded-2xl border border-slate-200/90 bg-white/95 p-5 shadow-panel backdrop-blur">
-      <div className="mb-3 flex min-w-0 flex-wrap items-center justify-between gap-3">
-        <h2 className="text-lg font-semibold text-ink">Autenticacion</h2>
+    <section className="soft-rise min-w-0 flex-shrink-0 self-start overflow-hidden rounded-2xl border border-border bg-card p-5 shadow-panel backdrop-blur-sm">
+      <div className="mb-4 flex min-w-0 flex-wrap items-center justify-between gap-3">
+        <h2 className="text-lg font-semibold leading-tight text-foreground">{t('auth.title')}</h2>
         <button
           type="button"
           onClick={() => {
@@ -180,108 +189,175 @@ export function AuthStatusCard() {
               void queryClient.invalidateQueries({ queryKey: queryKeys.storedCookies });
             }
           }}
-          className="flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
+          className="flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-xs font-medium text-foreground transition hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
-          <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-            <path d="M13.5 8A5.5 5.5 0 1 1 8 2.5" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" />
-            <path d="M6.5 1.5L8 2.5L6.5 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+          <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <path
+              d="M13.5 8A5.5 5.5 0 1 1 8 2.5"
+              stroke="currentColor"
+              strokeWidth="1.75"
+              strokeLinecap="round"
+            />
+            <path
+              d="M6.5 1.5L8 2.5L6.5 3.5"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
           </svg>
-          Actualizar
+          {t('auth.refresh')}
         </button>
       </div>
 
-      <div className="mb-3 flex min-w-0 items-center gap-2">
+      <div className="mb-4 flex min-w-0 items-center gap-2">
         <span
           role="status"
           aria-live="polite"
-          className={`inline-flex max-w-full flex-wrap items-center gap-1.5 break-words rounded-full border px-2.5 py-1 text-xs font-semibold ${badgeClassName}`}
+          className={`inline-flex max-w-full flex-wrap items-center gap-2 break-words rounded-full border px-3 py-1.5 text-xs font-semibold leading-tight ${badgeClassName}`}
         >
           <StatusIcon />
           {statusLabel}
         </span>
       </div>
       {healthQuery.data ? (
-        <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1">
-          <p className="flex items-center gap-1.5 text-xs text-slate-500" role="status" aria-live="polite" aria-atomic="true">
-            <span className={`h-1.5 w-1.5 rounded-full ${healthQuery.data.status === "ok" ? "bg-emerald-400" : "bg-amber-400"}`} />
-            {healthQuery.data.status === "ok" ? "Servicio disponible" : `Servicio: ${healthQuery.data.status}`}
+        <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-2">
+          <p
+            className="flex items-center gap-2 text-xs text-muted-foreground"
+            role="status"
+            aria-live="polite"
+            aria-atomic="true"
+          >
+            <span
+              className={`h-2 w-2 rounded-full ${healthQuery.data.status === 'ok' ? 'bg-emerald-400' : 'bg-amber-400'}`}
+            />
+            {healthQuery.data.status === 'ok'
+              ? t('auth.service.available')
+              : `Servicio: ${healthQuery.data.status}`}
           </p>
-          {typeof healthQuery.data.uptime_seconds === "number" ? (
-            <p className="text-xs text-slate-400">
-              Uptime: {formatUptime(healthQuery.data.uptime_seconds)}
+          {typeof healthQuery.data.uptime_seconds === 'number' ? (
+            <p className="text-xs text-muted-foreground">
+              {t('auth.uptime')}: {formatUptime(healthQuery.data.uptime_seconds)}
             </p>
           ) : null}
         </div>
       ) : null}
-      {!healthQuery.data && healthQuery.isFetching ? <p className="mb-3 text-xs text-slate-500" role="status" aria-live="polite">Verificando servicio...</p> : null}
-      {healthQuery.error ? <p className="mb-3 text-sm text-red-600" role="alert" aria-live="assertive">Servicio no disponible: {(healthQuery.error as Error).message}</p> : null}
-      {statusQuery.error ? <p className="mb-3 text-sm text-red-600" role="alert" aria-live="assertive">{(statusQuery.error as Error).message}</p> : null}
-      {sessionHealthy && persistedCookieCount > 0 && !shouldShowCookieEditor ? (
-        <p className="mb-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800" role="status" aria-live="polite" aria-atomic="true">
-          Cookies guardadas: {persistedCookieCount}
+      {!healthQuery.data && healthQuery.isFetching ? (
+        <p className="mb-4 text-xs text-muted-foreground" role="status" aria-live="polite">
+          {t('auth.service.checking')}
         </p>
+      ) : null}
+      {healthQuery.error ? (
+        <p className="mb-4 text-sm text-destructive" role="alert" aria-live="assertive">
+          {t('auth.service.unavailable')}: {(healthQuery.error as Error).message}
+        </p>
+      ) : null}
+      {statusQuery.error ? (
+        <p className="mb-4 text-sm text-destructive" role="alert" aria-live="assertive">
+          {(statusQuery.error as Error).message}
+        </p>
+      ) : null}
+      {sessionHealthy && persistedCookieCount > 0 && !shouldShowCookieEditor ? (
+        <p
+          className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs leading-tight text-emerald-800"
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+        >
+          {t('auth.cookies.saved')}: {persistedCookieCount}
+        </p>
+      ) : null}
+
+      {/* Empty state mejorado cuando no hay cookies */}
+      {!sessionHealthy && persistedCookieCount === 0 && !shouldShowCookieEditor ? (
+        <EnhancedEmptyState
+          type="cookies"
+          variant="default"
+          action={{
+            label: t('auth.cookies.configure'),
+            onClick: () => {
+              setCookiesText('');
+              hasPrefilledRef.current = false;
+              setShowCookieEditor(true);
+            },
+            variant: 'primary',
+          }}
+        />
       ) : null}
 
       {shouldShowCookieEditor ? (
         <div id="cookie-editor">
-          <label className="mb-2 block text-xs font-medium uppercase tracking-wide text-slate-500" htmlFor="cookies-payload">
-            Cookies (JSON o encabezado HTTP)
+          <label
+            className="mb-2 block text-xs font-medium uppercase tracking-wide text-muted-foreground"
+            htmlFor="cookies-payload"
+          >
+            {t('auth.cookies.label')}
           </label>
           <textarea
             id="cookies-payload"
             ref={cookiesTextareaRef}
             value={cookiesText}
-            onChange={(event) => setCookiesText(event.target.value)}
-            placeholder='{"cookie": "value"} o "a=1; b=2"'
-            className="w-full resize-none overflow-y-auto rounded-xl border border-slate-700/70 bg-slate-950 p-3 font-mono text-xs leading-5 text-slate-100 outline-none ring-brand placeholder:text-slate-400 focus:border-brand focus:ring-2"
+            onChange={event => setCookiesText(event.target.value)}
+            placeholder={t('auth.cookies.placeholder')}
+            className="w-full resize-none overflow-y-auto rounded-lg border border-border bg-background p-3 font-mono text-xs leading-relaxed text-foreground outline-none ring-ring placeholder:text-muted-foreground focus:border-primary focus:ring-2"
           />
 
-          <div className="mt-3 grid gap-2 sm:flex sm:flex-wrap sm:items-center sm:gap-3">
+          <div className="mt-4 grid gap-3 sm:flex sm:flex-wrap sm:items-center sm:gap-3">
             <button
               type="button"
               onClick={() => cookiesMutation.mutate(cookiesText)}
               disabled={!cookiesText.trim() || cookiesMutation.isPending}
-              className="flex w-full items-center justify-center gap-2 rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/60 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+              className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
             >
               {cookiesMutation.isPending ? (
                 <>
-                  <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-                  Guardando...
+                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                  {t('auth.cookies.saving')}
                 </>
-              ) : "Guardar cookies"}
+              ) : (
+                t('auth.cookies.save')
+              )}
             </button>
 
             {sessionHealthy ? (
               <button
                 type="button"
                 onClick={() => setShowCookieEditor(false)}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs font-medium text-slate-700 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40 sm:w-auto"
+                className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-xs font-medium text-foreground transition hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:w-auto"
               >
-                Ocultar editor
+                {t('auth.cookies.hide_editor')}
               </button>
             ) : null}
 
-            {cookiesQuery.isFetching ? <span className="text-xs text-slate-500" role="status" aria-live="polite">Cargando cookies guardadas...</span> : null}
+            {cookiesQuery.isFetching ? (
+              <span className="text-xs text-muted-foreground" role="status" aria-live="polite">
+                {t('auth.cookies.loading')}
+              </span>
+            ) : null}
           </div>
         </div>
       ) : (
-        <div className="mt-2">
+        <div className="mt-4">
           <button
             type="button"
             onClick={() => {
-              setCookiesText("");
-              setHasPrefilledCookies(false);
+              setCookiesText('');
+              hasPrefilledRef.current = false;
               setShowCookieEditor(true);
             }}
             aria-expanded={shouldShowCookieEditor}
-              className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-medium text-slate-700 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
+            className="rounded-lg border border-border bg-background px-3 py-2.5 text-xs font-medium text-foreground transition hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
-              Ver / editar cookies
+            {t('auth.cookies.show_editor')}
           </button>
         </div>
       )}
 
-      {cookiesMutation.error ? <p className="mt-2 text-sm text-red-600" role="alert" aria-live="assertive">{(cookiesMutation.error as Error).message}</p> : null}
+      {cookiesMutation.error ? (
+        <p className="mt-4 text-sm text-destructive" role="alert" aria-live="assertive">
+          {(cookiesMutation.error as Error).message}
+        </p>
+      ) : null}
     </section>
   );
 }

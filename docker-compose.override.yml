@@ -1,0 +1,80 @@
+# Docker Compose override for development
+# This file is automatically loaded by docker-compose alongside docker-compose.yml
+# Usage: docker-compose up -d (will merge with docker-compose.yml)
+
+version: '3.8'
+
+services:
+  ryliox:
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+      target: development
+    
+    # Override ports for development
+    ports:
+      - "8000:8000"
+      - "5678:5678"  # Debugpy port
+    
+    # Development environment variables
+    environment:
+      - HOST=0.0.0.0
+      - PORT=8000
+      - PYTHONDONTWRITEBYTECODE=1
+      - PYTHONUNBUFFERED=1
+      - PYTHONUTF8=1
+      - PYTHONDONTWRITEBYTECODE=1
+      - PYTHONDEVMODE=1
+      - DATA_DIR=/app/data
+      - OUTPUT_DIR=/app/output
+      - LOG_LEVEL=debug
+      - DEBUG=1
+      - RELOAD=1
+    
+    # Mount source code for hot reloading
+    volumes:
+      # Mount source code
+      - ./core:/app/core:ro
+      - ./plugins:/app/plugins:ro
+      - ./utils:/app/utils:ro
+      - ./web:/app/web:ro
+      - ./config.py:/app/config.py:ro
+      - ./launcher.py:/app/launcher.py:ro
+      - ./pyproject.toml:/app/pyproject.toml:ro
+      - ./pytest.ini:/app/pytest.ini:ro
+      - ./requirements.txt:/app/requirements.txt:ro
+      # Mount frontend source for development
+      - ./frontend/src:/app/frontend/src:ro
+      - ./frontend/public:/app/frontend/public:ro
+      - ./frontend/package.json:/app/frontend/package.json:ro
+      - ./frontend/astro.config.mjs:/app/frontend/astro.config.mjs:ro
+      # Data volumes (read-write)
+      - ./data:/app/data
+      - ./output:/app/output
+      # Prevent node_modules and other generated files from being overwritten
+      - /app/frontend/node_modules
+      - /app/frontend/dist
+      - /app/__pycache__
+    
+    # Disable health check for faster development restarts
+    healthcheck:
+      disable: true
+    
+    # Override command for development
+    command: ["python", "-m", "uvicorn", "web.server:create_app", "--host", "0.0.0.0", "--port", "8000", "--reload", "--reload-dir", "."]
+    
+    # Remove resource limits for development
+    deploy:
+      resources:
+        limits: {}
+        reservations: {}
+    
+    # Override security settings for development
+    read_only: false
+    cap_drop: []
+    security_opt: []
+
+# Development volumes
+volumes:
+  # Anonymous volume for node_modules
+  node_modules:

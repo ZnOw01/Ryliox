@@ -1,0 +1,66 @@
+{
+  "recommendations": [
+    // Python
+    "ms-python.python",
+    "ms-python.vscode-pylance",
+    "charliermarsh.ruff",
+    "matangover.mypy",
+
+    // TypeScript/JavaScript
+    "esbenp.prettier-vscode",
+    "ms-vscode.vscode-typescript-next",
+
+    // Astro
+    "astro-build.astro-vscode",
+
+    // Tailwind CSS
+    "bradlc.vscode-tailwindcss",
+
+    // Shell scripting
+    "foxundermoon.shell-format",
+
+    // Git
+    "eamodio.gitlens",
+    "github.vscode-pull-request-github",
+    "GitHub.vscode-github-actions",
+
+    // Testing
+    "ms-vscode.test-adapter-converter",
+    "hbenl.vscode-test-explorer",
+
+    // Quality & Linting
+    "SonarSource.sonarlint-vscode",
+    "codeclimate.codeclimate",
+
+    // Documentation
+    "yzhang.markdown-all-in-one",
+    "bierner.markdown-preview-github-styles",
+
+    // Configuration files
+    "redhat.vscode-yaml",
+    "tamasfe.even-better-toml",
+
+    // Pre-commit
+    "elagil.pre-commit-vscode",
+
+    // Conveniencia
+    "usernamehw.errorlens",
+    "aaron-bond.better-comments",
+    "shardulm94.trailing-spaces",
+    "streetsidesoftware.code-spell-checker",
+    "wayou.vscode-todo-highlight",
+    "emmanuelbeziat.vscode-great-icons"
+  ],
+  "unwantedRecommendations": [
+    // Desactivamos extensiones que reemplazamos con Ruff
+    "ms-python.flake8",
+    "ms-python.black-formatter",
+    "ms-python.isort",
+    "ms-python.pylint",
+
+    // Desactivamos extensiones obsoletas o conflictivas
+    "hookyqr.beautify",
+    "dbaeumer.vscode-eslint",
+    "octref.vetur"
+  ]
+}

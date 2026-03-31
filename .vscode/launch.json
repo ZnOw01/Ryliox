@@ -1,0 +1,132 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Python: Current File",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${file}",
+      "console": "integratedTerminal",
+      "justMyCode": false,
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}",
+        "PYTHONASYNCIODEBUG": "1"
+      }
+    },
+    {
+      "name": "Python: FastAPI (Web Server)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "web.server",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": false,
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}",
+        "DEBUG": "1",
+        "ENVIRONMENT": "development"
+      }
+    },
+    {
+      "name": "Python: Launcher",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "launcher",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": false,
+      "args": ["--backend-only", "--no-browser"],
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}",
+        "DEBUG": "1"
+      }
+    },
+    {
+      "name": "Python: Tests",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": false,
+      "args": ["-xvs", "--tb=short", "${file}"],
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}",
+        "PYTEST_CURRENT_TEST": "1"
+      }
+    },
+    {
+      "name": "Python: Tests (Coverage)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": false,
+      "args": ["-xvs", "--cov=core", "--cov=plugins", "--cov=web", "--cov-report=html:htmlcov", "${file}"],
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}",
+        "PYTEST_CURRENT_TEST": "1"
+      }
+    },
+    {
+      "name": "Python: Attach to Process",
+      "type": "debugpy",
+      "request": "attach",
+      "connect": {
+        "host": "localhost",
+        "port": 5678
+      },
+      "justMyCode": false
+    },
+    {
+      "name": "Node.js: Frontend Build",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "build"],
+      "cwd": "${workspaceFolder}/frontend",
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Node.js: Frontend Dev (Astro)",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "cwd": "${workspaceFolder}/frontend",
+      "console": "integratedTerminal",
+      "env": {
+        "NODE_ENV": "development"
+      }
+    },
+    {
+      "name": "Docker: Attach to Python",
+      "type": "debugpy",
+      "request": "attach",
+      "connect": {
+        "host": "localhost",
+        "port": 5678
+      },
+      "pathMappings": [
+        {
+          "localRoot": "${workspaceFolder}",
+          "remoteRoot": "/app"
+        }
+      ],
+      "justMyCode": false
+    }
+  ],
+  "compounds": [
+    {
+      "name": "Full Stack: Backend + Frontend",
+      "configurations": ["Python: FastAPI (Web Server)", "Node.js: Frontend Dev (Astro)"],
+      "stopAll": true
+    },
+    {
+      "name": "Full Stack: Launcher + Tests",
+      "configurations": ["Python: Launcher", "Python: Tests"],
+      "stopAll": true
+    }
+  ]
+}

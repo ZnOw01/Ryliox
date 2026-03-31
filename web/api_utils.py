@@ -35,6 +35,9 @@ class ErrorCode(StrEnum):
     PATH_REQUIRED = "path_required"
     PATH_NOT_FOUND = "path_not_found"
     REVEAL_FAILED = "reveal_failed"
+    ACCESS_DENIED = "access_denied"
+    AUTH_REQUIRED = "auth_required"
+    SEARCH_FAILED = "search_failed"
 
 
 def error_response(

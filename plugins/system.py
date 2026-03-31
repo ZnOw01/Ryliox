@@ -22,7 +22,7 @@ _PLATFORM = platform.system()
 
 
 class SystemPlugin(Plugin):
-    """Operaciones de sistema específicas de plataforma (diálogos, gestor de archivos)."""
+    """Platform-specific system operations (dialogs, file manager)."""
 
     async def _run_subprocess(
         self,
@@ -30,11 +30,11 @@ class SystemPlugin(Plugin):
         timeout: float,
         env: dict[str, str] | None = None,
     ) -> tuple[int | None, str, str]:
-        """Ejecuta un subproceso con timeout y captura de salida.
+        """Execute a subprocess with timeout and capture output.
 
         Returns:
-            (returncode, stdout, stderr). returncode es None si hubo timeout
-            o error de lanzamiento.
+            (returncode, stdout, stderr). returncode is None if there was a timeout
+            or launch error.
         """
         try:
             process = await asyncio.create_subprocess_exec(
@@ -44,7 +44,7 @@ class SystemPlugin(Plugin):
                 env=env,
             )
         except (FileNotFoundError, PermissionError) as exc:
-            logger.debug("No se pudo lanzar %r: %s", args[0], exc)
+            logger.debug("Could not launch %r: %s", args[0], exc)
             return None, "", str(exc)
 
         try:
@@ -55,7 +55,7 @@ class SystemPlugin(Plugin):
         except asyncio.TimeoutError:
             process.kill()
             await process.communicate()
-            logger.warning("Subproceso %r agotó el timeout de %.0fs.", args[0], timeout)
+            logger.warning("Subprocess %r timed out after %.0fs.", args[0], timeout)
             return None, "", "timeout"
 
         stdout = stdout_bytes.decode("utf-8", errors="replace") if stdout_bytes else ""
@@ -64,16 +64,16 @@ class SystemPlugin(Plugin):
 
     @staticmethod
     def _escape_applescript_literal(value: str) -> str:
-        """Escapa backslashes y comillas dobles para un literal AppleScript."""
+        """Escape backslashes and double quotes for an AppleScript literal."""
         return value.replace("\\", "\\\\").replace('"', '\\"')
 
     async def show_folder_picker(
         self, initial_dir: Path | str | None = None
     ) -> Path | None:
-        """Muestra el diálogo nativo de selección de carpeta.
+        """Show the native folder selection dialog.
 
         Returns:
-            Path seleccionado por el usuario, o None si canceló o falló.
+            Path selected by the user, or None if cancelled or failed.
         """
         initial = str(initial_dir) if initial_dir else None
 
@@ -86,10 +86,10 @@ class SystemPlugin(Plugin):
                 return await self._show_windows_picker(initial)
         except Exception:
             logger.exception(
-                "Error inesperado en show_folder_picker (platform=%r).", _PLATFORM
+                "Unexpected error in show_folder_picker (platform=%r).", _PLATFORM
             )
 
-        logger.debug("Plataforma no soportada para folder picker: %r.", _PLATFORM)
+        logger.debug("Platform not supported for folder picker: %r.", _PLATFORM)
         return None
 
     async def _show_macos_picker(self, initial_dir: str | None) -> Path | None:
@@ -132,7 +132,7 @@ class SystemPlugin(Plugin):
             ]
         else:
             logger.debug(
-                "No se encontró zenity ni kdialog para el folder picker en Linux."
+                "Neither zenity nor kdialog found for the folder picker on Linux."
             )
             return None
 
@@ -173,14 +173,14 @@ if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {{
         return None
 
     async def reveal_in_file_manager(self, path: Path | str) -> bool:
-        """Abre el gestor de archivos y selecciona el archivo indicado.
+        """Open the file manager and select the indicated file.
 
         Returns:
-            True si el comando se lanzó con éxito, False en caso contrario.
+            True if the command was launched successfully, False otherwise.
         """
         resolved = Path(path).resolve()
         if not resolved.exists():
-            logger.warning("reveal_in_file_manager: ruta no existe: %s", resolved)
+            logger.warning("reveal_in_file_manager: path does not exist: %s", resolved)
             return False
 
         try:
@@ -205,7 +205,7 @@ if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {{
                     timeout=_REVEAL_TIMEOUT_SECONDS,
                 )
         except Exception:
-            logger.exception("Error inesperado en reveal_in_file_manager: %s", resolved)
+            logger.exception("Unexpected error in reveal_in_file_manager: %s", resolved)
             return False
 
         return rc == 0

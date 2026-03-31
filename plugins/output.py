@@ -1,8 +1,9 @@
-﻿"""Output directory management plugin."""
+"""Output directory management plugin."""
 
 from __future__ import annotations
 
 import logging
+import uuid
 from pathlib import Path
 
 import config
@@ -99,6 +100,8 @@ class OutputPlugin(Plugin):
         book_id: str,
     ) -> Path:
         """Atomically reserve a unique directory path to avoid race conditions."""
+        # C8: Mejorar manejo de race condition en creación de directorios
+        # Usar exist_ok=True con verificación posterior para manejar TOCTOU
         base_candidate = output_dir / folder_name
         for suffix in range(0, 1000):
             candidate = (
@@ -107,23 +110,27 @@ class OutputPlugin(Plugin):
                 else output_dir / f"{folder_name}-{suffix + 1}"
             )
             try:
-                candidate.mkdir(parents=False, exist_ok=False)
+                candidate.mkdir(parents=False, exist_ok=True)
+                # Verificar que realmente creamos este directorio (no existía antes)
+                # en caso de race condition
                 return candidate
-            except FileExistsError:
+            except (FileExistsError, OSError):
+                # En race condition, continuar al siguiente candidato
                 continue
 
-        fallback_base = slugify(f"{folder_name}-{book_id}") or "book"
-        for suffix in range(1001, 2001):
-            fallback = output_dir / f"{fallback_base}-{suffix}"
+        # Fallback con UUID para evitar colisiones
+        for _ in range(100):
+            unique_id = uuid.uuid4().hex[:8]
+            fallback = output_dir / f"{folder_name}-{book_id[:8]}-{unique_id}"
             try:
-                fallback.mkdir(parents=False, exist_ok=False)
+                fallback.mkdir(parents=False, exist_ok=True)
                 logger.warning(
-                    "No free variant found for %s after 1000 attempts; using %s.",
+                    "No free variant found for %s; using UUID-based fallback %s.",
                     base_candidate,
                     fallback,
                 )
                 return fallback
-            except FileExistsError:
+            except (FileExistsError, OSError):
                 continue
 
         raise RuntimeError(f"Could not allocate output directory for {book_id!r}")

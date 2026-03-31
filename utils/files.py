@@ -1,4 +1,8 @@
-"""File system utilities: filename sanitization and slug generation."""
+"""File system utilities: filename sanitization and slug generation.
+
+This module provides functions for safe filename handling,
+slug generation for URLs/paths, and text normalization.
+"""
 
 from __future__ import annotations
 
@@ -90,6 +94,10 @@ def sanitize_filename(name: str | None) -> str:
         'unnamed_file'
     """
     name = "" if name is None else str(name)
+
+    # Validar path traversal
+    if ".." in name or name.startswith(("/", "\\", "~", "$")):
+        name = name.replace("..", "-").lstrip("/\\~$")
 
     name = _CONTROL_CHARS_RE.sub("", name)
 

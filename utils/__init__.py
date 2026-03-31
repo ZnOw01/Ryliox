@@ -1,4 +1,4 @@
-"""Shared utilities."""
+"""Shared utilities for file handling, text processing, and common operations."""
 
 from __future__ import annotations
 

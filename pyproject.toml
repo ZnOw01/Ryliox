@@ -1,0 +1,143 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "ryliox"
+version = "0.1.0"
+description = "Exporta libros de O'Reilly Learning en PDF o EPUB con cola y progreso en tiempo real"
+readme = "README.md"
+license = {file = "LICENSE"}
+requires-python = ">=3.11"
+classifiers = [
+    "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+]
+dependencies = [
+    "beautifulsoup4==4.14.3",
+    "bleach>=6.3.0",
+    "certifi==2026.2.25",
+    "charset-normalizer==3.4.5",
+    "fake-useragent>=1.5.1,<2.0.0",
+    "fastapi>=0.135.1,<1.0.0",
+    "httpx==0.28.1",
+    "idna==3.11",
+    "lxml==6.0.2",
+    "pydantic-settings>=2.13.1,<3.0.0",
+    "python-dotenv>=1.2.2,<2.0.0",
+    "six==1.17.0",
+    "soupsieve==2.8.3",
+    "typing_extensions==4.15.0",
+    "urllib3==2.6.3",
+    "uvicorn>=0.41.0,<1.0.0",
+    "weasyprint>=68.1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-mock>=3.10.0",
+    "pytest-cov>=4.1.0",
+    "httpx>=0.24.0",  # For TestClient
+    # DX Tools
+    "ruff>=0.3.0",
+    "mypy>=1.9.0",
+    "pre-commit>=3.6.0",
+    "commitizen>=3.18.0",
+    "bandit[toml]>=1.7.7",
+    "pip-audit>=2.7.0",
+    "vulture>=2.11",
+    "pdoc>=14.4",
+    # Types
+    "types-beautifulsoup4>=4.12.0",
+    "types-python-dateutil>=2.8.19",
+    "types-requests>=2.31.0",
+]
+test = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-mock>=3.10.0",
+    "pytest-cov>=4.1.0",
+    "httpx>=0.24.0",
+    "playwright>=1.40.0",
+    "locust>=2.20.0",
+    "requests>=2.31.0",
+]
+
+[project.scripts]
+ryliox = "launcher:main"
+
+[project.urls]
+Homepage = "https://github.com/ZnOw01/Ryliox"
+Repository = "https://github.com/ZnOw01/Ryliox"
+Documentation = "https://github.com/ZnOw01/Ryliox/blob/main/README.md"
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "-v",
+    "--strict-markers",
+    "--tb=short",
+    "--disable-warnings",
+]
+markers = [
+    "integration: Integration tests (requires running services)",
+    "e2e: End-to-end tests with Playwright (requires server running)",
+    "performance: Performance and load tests",
+    "security: Security vulnerability tests",
+    "slow: Tests that take longer than 10 seconds",
+    "rate_limit: Tests related to rate limiting",
+]
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::UserWarning",
+]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+
+[tool.coverage.run]
+source = ["core", "plugins", "web"]
+omit = [
+    "tests/*",
+    "*/tests/*",
+    "*/test_*",
+    "frontend/*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+]
+show_missing = true
+skip_covered = false
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+warn_unreachable = true
+strict_equality = true
+
+[[tool.mypy.overrides]]
+module = ["tests.*"]
+disallow_untyped_defs = false
+disallow_incomplete_defs = false

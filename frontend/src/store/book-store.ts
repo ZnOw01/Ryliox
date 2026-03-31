@@ -1,6 +1,6 @@
-import { create } from "zustand";
+import { create } from 'zustand';
 
-import type { SearchBook } from "../lib/types";
+import type { SearchBook } from '../lib/types';
 
 type BookState = {
   selectedBook: SearchBook | null;
@@ -12,19 +12,19 @@ type BookState = {
   reset: () => void;
 };
 
-const DEFAULT_FORMAT = "epub";
+const DEFAULT_FORMAT = 'epub';
 
-export const useBookStore = create<BookState>((set) => ({
+export const useBookStore = create<BookState>(set => ({
   selectedBook: null,
   format: DEFAULT_FORMAT,
   skipImages: false,
-  setSelectedBook: (selectedBook) => set({ selectedBook }),
-  setFormat: (format) => set({ format }),
-  setSkipImages: (skipImages) => set({ skipImages }),
+  setSelectedBook: selectedBook => set({ selectedBook }),
+  setFormat: format => set({ format }),
+  setSkipImages: skipImages => set({ skipImages }),
   reset: () =>
     set({
       selectedBook: null,
       format: DEFAULT_FORMAT,
-      skipImages: false
-    })
+      skipImages: false,
+    }),
 }));

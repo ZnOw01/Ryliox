@@ -1,0 +1,114 @@
+# See https://pre-commit.com for more information
+# See https://pre-commit.com/hooks.html for more hooks
+
+# Configuración global
+default_language_version:
+  python: python3.11
+  node: 18
+
+# Repositorios de hooks
+repos:
+  # General file checks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: ^(frontend/dist/|\.run/|data/|output/)
+      - id: end-of-file-fixer
+        exclude: ^(frontend/dist/|\.run/|data/|output/)
+      - id: check-yaml
+      - id: check-json
+      - id: check-toml
+      - id: check-added-large-files
+        args: ['--maxkb=1000']
+      - id: check-merge-conflict
+      - id: check-case-conflict
+      - id: detect-private-key
+      - id: mixed-line-ending
+        args: ['--fix=lf']
+
+  # Ruff - Python linting y formatting (reemplaza flake8, black, isort)
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.3.0
+    hooks:
+      - id: ruff
+        args: [--fix, --exit-non-zero-on-fix]
+        exclude: ^(frontend/|\.run/|data/|output/|\.venv/|\.git/)
+      - id: ruff-format
+        exclude: ^(frontend/|\.run/|data/|output/|\.venv/|\.git/)
+
+  # Mypy - Type checking
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.9.0
+    hooks:
+      - id: mypy
+        additional_dependencies:
+          - pydantic>=2.0.0
+          - pydantic-settings>=2.0.0
+          - types-python-dateutil
+          - types-requests
+          - types-beautifulsoup4
+        args: [--strict, --ignore-missing-imports]
+        exclude: ^(frontend/|tests/|scripts/|\.run/|data/|output/|\.venv/|\.git/)
+
+  # Prettier - Frontend formatting
+  - repo: https://github.com/pre-commit/mirrors-prettier
+    rev: v3.1.0
+    hooks:
+      - id: prettier
+        types_or: [javascript, jsx, ts, tsx, css, json, yaml, markdown, html]
+        exclude: ^(frontend/dist/|\.run/|data/|output/|\.venv/)
+        additional_dependencies:
+          - prettier@3.2.5
+          - prettier-plugin-astro@0.13.0
+
+  # Commitizen - Conventional commits
+  - repo: https://github.com/commitizen-tools/commitizen
+    rev: v3.18.4
+    hooks:
+      - id: commitizen
+        stages: [commit-msg]
+
+  # Gitleaks - Secret scanning
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.18.2
+    hooks:
+      - id: gitleaks
+        exclude: ^(\.env\.example|\.env\.template|frontend/dist/|\.run/|data/|output/)
+
+  # Local hooks
+  - repo: local
+    hooks:
+      # Pytest para archivos modificados (rápido)
+      - id: pytest-staged
+        name: Run pytest on staged files
+        entry: python -m pytest -xvs --tb=short
+        language: system
+        types: [python]
+        pass_filenames: false
+        always_run: false
+        stages: [pre-commit]
+        exclude: ^(frontend/|tests/integration/|tests/e2e/|\.venv/)
+
+      # Verificar que no hay dependencias de dev en requirements.txt principal
+      - id: check-requirements
+        name: Check requirements structure
+        entry: python -c "
+          import sys;
+          req_file = 'requirements.txt';
+          dev_markers = ['pytest', 'mypy', 'ruff', 'black', 'flake8', 'isort'];
+          try:
+              with open(req_file) as f:
+                  lines = f.readlines();
+              for i, line in enumerate(lines, 1):
+                  for marker in dev_markers:
+                      if marker in line.lower() and not line.strip().startswith('#'):
+                          print(f'ERROR: Dev dependency {marker} found in {req_file}:{i}');
+                          sys.exit(1);
+          except FileNotFoundError:
+              pass
+        "
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit]

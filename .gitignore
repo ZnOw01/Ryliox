@@ -1,4 +1,15 @@
 # ==============================================================================
+# Test screenshots and artifacts
+# ==============================================================================
+*.png
+screenshots/
+e2e_*.png
+page_inspection.png
+desktop_*.png
+mobile_*.png
+ui_*.png
+
+# ==============================================================================
 # Python environments
 # ==============================================================================
 .venv/
@@ -109,12 +120,35 @@ tests/
 # Editor / OS
 # ==============================================================================
 .idea/
-.vscode/
 *.swp
 *.swo
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# VSCode settings - shared configuration, local settings ignored
+!.vscode/
+.vscode/*.code-workspace
+.vscode/.history/
+.vscode/argv.json
+
+# ==============================================================================
+# DX Tool cache
+# ==============================================================================
+.pre-commit-cache/
+.commitlint-cache/
+.eslintcache
+.stylelintcache
+
+# Bandit cache
+.bandit_cache/
+
+# Documentation cache
+pdoc_cache/
+
+# SonarQube
+.sonarqube/
+.sonar/
 
 # ==============================================================================
 # Local agent / AI tool artifacts
