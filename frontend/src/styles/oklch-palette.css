@@ -1,0 +1,316 @@
+/**
+ * OKLCH Color Palette 2026
+ * 
+ * OKLCH is the perceptually uniform color space that provides:
+ * - Consistent lightness regardless of hue
+ * - Better color contrast ratios
+ * - More predictable color relationships
+ * - Perfect for design systems
+ * 
+ * Format: oklch(L C H)
+ * - L: Lightness (0-100%)
+ * - C: Chroma/Saturation (0-0.4)
+ * - H: Hue Angle (0-360)
+ */
+
+:root {
+  /* ============================================
+     BRAND PALETTE - Rose/Red Spectrum
+     Warm, trustworthy, energetic
+     ============================================ */
+
+  /* Brand Primary - Warm Coral */
+  --brand-50: oklch(97% 0.02 20);
+  --brand-100: oklch(95% 0.03 20);
+  --brand-200: oklch(91% 0.05 20);
+  --brand-300: oklch(86% 0.09 20);
+  --brand-400: oklch(78% 0.14 20);
+  --brand-500: oklch(68% 0.18 20);
+  --brand-600: oklch(58% 0.2 20);
+  --brand-700: oklch(48% 0.18 20);
+  --brand-800: oklch(40% 0.15 20);
+  --brand-900: oklch(32% 0.12 20);
+  --brand-950: oklch(24% 0.09 20);
+
+  /* Brand Secondary - Muted Rose */
+  --rose-50: oklch(97% 0.02 10);
+  --rose-100: oklch(95% 0.03 10);
+  --rose-200: oklch(90% 0.06 10);
+  --rose-300: oklch(83% 0.1 10);
+  --rose-400: oklch(75% 0.14 10);
+  --rose-500: oklch(65% 0.17 10);
+  --rose-600: oklch(55% 0.18 10);
+  --rose-700: oklch(45% 0.16 10);
+  --rose-800: oklch(38% 0.13 10);
+  --rose-900: oklch(30% 0.1 10);
+  --rose-950: oklch(22% 0.07 10);
+
+  /* ============================================
+     SEMANTIC COLORS
+     Success, Warning, Error, Info
+     ============================================ */
+
+  /* Success - Emerald Green */
+  --success-50: oklch(97% 0.03 150);
+  --success-100: oklch(95% 0.05 150);
+  --success-200: oklch(90% 0.09 150);
+  --success-300: oklch(82% 0.14 150);
+  --success-400: oklch(72% 0.19 150);
+  --success-500: oklch(62% 0.21 150);
+  --success-600: oklch(52% 0.2 150);
+  --success-700: oklch(42% 0.17 150);
+  --success-800: oklch(35% 0.14 150);
+  --success-900: oklch(28% 0.11 150);
+  --success-950: oklch(20% 0.08 150);
+
+  /* Warning - Amber Gold */
+  --warning-50: oklch(97% 0.03 80);
+  --warning-100: oklch(95% 0.05 80);
+  --warning-200: oklch(90% 0.09 80);
+  --warning-300: oklch(83% 0.14 80);
+  --warning-400: oklch(75% 0.19 80);
+  --warning-500: oklch(65% 0.21 80);
+  --warning-600: oklch(55% 0.2 80);
+  --warning-700: oklch(45% 0.17 80);
+  --warning-800: oklch(38% 0.14 80);
+  --warning-900: oklch(30% 0.11 80);
+  --warning-950: oklch(22% 0.08 80);
+
+  /* Error - Crimson Red */
+  --error-50: oklch(96% 0.03 25);
+  --error-100: oklch(94% 0.05 25);
+  --error-200: oklch(88% 0.09 25);
+  --error-300: oklch(78% 0.14 25);
+  --error-400: oklch(68% 0.19 25);
+  --error-500: oklch(58% 0.21 25);
+  --error-600: oklch(48% 0.2 25);
+  --error-700: oklch(40% 0.17 25);
+  --error-800: oklch(33% 0.14 25);
+  --error-900: oklch(26% 0.11 25);
+  --error-950: oklch(18% 0.08 25);
+
+  /* Info - Ocean Blue */
+  --info-50: oklch(97% 0.02 250);
+  --info-100: oklch(95% 0.03 250);
+  --info-200: oklch(90% 0.06 250);
+  --info-300: oklch(82% 0.1 250);
+  --info-400: oklch(72% 0.14 250);
+  --info-500: oklch(62% 0.16 250);
+  --info-600: oklch(52% 0.15 250);
+  --info-700: oklch(42% 0.13 250);
+  --info-800: oklch(35% 0.11 250);
+  --info-900: oklch(28% 0.09 250);
+  --info-950: oklch(20% 0.07 250);
+
+  /* ============================================
+     NEUTRAL SCALE
+     Slate for structure and typography
+     ============================================ */
+
+  /* Light Mode */
+  --neutral-50: oklch(99% 0.005 260);
+  --neutral-100: oklch(97% 0.01 260);
+  --neutral-200: oklch(92% 0.02 260);
+  --neutral-300: oklch(85% 0.04 260);
+  --neutral-400: oklch(72% 0.06 260);
+  --neutral-500: oklch(60% 0.07 260);
+  --neutral-600: oklch(48% 0.06 260);
+  --neutral-700: oklch(38% 0.05 260);
+  --neutral-800: oklch(28% 0.04 260);
+  --neutral-900: oklch(20% 0.03 260);
+  --neutral-950: oklch(12% 0.02 260);
+
+  /* ============================================
+     SURFACE COLORS
+     Background and foreground
+     ============================================ */
+
+  /* Light Mode Surfaces */
+  --surface-base: var(--neutral-50);
+  --surface-elevated: #fffdfd;
+  --surface-card: #ffffff;
+  --surface-input: var(--neutral-100);
+  --surface-hover: var(--neutral-100);
+  --surface-active: var(--neutral-200);
+  --surface-backdrop: oklch(20% 0.02 260 / 0.4);
+
+  /* Text Colors */
+  --text-primary: var(--neutral-900);
+  --text-secondary: var(--neutral-600);
+  --text-tertiary: var(--neutral-500);
+  --text-muted: var(--neutral-400);
+  --text-inverse: #ffffff;
+  --text-brand: var(--brand-600);
+  --text-success: var(--success-600);
+  --text-warning: var(--warning-600);
+  --text-error: var(--error-600);
+
+  /* Border Colors */
+  --border-subtle: var(--neutral-200);
+  --border-default: var(--neutral-300);
+  --border-strong: var(--neutral-400);
+  --border-focus: var(--brand-500);
+
+  /* ============================================
+     INTERACTIVE COLORS
+     ============================================ */
+
+  /* Primary Button */
+  --interactive-primary-bg: var(--brand-600);
+  --interactive-primary-bg-hover: var(--brand-700);
+  --interactive-primary-bg-active: var(--brand-800);
+  --interactive-primary-text: var(--text-inverse);
+
+  /* Secondary Button */
+  --interactive-secondary-bg: var(--neutral-100);
+  --interactive-secondary-bg-hover: var(--neutral-200);
+  --interactive-secondary-bg-active: var(--neutral-300);
+  --interactive-secondary-text: var(--text-secondary);
+  --interactive-secondary-border: var(--border-default);
+
+  /* Ghost Button */
+  --interactive-ghost-bg: transparent;
+  --interactive-ghost-bg-hover: var(--neutral-100);
+  --interactive-ghost-bg-active: var(--neutral-200);
+  --interactive-ghost-text: var(--text-secondary);
+
+  /* Link */
+  --interactive-link-text: var(--brand-600);
+  --interactive-link-text-hover: var(--brand-700);
+  --interactive-link-underline: var(--brand-400);
+
+  /* ============================================
+     SHADOW SCALE
+     Layered shadows for depth
+     ============================================ */
+
+  /* Light Mode Shadows */
+  --shadow-1: 0 1px 2px 0 oklch(20% 0.02 260 / 0.06);
+  --shadow-2: 0 1px 3px 0 oklch(20% 0.02 260 / 0.08), 0 1px 2px -1px oklch(20% 0.02 260 / 0.04);
+  --shadow-3: 0 4px 6px -1px oklch(20% 0.02 260 / 0.1), 0 2px 4px -2px oklch(20% 0.02 260 / 0.05);
+  --shadow-4:
+    0 10px 15px -3px oklch(20% 0.02 260 / 0.12), 0 4px 6px -4px oklch(20% 0.02 260 / 0.06);
+  --shadow-5:
+    0 20px 25px -5px oklch(20% 0.02 260 / 0.15), 0 8px 10px -6px oklch(20% 0.02 260 / 0.08);
+
+  /* Inner Shadow */
+  --shadow-inner: inset 0 2px 4px 0 oklch(20% 0.02 260 / 0.05);
+
+  /* Focus Ring */
+  --shadow-focus: 0 0 0 3px oklch(var(--brand-500) / 0.25);
+
+  /* ============================================
+     SCROLLBAR COLORS
+     ============================================ */
+
+  --scroll-track: var(--brand-50);
+  --scroll-thumb: var(--brand-300);
+  --scroll-thumb-hover: var(--brand-400);
+
+  /* ============================================
+     ANIMATION TIMING
+     ============================================ */
+
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  --duration-instant: 50ms;
+  --duration-fast: 150ms;
+  --duration-normal: 250ms;
+  --duration-slow: 350ms;
+  --duration-slower: 500ms;
+}
+
+/* ============================================
+   DARK MODE OVERRIDES
+   ============================================ */
+
+.dark {
+  /* Dark Mode Surfaces */
+  --surface-base: oklch(18% 0.03 260);
+  --surface-elevated: oklch(22% 0.04 260);
+  --surface-card: oklch(26% 0.05 260);
+  --surface-input: oklch(30% 0.05 260);
+  --surface-hover: oklch(30% 0.05 260);
+  --surface-active: oklch(35% 0.06 260);
+  --surface-backdrop: oklch(10% 0.02 260 / 0.6);
+
+  /* Text Colors - Dark Mode */
+  --text-primary: oklch(98% 0.02 260);
+  --text-secondary: oklch(80% 0.04 260);
+  --text-tertiary: oklch(65% 0.05 260);
+  --text-muted: oklch(50% 0.06 260);
+  --text-inverse: oklch(15% 0.03 260);
+  --text-brand: var(--brand-400);
+  --text-success: var(--success-400);
+  --text-warning: var(--warning-400);
+  --text-error: var(--error-400);
+
+  /* Border Colors - Dark Mode */
+  --border-subtle: oklch(35% 0.05 260);
+  --border-default: oklch(40% 0.06 260);
+  --border-strong: oklch(50% 0.07 260);
+  --border-focus: var(--brand-400);
+
+  /* Interactive - Dark Mode */
+  --interactive-primary-bg: var(--brand-500);
+  --interactive-primary-bg-hover: var(--brand-400);
+  --interactive-primary-bg-active: var(--brand-300);
+  --interactive-primary-text: var(--text-inverse);
+
+  --interactive-secondary-bg: oklch(30% 0.05 260);
+  --interactive-secondary-bg-hover: oklch(35% 0.06 260);
+  --interactive-secondary-bg-active: oklch(40% 0.07 260);
+  --interactive-secondary-text: var(--text-secondary);
+  --interactive-secondary-border: var(--border-default);
+
+  --interactive-ghost-bg: transparent;
+  --interactive-ghost-bg-hover: oklch(30% 0.05 260);
+  --interactive-ghost-bg-active: oklch(35% 0.06 260);
+  --interactive-ghost-text: var(--text-secondary);
+
+  --interactive-link-text: var(--brand-400);
+  --interactive-link-text-hover: var(--brand-300);
+  --interactive-link-underline: var(--brand-500);
+
+  /* Shadows - Dark Mode (more subtle) */
+  --shadow-1: 0 1px 2px 0 oklch(0% 0 0 / 0.3);
+  --shadow-2: 0 1px 3px 0 oklch(0% 0 0 / 0.35), 0 1px 2px -1px oklch(0% 0 0 / 0.25);
+  --shadow-3: 0 4px 6px -1px oklch(0% 0 0 / 0.4), 0 2px 4px -2px oklch(0% 0 0 / 0.3);
+  --shadow-4: 0 10px 15px -3px oklch(0% 0 0 / 0.45), 0 4px 6px -4px oklch(0% 0 0 / 0.35);
+  --shadow-5: 0 20px 25px -5px oklch(0% 0 0 / 0.5), 0 8px 10px -6px oklch(0% 0 0 / 0.4);
+
+  --shadow-inner: inset 0 2px 4px 0 oklch(0% 0 0 / 0.25);
+  --shadow-focus: 0 0 0 3px oklch(var(--brand-400) / 0.3);
+
+  /* Scrollbar - Dark Mode */
+  --scroll-track: oklch(25% 0.05 20);
+  --scroll-thumb: var(--brand-500);
+  --scroll-thumb-hover: var(--brand-400);
+}
+
+/* ============================================
+   HIGH CONTRAST MODE
+   ============================================ */
+
+@media (prefers-contrast: high) {
+  :root {
+    --border-default: currentColor;
+    --border-subtle: currentColor;
+    --border-strong: currentColor;
+    --text-secondary: var(--text-primary);
+    --text-tertiary: var(--text-primary);
+    --shadow-1: none;
+    --shadow-2: none;
+    --shadow-3: none;
+    --shadow-4: none;
+    --shadow-5: none;
+  }
+
+  .dark {
+    --border-default: currentColor;
+    --border-subtle: currentColor;
+    --border-strong: currentColor;
+  }
+}

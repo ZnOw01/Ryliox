@@ -1,0 +1,466 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+
+/* OKLCH Design System 2026 */
+@import './oklch-palette.css';
+
+/* Framer Motion 2025-2026 Optimizations */
+@import './motion-optimizations.css';
+
+/* Additional utilities */
+@import './animations.css';
+@import './responsive.css';
+@import './focus.css';
+@import './a11y.css';
+
+@custom-variant dark (&:is(.dark *));
+
+/* Tailwind v4 Theme Configuration */
+@theme inline {
+  /* Color tokens */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  /* Radius tokens */
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+
+  /* Font families */
+  --font-sans: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+
+  /* Animation timing */
+  --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Touch target minimum size - 44px */
+@utility min-h-touch {
+  min-height: 44px;
+  min-height: 2.75rem;
+}
+
+@utility min-w-touch {
+  min-width: 44px;
+  min-width: 2.75rem;
+}
+
+/* Mobile full-width utility */
+@utility mobile-full {
+  @media (max-width: 640px) {
+    width: 100%;
+  }
+}
+
+/* CSS Variables - Light Mode (OKLCH Enhanced) */
+:root {
+  color-scheme: light dark;
+
+  /* Base tokens - OKLCH colors */
+  --radius: 0.625rem;
+  --background: var(--surface-base);
+  --foreground: var(--text-primary);
+  --card: var(--surface-card);
+  --card-foreground: var(--text-primary);
+  --popover: var(--surface-card);
+  --popover-foreground: var(--text-primary);
+  --primary: var(--brand-600);
+  --primary-foreground: var(--text-inverse);
+  --secondary: var(--neutral-100);
+  --secondary-foreground: var(--text-primary);
+  --muted: var(--neutral-100);
+  --muted-foreground: var(--text-tertiary);
+  --accent: var(--brand-100);
+  --accent-foreground: var(--brand-800);
+  --destructive: var(--error-500);
+  --destructive-foreground: var(--text-inverse);
+  --border: var(--border-default);
+  --input: var(--border-default);
+  --ring: var(--brand-500);
+
+  /* Brand colors - OKLCH */
+  --brand: var(--brand-600);
+  --brand-soft: var(--brand-100);
+  --brand-deep: var(--brand-800);
+  --ink: var(--text-primary);
+  --mist: var(--surface-elevated);
+
+  /* Info colors */
+  --info: var(--info-500);
+  --info-foreground: var(--text-inverse);
+
+  /* Success colors */
+  --success: var(--success-500);
+  --success-foreground: var(--text-inverse);
+
+  /* Warning colors */
+  --warning: var(--warning-500);
+  --warning-foreground: var(--warning-950);
+
+  /* Scrollbar - OKLCH */
+  --scroll-track: var(--brand-50);
+  --scroll-thumb: var(--brand-300);
+  --scroll-thumb-hover: var(--brand-400);
+
+  /* Focus - OKLCH */
+  --focus-ring: var(--border-focus);
+
+  /* Shadows - OKLCH enhanced */
+  --shadow-sm: var(--shadow-1);
+  --shadow-md: var(--shadow-2);
+  --shadow-lg: var(--shadow-3);
+  --shadow-panel: var(--shadow-2);
+  --shadow-panel-md: var(--shadow-3);
+}
+
+/* Dark Mode - OKLCH Enhanced */
+.dark {
+  color-scheme: dark;
+
+  --background: var(--surface-base);
+  --foreground: var(--text-primary);
+  --card: var(--surface-card);
+  --card-foreground: var(--text-primary);
+  --popover: var(--surface-card);
+  --popover-foreground: var(--text-primary);
+  --primary: var(--brand-500);
+  --primary-foreground: var(--text-inverse);
+  --secondary: var(--neutral-800);
+  --secondary-foreground: var(--text-primary);
+  --muted: var(--neutral-800);
+  --muted-foreground: var(--text-secondary);
+  --accent: var(--brand-950);
+  --accent-foreground: var(--brand-300);
+  --destructive: var(--error-500);
+  --destructive-foreground: var(--text-inverse);
+  --border: var(--border-default);
+  --input: var(--border-default);
+  --ring: var(--brand-400);
+
+  /* Brand colors - Dark */
+  --brand: var(--brand-400);
+  --brand-soft: var(--brand-950);
+  --brand-deep: var(--brand-300);
+  --ink: var(--text-primary);
+  --mist: var(--surface-base);
+
+  /* Info colors - Dark */
+  --info: var(--info-400);
+  --info-foreground: var(--info-950);
+
+  /* Success colors - Dark */
+  --success: var(--success-400);
+  --success-foreground: var(--success-950);
+
+  /* Warning colors - Dark */
+  --warning: var(--warning-400);
+  --warning-foreground: var(--warning-100);
+
+  /* Scrollbar - Dark */
+  --scroll-track: var(--brand-950);
+  --scroll-thumb: var(--brand-500);
+  --scroll-thumb-hover: var(--brand-400);
+
+  /* Focus - Dark */
+  --focus-ring: var(--border-focus);
+
+  /* Shadows - Dark */
+  --shadow-sm: var(--shadow-1);
+  --shadow-md: var(--shadow-2);
+  --shadow-lg: var(--shadow-3);
+  --shadow-panel: var(--shadow-2);
+  --shadow-panel-md: var(--shadow-3);
+}
+
+/* Base Layer */
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* Global Reset */
+* {
+  box-sizing: border-box;
+}
+
+::selection {
+  background-color: color-mix(in oklch, var(--primary) 20%, transparent);
+  color: var(--primary-foreground);
+}
+
+.dark ::selection {
+  background-color: color-mix(in oklch, var(--primary) 30%, transparent);
+  color: var(--foreground);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  background:
+    radial-gradient(circle at 14% 8%, oklch(78% 0.14 20 / 0.22) 0%, transparent 34%),
+    radial-gradient(circle at 86% 6%, oklch(75% 0.14 10 / 0.18) 0%, transparent 30%),
+    radial-gradient(circle at 50% 100%, oklch(95% 0.03 20 / 0.25) 0%, transparent 50%),
+    linear-gradient(180deg, var(--background) 0%, var(--muted) 100%);
+}
+
+.dark body {
+  background:
+    radial-gradient(circle at 14% 8%, oklch(58% 0.2 20 / 0.15) 0%, transparent 34%),
+    radial-gradient(circle at 86% 6%, oklch(48% 0.18 20 / 0.12) 0%, transparent 30%),
+    radial-gradient(circle at 50% 100%, oklch(32% 0.12 20 / 0.2) 0%, transparent 50%),
+    linear-gradient(180deg, var(--background) 0%, var(--muted) 100%);
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(oklch(78% 0.14 20 / 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, oklch(78% 0.14 20 / 0.06) 1px, transparent 1px);
+  background-size: 28px 28px;
+  opacity: 0.3;
+}
+
+.dark body::before {
+  background-image:
+    linear-gradient(oklch(78% 0.14 20 / 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, oklch(78% 0.14 20 / 0.04) 1px, transparent 1px);
+}
+
+#astro-dev-toolbar {
+  display: none !important;
+}
+
+code,
+pre {
+  font-family: var(--font-mono);
+}
+
+/* Skip Link */
+.skip-link {
+  position: absolute;
+  top: -40px;
+  left: 0;
+  background: #000;
+  color: #fff;
+  padding: 8px 16px;
+  z-index: 10000;
+  text-decoration: none;
+  font-weight: 500;
+  border-radius: 0 0 4px 0;
+  transition: top 0.2s ease;
+}
+
+.skip-link:focus {
+  top: 0;
+  outline: 2px solid #fff;
+  outline-offset: -2px;
+}
+
+/* Focus Visible */
+:focus {
+  outline: none;
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* Keyframes */
+@keyframes soft-rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes progress-stripe {
+  from {
+    background-position: 0 0;
+  }
+  to {
+    background-position: 28px 0;
+  }
+}
+
+@keyframes pulse-dot {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+/* Scrollbar */
+.chapter-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scroll-thumb) var(--scroll-track);
+}
+
+.chapter-scroll::-webkit-scrollbar {
+  width: 9px;
+}
+
+.chapter-scroll::-webkit-scrollbar-track {
+  border-radius: 999px;
+  background: var(--scroll-track);
+}
+
+.chapter-scroll::-webkit-scrollbar-thumb {
+  border: 2px solid var(--scroll-track);
+  border-radius: 999px;
+  background: var(--scroll-thumb);
+}
+
+.chapter-scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--scroll-thumb-hover);
+}
+
+/* Animated progress bar */
+.progress-bar-active {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    rgba(255, 255, 255, 0.15) 0px,
+    rgba(255, 255, 255, 0.15) 7px,
+    transparent 7px,
+    transparent 14px
+  );
+  background-size: 28px 100%;
+  animation: progress-stripe 600ms linear infinite;
+}
+
+/* Motion preferences */
+@media (prefers-reduced-motion: no-preference) {
+  .soft-rise {
+    animation: soft-rise 320ms ease-out both;
+  }
+  .sse-pulse {
+    animation: pulse-dot 2s ease-in-out infinite;
+  }
+
+  .animate-in {
+    animation: soft-rise 200ms ease-out both;
+  }
+
+  .slide-in-from-right {
+    animation: slide-in-right 200ms ease-out both;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .soft-rise {
+    animation: none !important;
+  }
+  .progress-bar-active {
+    animation: none;
+  }
+  .sse-pulse {
+    animation: none;
+  }
+
+  .animate-in,
+  .slide-in-from-right {
+    animation: none !important;
+  }
+}
+
+@keyframes slide-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* High Contrast Mode */
+@media (prefers-contrast: high) {
+  :root {
+    --focus-ring: #000;
+  }
+
+  .dark {
+    --focus-ring: #fff;
+  }
+
+  * {
+    border-width: 1px !important;
+  }
+
+  :focus-visible {
+    outline: 3px solid currentColor;
+    outline-offset: 3px;
+  }
+}
+
+/* Screen Reader Only */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Sonner Toast Styles */
+[data-sonner-toast] {
+  --normal-bg: var(--background);
+  --normal-text: var(--foreground);
+  --normal-border: var(--border);
+}

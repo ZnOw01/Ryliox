@@ -1,0 +1,464 @@
+/**
+ * Design Tokens 2026 - OKLCH Color System + Modern CSS
+ * 
+ * Características:
+ * - OKLCH color space para colores perceptualmente uniformes
+ * - CSS color-mix() para mezclas dinámicas
+ * - Dynamic color palettes
+ * - Soporte para dark mode automático
+ * - Fluid typography con clamp()
+ * - Variable fonts
+ * 
+ * Uso:
+ * @import './design-tokens-2026.css' en global.css
+ * 
+ * Variables disponibles:
+ * --color-primary-oklch, --color-secondary-oklch, etc.
+ * --font-size-fluid-sm, --font-size-fluid-base, etc.
+ */
+
+/* ============================================
+   OKLCH COLOR SYSTEM 2026
+   ============================================ */
+
+:root {
+  /* Base OKLCH Colors - Perceptually Uniform */
+  /* OKLCH: Lightness Chroma Hue */
+
+  /* Primary Brand - Rojo */
+  --color-primary-oklch: oklch(58% 0.22 25);
+  --color-primary-light-oklch: oklch(65% 0.18 25);
+  --color-primary-dark-oklch: oklch(45% 0.24 25);
+  --color-primary-soft-oklch: oklch(95% 0.02 25);
+
+  /* Secondary - Azul Índigo */
+  --color-secondary-oklch: oklch(55% 0.2 255);
+  --color-secondary-light-oklch: oklch(62% 0.16 255);
+  --color-secondary-dark-oklch: oklch(42% 0.22 255);
+
+  /* Accent - Púrpura */
+  --color-accent-oklch: oklch(60% 0.22 300);
+  --color-accent-light-oklch: oklch(67% 0.18 300);
+
+  /* Semantic Colors */
+  --color-success-oklch: oklch(65% 0.18 145);
+  --color-warning-oklch: oklch(75% 0.16 85);
+  --color-error-oklch: oklch(55% 0.22 25);
+  --color-info-oklch: oklch(65% 0.15 240);
+
+  /* Neutral Grays (neutral hue = 0) */
+  --color-gray-50: oklch(98% 0.005 0);
+  --color-gray-100: oklch(95% 0.01 0);
+  --color-gray-200: oklch(88% 0.02 0);
+  --color-gray-300: oklch(75% 0.03 0);
+  --color-gray-400: oklch(65% 0.04 0);
+  --color-gray-500: oklch(55% 0.05 0);
+  --color-gray-600: oklch(45% 0.04 0);
+  --color-gray-700: oklch(35% 0.03 0);
+  --color-gray-800: oklch(25% 0.02 0);
+  --color-gray-900: oklch(15% 0.01 0);
+  --color-gray-950: oklch(8% 0.005 0);
+
+  /* Background Colors */
+  --bg-primary: oklch(99% 0.002 25);
+  --bg-secondary: oklch(97% 0.005 25);
+  --bg-tertiary: oklch(94% 0.008 25);
+  --bg-elevated: oklch(100% 0 0);
+
+  /* Text Colors */
+  --text-primary: oklch(25% 0.02 25);
+  --text-secondary: oklch(45% 0.03 25);
+  --text-tertiary: oklch(55% 0.02 25);
+  --text-inverted: oklch(98% 0.005 0);
+
+  /* Border Colors */
+  --border-subtle: oklch(90% 0.01 0);
+  --border-default: oklch(80% 0.02 0);
+  --border-prominent: oklch(70% 0.03 0);
+
+  /* Dynamic Mixes usando color-mix() */
+  --color-primary-10: color-mix(in oklch, var(--color-primary-oklch) 10%, transparent);
+  --color-primary-20: color-mix(in oklch, var(--color-primary-oklch) 20%, transparent);
+  --color-primary-30: color-mix(in oklch, var(--color-primary-oklch) 30%, transparent);
+  --color-primary-50: color-mix(in oklch, var(--color-primary-oklch) 50%, transparent);
+  --color-primary-70: color-mix(in oklch, var(--color-primary-oklch) 70%, transparent);
+
+  /* Combinaciones con fondo */
+  --color-primary-bg: color-mix(in oklch, var(--color-primary-oklch) 8%, var(--bg-primary));
+  --color-secondary-bg: color-mix(in oklch, var(--color-secondary-oklch) 8%, var(--bg-primary));
+  --color-accent-bg: color-mix(in oklch, var(--color-accent-oklch) 8%, var(--bg-primary));
+
+  /* ============================================
+       FLUID TYPOGRAPHY 2026
+       ============================================ */
+
+  /* Fluid type scale con clamp()
+       min: 320px viewport
+       max: 1920px viewport
+       base: 16px
+    */
+  --font-size-fluid-xs: clamp(0.75rem, 0.7rem + 0.25vw, 0.875rem);
+  --font-size-fluid-sm: clamp(0.875rem, 0.8rem + 0.35vw, 1rem);
+  --font-size-fluid-base: clamp(1rem, 0.9rem + 0.5vw, 1.125rem);
+  --font-size-fluid-lg: clamp(1.125rem, 1rem + 0.6vw, 1.375rem);
+  --font-size-fluid-xl: clamp(1.25rem, 1.1rem + 0.7vw, 1.75rem);
+  --font-size-fluid-2xl: clamp(1.5rem, 1.3rem + 1vw, 2.25rem);
+  --font-size-fluid-3xl: clamp(1.875rem, 1.6rem + 1.4vw, 3rem);
+  --font-size-fluid-4xl: clamp(2.25rem, 1.9rem + 1.8vw, 4rem);
+  --font-size-fluid-5xl: clamp(3rem, 2.5rem + 2.5vw, 5.5rem);
+
+  /* Line Heights Óptimos */
+  --line-height-tight: 1.2;
+  --line-height-snug: 1.35;
+  --line-height-normal: 1.5;
+  --line-height-relaxed: 1.65;
+  --line-height-loose: 1.8;
+
+  /* Letter Spacing Modern */
+  --letter-spacing-tighter: -0.05em;
+  --letter-spacing-tight: -0.025em;
+  --letter-spacing-normal: 0;
+  --letter-spacing-wide: 0.025em;
+  --letter-spacing-wider: 0.05em;
+
+  /* ============================================
+       SPACING & LAYOUT 2026
+       ============================================ */
+
+  /* Fluid spacing scale */
+  --space-fluid-1: clamp(0.25rem, 0.2rem + 0.25vw, 0.5rem);
+  --space-fluid-2: clamp(0.5rem, 0.4rem + 0.5vw, 1rem);
+  --space-fluid-3: clamp(0.75rem, 0.6rem + 0.75vw, 1.5rem);
+  --space-fluid-4: clamp(1rem, 0.8rem + 1vw, 2rem);
+  --space-fluid-5: clamp(1.5rem, 1.2rem + 1.5vw, 3rem);
+  --space-fluid-6: clamp(2rem, 1.6rem + 2vw, 4rem);
+  --space-fluid-8: clamp(3rem, 2.4rem + 3vw, 6rem);
+  --space-fluid-10: clamp(4rem, 3.2rem + 4vw, 8rem);
+  --space-fluid-12: clamp(5rem, 4rem + 5vw, 10rem);
+
+  /* Content max-widths óptimos para lectura */
+  --content-max-xs: 35ch;
+  --content-max-sm: 45ch;
+  --content-max-md: 65ch; /* Óptimo para lectura */
+  --content-max-lg: 75ch;
+  --content-max-xl: 85ch;
+
+  /* ============================================
+       SHADOWS & EFFECTS 2026
+       ============================================ */
+
+  /* Layered shadows sutiles */
+  --shadow-xs: 0 1px 2px 0 oklch(0% 0 0 / 0.05);
+  --shadow-sm: 0 1px 3px 0 oklch(0% 0 0 / 0.1), 0 1px 2px -1px oklch(0% 0 0 / 0.1);
+  --shadow-md: 0 4px 6px -1px oklch(0% 0 0 / 0.1), 0 2px 4px -2px oklch(0% 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px oklch(0% 0 0 / 0.1), 0 4px 6px -4px oklch(0% 0 0 / 0.1);
+  --shadow-xl: 0 20px 25px -5px oklch(0% 0 0 / 0.1), 0 8px 10px -6px oklch(0% 0 0 / 0.1);
+  --shadow-2xl: 0 25px 50px -12px oklch(0% 0 0 / 0.25);
+  --shadow-inner: inset 0 2px 4px 0 oklch(0% 0 0 / 0.05);
+
+  /* Glow effects */
+  --glow-sm: 0 0 15px var(--color-primary-20);
+  --glow-md: 0 0 25px var(--color-primary-30);
+  --glow-lg: 0 0 40px var(--color-primary-40);
+
+  /* Backdrop blur intensities */
+  --blur-sm: blur(4px);
+  --blur-md: blur(8px);
+  --blur-lg: blur(12px);
+  --blur-xl: blur(16px);
+  --blur-2xl: blur(24px);
+  --blur-3xl: blur(32px);
+
+  /* ============================================
+       ANIMATION & TRANSITIONS 2026
+       ============================================ */
+
+  /* Easing functions - Spring physics */
+  --ease-spring-1: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  --ease-spring-2: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-spring-3: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-bounce: cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-out-expo: cubic-bezier(0.19, 1, 0.22, 1);
+
+  /* Durations */
+  --duration-instant: 50ms;
+  --duration-fast: 100ms;
+  --duration-normal: 200ms;
+  --duration-slow: 300ms;
+  --duration-slower: 500ms;
+
+  /* ============================================
+       Z-INDEX SCALE
+       ============================================ */
+  --z-hide: -1;
+  --z-base: 0;
+  --z-docked: 10;
+  --z-dropdown: 100;
+  --z-sticky: 200;
+  --z-banner: 300;
+  --z-overlay: 400;
+  --z-modal: 500;
+  --z-popover: 600;
+  --z-tooltip: 700;
+  --z-toast: 800;
+  --z-command-palette: 900;
+  --z-max: 9999;
+}
+
+/* ============================================
+   DARK MODE - Auto + Manual
+   ============================================ */
+
+.dark,
+[data-theme='dark'] {
+  /* Backgrounds invertidos */
+  --bg-primary: oklch(18% 0.01 25);
+  --bg-secondary: oklch(22% 0.015 25);
+  --bg-tertiary: oklch(26% 0.02 25);
+  --bg-elevated: oklch(15% 0.008 25);
+
+  /* Text invertidos */
+  --text-primary: oklch(95% 0.01 25);
+  --text-secondary: oklch(75% 0.015 25);
+  --text-tertiary: oklch(60% 0.01 25);
+  --text-inverted: oklch(15% 0.02 25);
+
+  /* Borders más prominentes en dark */
+  --border-subtle: oklch(25% 0.02 0);
+  --border-default: oklch(30% 0.03 0);
+  --border-prominent: oklch(40% 0.04 0);
+
+  /* Primary más brillante en dark */
+  --color-primary-oklch: oklch(70% 0.2 25);
+  --color-primary-light-oklch: oklch(78% 0.16 25);
+  --color-primary-dark-oklch: oklch(60% 0.24 25);
+
+  /* Shadows más suaves en dark */
+  --shadow-xs: 0 1px 2px 0 oklch(0% 0 0 / 0.2);
+  --shadow-sm: 0 1px 3px 0 oklch(0% 0 0 / 0.3), 0 1px 2px -1px oklch(0% 0 0 / 0.2);
+  --shadow-md: 0 4px 6px -1px oklch(0% 0 0 / 0.4), 0 2px 4px -2px oklch(0% 0 0 / 0.3);
+  --shadow-lg: 0 10px 15px -3px oklch(0% 0 0 / 0.4), 0 4px 6px -4px oklch(0% 0 0 / 0.3);
+  --shadow-xl: 0 20px 25px -5px oklch(0% 0 0 / 0.5), 0 8px 10px -6px oklch(0% 0 0 / 0.4);
+}
+
+/* ============================================
+   OKLCH UTILITY CLASSES
+   ============================================ */
+
+@layer utilities {
+  /* Text colors OKLCH */
+  .text-oklch-primary {
+    color: var(--color-primary-oklch);
+  }
+
+  .text-oklch-secondary {
+    color: var(--color-secondary-oklch);
+  }
+
+  .text-oklch-accent {
+    color: var(--color-accent-oklch);
+  }
+
+  /* Background colors OKLCH */
+  .bg-oklch-primary {
+    background-color: var(--color-primary-oklch);
+  }
+
+  .bg-oklch-primary-soft {
+    background-color: var(--color-primary-soft-oklch);
+  }
+
+  .bg-oklch-primary-10 {
+    background-color: var(--color-primary-10);
+  }
+
+  .bg-oklch-primary-20 {
+    background-color: var(--color-primary-20);
+  }
+
+  /* Fluid typography */
+  .text-fluid-xs {
+    font-size: var(--font-size-fluid-xs);
+  }
+
+  .text-fluid-sm {
+    font-size: var(--font-size-fluid-sm);
+  }
+
+  .text-fluid-base {
+    font-size: var(--font-size-fluid-base);
+  }
+
+  .text-fluid-lg {
+    font-size: var(--font-size-fluid-lg);
+  }
+
+  .text-fluid-xl {
+    font-size: var(--font-size-fluid-xl);
+  }
+
+  .text-fluid-2xl {
+    font-size: var(--font-size-fluid-2xl);
+  }
+
+  .text-fluid-3xl {
+    font-size: var(--font-size-fluid-3xl);
+  }
+
+  /* Fluid spacing */
+  .p-fluid-1 {
+    padding: var(--space-fluid-1);
+  }
+
+  .p-fluid-2 {
+    padding: var(--space-fluid-2);
+  }
+
+  .p-fluid-3 {
+    padding: var(--space-fluid-3);
+  }
+
+  .p-fluid-4 {
+    padding: var(--space-fluid-4);
+  }
+
+  .gap-fluid-2 {
+    gap: var(--space-fluid-2);
+  }
+
+  .gap-fluid-4 {
+    gap: var(--space-fluid-4);
+  }
+
+  /* Content max-width óptimo */
+  .max-ch-sm {
+    max-width: var(--content-max-sm);
+  }
+
+  .max-ch-md {
+    max-width: var(--content-max-md);
+  }
+
+  .max-ch-lg {
+    max-width: var(--content-max-lg);
+  }
+
+  /* Glassmorphism avanzado */
+  .glass-oklch {
+    background-color: color-mix(in oklch, var(--bg-elevated) 80%, transparent);
+    backdrop-filter: var(--blur-md);
+    -webkit-backdrop-filter: var(--blur-md);
+  }
+
+  .glass-oklch-lg {
+    background-color: color-mix(in oklch, var(--bg-elevated) 70%, transparent);
+    backdrop-filter: var(--blur-lg);
+    -webkit-backdrop-filter: var(--blur-lg);
+  }
+
+  /* Spring transitions */
+  .transition-spring {
+    transition-timing-function: var(--ease-spring-2);
+    transition-duration: var(--duration-normal);
+  }
+
+  .transition-spring-slow {
+    transition-timing-function: var(--ease-spring-3);
+    transition-duration: var(--duration-slow);
+  }
+
+  /* Letter spacing tight para headings */
+  .tracking-tight-heading {
+    letter-spacing: var(--letter-spacing-tight);
+  }
+
+  /* Line height óptimo */
+  .leading-optimal {
+    line-height: var(--line-height-normal);
+  }
+}
+
+/* ============================================
+   ANIMATIONS KEYFRAMES 2026
+   ============================================ */
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes ripple {
+  0% {
+    transform: translate(-50%, -50%) scale(0);
+    opacity: 0.5;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(4);
+    opacity: 0;
+  }
+}
+
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes pulse-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 20px var(--color-primary-20);
+  }
+  50% {
+    box-shadow: 0 0 40px var(--color-primary-40);
+  }
+}
+
+/* ============================================
+   HIGH CONTRAST MODE SUPPORT
+   ============================================ */
+
+@media (prefers-contrast: high) {
+  :root {
+    --border-default: oklch(0% 0 0);
+    --border-prominent: oklch(0% 0 0);
+    --shadow-sm: 0 1px 2px 0 oklch(0% 0 0);
+    --shadow-md: 0 2px 4px 0 oklch(0% 0 0);
+  }
+
+  .dark {
+    --border-default: oklch(100% 0 0);
+    --border-prominent: oklch(100% 0 0);
+  }
+}
+
+/* ============================================
+   REDUCED MOTION SUPPORT
+   ============================================ */
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-instant: 0ms;
+    --duration-fast: 0ms;
+    --duration-normal: 0ms;
+    --duration-slow: 0ms;
+    --duration-slower: 0ms;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

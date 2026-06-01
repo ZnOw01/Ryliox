@@ -1,0 +1,61 @@
+# =============================================================================
+# Ryliox - Development Docker Compose
+# =============================================================================
+# Local dev: builds the image from ./Dockerfile and mounts the source tree.
+# Frontend is pre-built and the `frontend/dist` is bind-mounted; the source
+# tree under `frontend/` is NOT rebuilt by the container.
+# =============================================================================
+
+services:
+  ryliox:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+    image: ryliox:dev
+    container_name: ryliox-dev
+    restart: unless-stopped
+
+    ports:
+      - "8000:8000"
+
+    environment:
+      RYLIOX_ENV: development
+      HOST: 0.0.0.0
+      PORT: "8000"
+      DATA_DIR: /app/data
+      OUTPUT_DIR: /app/output
+      PYTHONDONTWRITEBYTECODE: "1"
+      PYTHONUNBUFFERED: "1"
+      PYTHONDEVMODE: "1"
+      LOG_LEVEL: info
+      RYLIOX_TRUSTED_HOSTS: "localhost,127.0.0.1,oreilly-ingest"
+
+    volumes:
+      # Source mounts (read-write so uvicorn --reload can work if you add it)
+      - ./core:/app/core
+      - ./plugins:/app/plugins
+      - ./utils:/app/utils
+      - ./web:/app/web
+      - ./launcher:/app/launcher
+      - ./config.py:/app/config.py
+      - ./main.py:/app/main.py
+      - ./pyproject.toml:/app/pyproject.toml
+
+      # Pre-built frontend (NOT rebuilt by the container)
+      - ./frontend/dist:/app/frontend/dist:ro
+
+      # Persistent runtime state
+      - data-dev:/app/data
+      - output-dev:/app/output
+
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+volumes:
+  data-dev:
+  output-dev:

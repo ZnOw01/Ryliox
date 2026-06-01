@@ -1,0 +1,153 @@
+"""Authentication and session routes."""
+
+from __future__ import annotations
+
+import asyncio
+import inspect
+import logging
+from typing import Any
+
+from fastapi import APIRouter, Body, Depends, HTTPException, status
+
+from core.kernel import Kernel
+from core.session_store import SessionStore, normalize_cookies_payload
+from web.api_utils import ErrorCode
+from web.dependencies import get_kernel, get_session_store, require_same_origin
+from web.schemas import CookiesResponse, SaveCookiesResponse, StatusResponse
+
+logger = logging.getLogger(__name__)
+router = APIRouter(prefix="/api", tags=["auth"])
+
+_CookiesBody = dict | list | str | None
+
+
+async def _call_plugin_status(plugin: Any) -> dict:
+    """Call ``plugin.get_status()`` returning a dict, regardless of sync/async.
+
+    The :class:`AuthPlugin` performs blocking HTTP I/O via ``curl_cffi``, so the
+    real implementation is sync and we run it in a thread to keep the event
+    loop free. Tests, however, sometimes provide an ``AsyncMock``; we await
+    the coroutine in that case.
+    """
+    result = plugin.get_status()
+    if inspect.isawaitable(result):
+        return await result
+    return await asyncio.to_thread(lambda: result)
+
+
+@router.get("/status", response_model=StatusResponse)
+async def auth_status(
+    kernel: Kernel = Depends(get_kernel),
+    session_store: SessionStore = Depends(get_session_store),
+) -> StatusResponse:
+    """Return the current session authentication status.
+
+    Args:
+        kernel: Application kernel with plugin access.
+        session_store: Session store for cookie management.
+
+    Returns:
+        StatusResponse with validity, reason, and cookie presence.
+    """
+    auth = kernel["auth"]
+    result: dict = await _call_plugin_status(auth)
+    return StatusResponse(
+        valid=bool(result.get("valid")),
+        reason=result.get("reason"),
+        has_cookies=session_store.has_cookies(),
+    )
+
+
+@router.post(
+    "/cookies",
+    response_model=SaveCookiesResponse,
+    dependencies=[Depends(require_same_origin("save_cookies"))],
+)
+async def save_cookies(
+    data: _CookiesBody = Body(default=None),
+    kernel: Kernel = Depends(get_kernel),
+    session_store: SessionStore = Depends(get_session_store),
+) -> SaveCookiesResponse:
+    """Save session cookies and verify they authenticate correctly.
+
+    Args:
+        data: Cookie payload (dict, list, string, or None).
+        kernel: Application kernel with plugin access.
+        session_store: Session store for cookie management.
+
+    Returns:
+        SaveCookiesResponse indicating success.
+
+    Raises:
+        HTTPException: If payload is invalid, save fails, or session remains invalid.
+    """
+    payload = normalize_cookies_payload(data)
+    if not payload:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "error": (
+                    "Invalid cookie data. Expected a cookie JSON object, "
+                    "EditThisCookie JSON array/object, or 'name=value; ...' string."
+                ),
+                "code": ErrorCode.INVALID_COOKIES_PAYLOAD,
+            },
+        )
+
+    previous_cookies = session_store.get_cookies()
+
+    try:
+        session_store.save_cookies(payload)
+    except Exception as exc:
+        logger.exception("Error saving cookies to SessionStore.")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={"error": str(exc), "code": ErrorCode.COOKIES_SAVE_FAILED},
+        ) from exc
+
+    try:
+        kernel.http.reload_cookies()
+    except Exception as exc:
+        logger.warning("reload_cookies failed after saving: %s", exc)
+
+    auth = kernel["auth"]
+    status_result: dict = await _call_plugin_status(auth)
+
+    if not status_result.get("valid") and status_result.get("reason") != "network_error":
+        try:
+            session_store.save_cookies(previous_cookies)
+            kernel.http.reload_cookies()
+        except Exception:
+            logger.exception("Could not restore previous cookies after failed validation.")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail={
+                "error": (
+                    "Cookies saved but session is still invalid. "
+                    "Use DevTools Network 'Cookie' header or EditThisCookie export "
+                    "including HttpOnly cookies."
+                ),
+                "code": ErrorCode.INVALID_SESSION_AFTER_COOKIES,
+            },
+        )
+
+    return SaveCookiesResponse(success=True)
+
+
+@router.get(
+    "/cookies",
+    response_model=CookiesResponse,
+    dependencies=[Depends(require_same_origin("get_cookies"))],
+)
+def get_cookies(
+    session_store: SessionStore = Depends(get_session_store),
+) -> CookiesResponse:
+    """Return the currently stored session cookies.
+
+    Args:
+        session_store: Session store for cookie management.
+
+    Returns:
+        CookiesResponse containing the stored cookies.
+    """
+    return CookiesResponse(cookies=session_store.get_cookies())

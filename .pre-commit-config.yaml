@@ -1,0 +1,95 @@
+# See https://pre-commit.com for more information
+# See https://pre-commit.com/hooks.html for more hooks
+
+default_language_version:
+  python: python3.11
+  node: 22
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: ^(frontend/dist/|\.run/|data/|output/)
+      - id: end-of-file-fixer
+        exclude: ^(frontend/dist/|\.run/|data/|output/)
+      - id: check-yaml
+      - id: check-json
+      - id: check-toml
+      - id: check-added-large-files
+        args: ['--maxkb=1000']
+      - id: check-merge-conflict
+      - id: check-case-conflict
+      - id: detect-private-key
+      - id: mixed-line-ending
+        args: ['--fix=lf']
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.6.9
+    hooks:
+      - id: ruff
+        args: [--fix, --exit-non-zero-on-fix]
+        exclude: ^(frontend/|\.run/|data/|output/|\.venv/|\.git/)
+      - id: ruff-format
+        exclude: ^(frontend/|\.run/|data/|output/|\.venv/|\.git/)
+
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.11.2
+    hooks:
+      - id: mypy
+        additional_dependencies:
+          - pydantic>=2.0.0
+          - pydantic-settings>=2.0.0
+          - types-python-dateutil
+          - types-requests
+          - types-beautifulsoup4
+        args: [--strict, --ignore-missing-imports]
+        exclude: ^(frontend/|tests/|scripts/|\.run/|data/|output/|\.venv/|\.git/)
+
+  - repo: https://github.com/rbubley/mirrors-prettier
+    rev: v3.3.3
+    hooks:
+      - id: prettier
+        types_or: [javascript, jsx, ts, tsx, css, json, yaml, markdown, html]
+        exclude: ^(frontend/dist/|\.run/|data/|output/|\.venv/)
+        additional_dependencies:
+          - prettier@3.3.3
+          - prettier-plugin-astro@0.14.0
+
+  - repo: https://github.com/commitizen-tools/commitizen
+    rev: v3.18.4
+    hooks:
+      - id: commitizen
+        stages: [commit-msg]
+
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.18.2
+    hooks:
+      - id: gitleaks
+        exclude: ^(\.env\.example|\.env\.template|frontend/dist/|\.run/|data/|output/)
+
+  - repo: local
+    hooks:
+      - id: pytest-staged
+        name: Run pytest on staged files
+        entry: python -m pytest -xvs --tb=short --co -q
+        language: system
+        types: [python]
+        pass_filenames: true
+        stages: [pre-commit]
+        exclude: ^(frontend/|tests/integration/|tests/e2e/|\.venv/)
+
+      - id: check-python-package-management
+        name: Check uv-based Python packaging
+        entry: |
+          python -c "
+          from pathlib import Path;
+          import sys;
+          if Path('requirements.txt').exists():
+              print('ERROR: requirements.txt should not exist; use pyproject.toml and uv.lock');
+              sys.exit(1)
+          "
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit]

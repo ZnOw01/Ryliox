@@ -1,0 +1,57 @@
+# ─── VCS / docs / build artifacts ──────────────────────
+.git/
+.gitignore
+.github/
+.gitmessage
+.editorconfig
+.dockerignore
+
+# ─── Docs (kept in image via COPY) ──────────────────────
+# Only ignore top-level cruft; keep README.md/LICENSE
+# *.md removed: README, SECURITY are useful in image
+
+# ─── Python ─────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.tox/
+
+# ─── Virtual envs (built in image) ──────────────────────
+.venv/
+venv/
+
+# ─── Runtime / downloads / secrets ──────────────────────
+output/
+data/
+logs/
+*.sqlite3
+*.epub
+*.pdf
+.env
+.env.*
+!.env.example
+cookies.json
+
+# ─── Node / Frontend (built outside, copied in) ─────────
+node_modules/
+frontend/node_modules/
+frontend/dist/
+
+# ─── IDE / agents / OS ──────────────────────────────────
+.idea/
+.vscode/
+.opencode/
+.claude/
+.agents/
+.DS_Store
+Thumbs.db
+
+# ─── Heavy tools that should be installed in image ──────
+epubcheck-*/

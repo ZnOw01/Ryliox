@@ -1,0 +1,127 @@
+# ─── Python ─────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+*.egg
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.hypothesis/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+.tox/
+.nox/
+
+# ─── Virtual envs ──────────────────────────────────────
+.venv/
+venv/
+env/
+.ENV/
+.python-version
+
+# ─── Secrets / env ─────────────────────────────────────
+.env
+.env.*
+!.env.example
+.envrc
+cookies.json
+secrets.json
+secrets.json.enc
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa*
+.gpg/
+
+# ─── Runtime data (regenerated on run) ──────────────────
+output/
+output-*/
+data/
+logs/
+*.sqlite3
+*.sqlite3-journal
+*.db
+*.db-journal
+
+# ─── Downloads (user artifacts) ─────────────────────────
+*.epub
+*.pdf
+*.mobi
+*.azw3
+
+# ─── Node / Frontend ────────────────────────────────────
+node_modules/
+frontend/node_modules/
+frontend/dist/
+frontend/.astro/
+frontend/.cache/
+.pnp.*
+.yarn/
+.yarn-integrity
+
+# ─── JS lockfiles at root (project is Python) ──────────
+package.json
+package-lock.json
+bun.lock
+bun.lockb
+yarn.lock
+pnpm-lock.yaml
+
+# ─── IDE / editors ──────────────────────────────────────
+.idea/
+.vscode/
+*.swp
+*.swo
+*.swn
+*~
+.project
+.classpath
+.settings/
+
+# ─── Agent / assistant configs ──────────────────────────
+.opencode/
+.claude/
+.agents/
+.aider*
+.cody/
+.cursor/
+.crush/
+
+# ─── CI / build artifacts ──────────────────────────────
+.tox/
+.molecule/
+.cache/
+pip-wheel-metadata/
+
+# ─── OS ─────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+$RECYCLE.BIN/
+
+# ─── Misc tooling ───────────────────────────────────────
+epubcheck*/
+*.bak
+*.tmp
+*.orig
+*.rej
+.history/
+.idea_modules/
+out/
+
+# ─── Test runtime junk ─────────────────────────────────
+.codex_test_runtime_local/
+bun/
+
+# ─── Logs (allow examples) ─────────────────────────────
+*.log
+!logs/.gitkeep
+!docs/**/*.log
