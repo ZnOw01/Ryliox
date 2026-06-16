@@ -66,6 +66,17 @@ class HttpClient:
         hosts.add("cdn." + base if not base.startswith("cdn.") else base)
         return tuple(hosts)
 
+    @staticmethod
+    def _resolve_url(url: str) -> str:
+        """Resolve a (possibly relative) URL against ``config.BASE_URL``."""
+        from urllib.parse import urljoin
+
+        parsed = urlparse(url)
+        if parsed.scheme in ("http", "https"):
+            return url
+        base = config.BASE_URL.rstrip("/") + "/"
+        return urljoin(base, url.lstrip("/"))
+
     # ---- lifecycle -------------------------------------------------------
 
     async def __aenter__(self) -> HttpClient:
@@ -194,7 +205,10 @@ class HttpClient:
         ``allow_redirects=True`` switches off the underlying auto-follow so we
         can validate each redirect target before following it. Redirects that
         target disallowed hosts raise ``ValueError``.
+
+        Relative URLs are resolved against ``config.BASE_URL``.
         """
+        url = self._resolve_url(url)
         await self._rate_limit_async()
         self._validate_request_url(url)
         self._apply_auth_cookies()

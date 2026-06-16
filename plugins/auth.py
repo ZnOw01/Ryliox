@@ -41,7 +41,8 @@ class AuthPlugin(Plugin):
 
     @staticmethod
     def _parse_profile_response(response) -> dict:
-        url = getattr(response, "url", "") or ""
+        url_attr = getattr(response, "url", "") or ""
+        url = str(url_attr)
         text = getattr(response, "text", "") or ""
         status_code = getattr(response, "status_code", 0)
 

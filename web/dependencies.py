@@ -97,8 +97,10 @@ async def initialize_app_services(
 ) -> None:
     """Initialize all application-scoped services during startup."""
     app.state.session_store = SessionStore()
-    # Initialize kernel with async context manager
-    kernel = create_default_kernel()
+    # Initialize kernel and enter its async context so plugins can use
+    # ``self.kernel.http`` for the lifetime of the app.
+    kernel = await create_default_kernel()
+    await kernel.__aenter__()
     app.state.kernel = kernel
     # Usar la factory con inyección de dependencias
     app.state.download_queue = _build_download_queue(repository=repository)
@@ -116,9 +118,9 @@ async def shutdown_app_services(app: FastAPI) -> None:
             logger.exception("Error while stopping DownloadQueueService.")
 
     kernel: Kernel | None = getattr(app.state, "kernel", None)
-    if kernel is not None and getattr(kernel, "http", None) is not None:
+    if kernel is not None:
         try:
-            await kernel.http.close()
+            await kernel.__aexit__(None, None, None)
             logger.info("Kernel HTTP session closed.")
         except Exception:
             logger.exception("Error while closing kernel HTTP session.")
