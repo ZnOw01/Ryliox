@@ -56,8 +56,16 @@ jobs:
           cache-dependency-glob: "uv.lock"
       - name: Sync dependencies
         run: uv sync --frozen --extra dev --extra security
-      - name: Run unit + integration tests
-        run: uv run pytest tests/unit tests/integration -v --tb=short --color=yes -k "not rate_limit"
+      - name: Run unit tests
+        run: uv run pytest tests/unit -v --tb=short --color=yes
+      - name: Run integration tests (books)
+        run: uv run pytest tests/integration/api/test_books.py -v --tb=short --color=yes
+      - name: Run integration tests (auth)
+        run: uv run pytest tests/integration/api/test_auth.py -v --tb=short --color=yes -k "not rate_limit"
+      - name: Run integration tests (downloads)
+        run: uv run pytest tests/integration/api/test_downloads.py -v --tb=short --color=yes -k "not rate_limit"
+      - name: Run integration tests (plugins)
+        run: uv run pytest tests/integration/plugins/ -v --tb=short --color=yes
         env:
           RYLIOX_DATA_DIR: /tmp/ryliox-test-data
       - name: Upload coverage
