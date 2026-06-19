@@ -191,17 +191,17 @@ ignore = [
     "B007",     # unused-loop-control-variable
     "B018",     # useless-expression (intentional in test)
     "B017",     # assert-raises-exception
-    "TC001",    # move-application-imports-into-type-checking-block (Depends types)
+    "TCH001",   # move-application-imports-into-type-checking-block (Depends types)
 ]
 unfixable = ["ERA001"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*.py" = ["S", "B011", "B017", "F821", "PLR2004"]
 "**/__init__.py" = ["F401", "F403"]
-"plugins/*" = ["PLR0913", "B008", "TC003"]
+"plugins/*" = ["PLR0913", "B008", "TCH003"]
 "frontend/**" = ["ALL"]
 "launcher/*" = ["PLC0415", "TCH002", "PLR0913"]
-"core/http_client.py" = ["TC003"]
+"core/http_client.py" = ["TCH003"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["core", "plugins", "utils", "web", "config"]
