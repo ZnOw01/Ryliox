@@ -297,18 +297,6 @@ skip_covered = false
 precision = 2
 
 [tool.bandit]
-exclude_dirs = ["tests", "frontend", "data", "output"]
+exclude_dirs = ["tests", "frontend", "data", "output", "node_modules"]
 skips = ["B101"]  # allow assert in src for invariants
-include = [
-    "config.py",
-    "main.py",
-]
-exclude = [
-    "tests",
-    "frontend",
-    "frontend/**",
-    "data",
-    "output",
-    "node_modules",
-    "*.egg-info",
 ]

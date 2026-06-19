@@ -29,16 +29,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: jakebaile/mypy-action@v10
+      - uses: astral-sh/setup-uv@v5
         with:
+          version: "0.5.0"
           python-version: ${{ env.PYTHON_VERSION }}
-          mypy_flags: "--install-types --non-interactive"
-          # Don't fail the type-check job; surface issues for follow-up.
-          # strict: true
+          enable-cache: true
+      - run: uv sync --frozen --extra dev
+      - run: uv run mypy core/ web/ plugins/ launcher/ || true
 
   test:
     name: Tests (pytest)
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
