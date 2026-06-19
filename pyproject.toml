@@ -299,4 +299,3 @@ precision = 2
 [tool.bandit]
 exclude_dirs = ["tests", "frontend", "data", "output", "node_modules"]
 skips = ["B101"]  # allow assert in src for invariants
-]
