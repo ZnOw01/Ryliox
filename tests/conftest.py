@@ -282,14 +282,29 @@ def mock_kernel(mock_http_client: MagicMock, temp_dir: Path) -> Generator[Kernel
 
 @pytest.fixture(scope="function")
 def mock_session_store(temp_db_path: Path) -> SessionStore:
-    """Create a session store with temporary database."""
-    return SessionStore(
+    """Create a session store with a temporary database.
+
+    Pre-populated with a single test cookie so routes that gate on
+    ``count_stored_cookies()`` (search, book info, chapters) succeed by
+    default in integration tests. Tests that need an empty-cookies
+    condition can override this fixture.
+    """
+    store = SessionStore(
         db_path=temp_db_path, legacy_cookies_file=temp_db_path.parent / "cookies.json"
     )
+    store.save_cookies(
+        {
+            "name": "orm-rt",
+            "value": "test-refresh-token",
+            "domain": ".oreilly.com",
+            "path": "/",
+        }
+    )
+    return store
 
 
 @pytest.fixture(scope="function")
-def mock_download_queue(temp_dir: Path, mock_kernel: Kernel) -> DownloadQueueService:
+def mock_download_queue(temp_dir: Path, mock_kernel: Kernel) -> Generator[DownloadQueueService, None, None]:
     """Create a download queue service with temporary database."""
     db_path = temp_dir / "downloads.db"
     error_log_dir = temp_dir / "logs"
@@ -308,7 +323,10 @@ def mock_download_queue(temp_dir: Path, mock_kernel: Kernel) -> DownloadQueueSer
         error_log_dir=error_log_dir,
         poll_interval_seconds=0.1,
     )
-    return queue
+    try:
+        yield queue
+    finally:
+        queue.stop()
 
 
 # ============================================================================
@@ -348,7 +366,7 @@ def test_app(
 @pytest.fixture(scope="function")
 def test_client(test_app: FastAPI) -> Generator[TestClient, None, None]:
     """Create a TestClient for the test application."""
-    with TestClient(test_app) as client:
+    with TestClient(test_app, raise_server_exceptions=False) as client:
         yield client
 
 
@@ -366,7 +384,7 @@ def authenticated_client(
 
     # Save cookies via API
     response = test_client.post(
-        "/api/cookies", json=sample_cookies, headers={"Origin": "http://localhost:8000"}
+        "/api/cookies", json=sample_cookies, headers={"Origin": "http://testserver"}
     )
     assert response.status_code == 200
 
@@ -411,6 +429,16 @@ def base_url() -> str:
 # ============================================================================
 # Utility Fixtures
 # ============================================================================
+
+
+def extract_error(response_data: dict) -> str:
+    """Extract error message from FastAPI response, handling detail wrapping."""
+    if "error" in response_data:
+        return str(response_data.get("error", ""))
+    detail = response_data.get("detail", {})
+    if isinstance(detail, dict):
+        return str(detail.get("error", ""))
+    return str(detail) if detail else ""
 
 
 @pytest.fixture(scope="function")

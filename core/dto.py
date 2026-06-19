@@ -35,6 +35,8 @@ class DownloadJobDTO(BaseModel):
         data["output_dir"] = str(self.output_dir)
         if self.selected_chapters is not None:
             data["selected_chapters"] = list(self.selected_chapters)
+        else:
+            data.pop("selected_chapters", None)
         return data
 
     @classmethod

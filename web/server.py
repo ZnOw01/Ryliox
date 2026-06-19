@@ -25,6 +25,7 @@ from fastapi.staticfiles import StaticFiles
 import config
 from web.api_utils import ErrorCode, error_response
 from web.dependencies import (
+    ForbiddenOriginError,
     initialize_app_services,
     shutdown_app_services,
 )
@@ -69,6 +70,24 @@ def _security_headers_middleware_factory():
         return response
 
     return _middleware
+
+
+# ─── Error sanitisation ─────────────────────────────────────────────────────
+
+
+def _sanitize_errors(errors: list[dict]) -> list[dict]:
+    """Strip non-JSON-serializable values from Pydantic validation errors."""
+    safe: list[dict] = []
+    for err in errors:
+        item = dict(err)
+        ctx = item.get("ctx")
+        if isinstance(ctx, dict):
+            item["ctx"] = {
+                k: str(v) if not isinstance(v, (str, int, float, bool, type(None))) else v
+                for k, v in ctx.items()
+            }
+        safe.append(item)
+    return safe
 
 
 # ─── Request size / timeout middleware ───────────────────────────────────────
@@ -159,11 +178,21 @@ def create_app() -> FastAPI:
     @app.exception_handler(RequestValidationError)
     async def _validation_handler(request: Request, exc: RequestValidationError):
         logger.debug("Validation error: %s", exc.errors())
+        errors = _sanitize_errors(exc.errors())
         return error_response(
             "Request validation failed",
-            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
             code=ErrorCode.BAD_REQUEST,
-            details={"errors": exc.errors()},
+            details={"errors": errors},
+        )
+
+    @app.exception_handler(ForbiddenOriginError)
+    async def _forbidden_origin_handler(request: Request, exc: ForbiddenOriginError):
+        logger.warning("Cross-origin request blocked: %s", exc)
+        return error_response(
+            f"Cross-origin request blocked for '{exc.args[0]}'.",
+            status.HTTP_403_FORBIDDEN,
+            code=ErrorCode.CROSS_ORIGIN_BLOCKED,
         )
 
     @app.exception_handler(Exception)

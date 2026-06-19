@@ -240,6 +240,7 @@ class HttpClient:
                 if current == url:
                     self._validate_request_url(current)
                 raise ValueError(f"Blocked unsafe redirect URL: {current}")
+            self._apply_auth_cookies()
             response = await self.client.get(current, follow_redirects=False, **kwargs)
             if response.status_code not in (301, 302, 303, 307, 308):
                 return response

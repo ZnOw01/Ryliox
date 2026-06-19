@@ -720,11 +720,7 @@ class DownloadJobRepository:
                 ),
             )
             if cursor.rowcount == 0:
-                import logging
-
-                logging.getLogger(__name__).warning(
-                    f"mark_completed: no rows updated for job_id={job_id}"
-                )
+                logger.warning("mark_completed: no rows updated for job_id=%s", job_id)
                 conn.commit()
                 return False
             self._prune_terminal_jobs_conn(conn)
@@ -769,11 +765,7 @@ class DownloadJobRepository:
                 ),
             )
             if cursor.rowcount == 0:
-                import logging
-
-                logging.getLogger(__name__).warning(
-                    f"mark_failed: no rows updated for job_id={job_id}"
-                )
+                logger.warning("mark_failed: no rows updated for job_id=%s", job_id)
                 conn.commit()
                 return False
             self._prune_terminal_jobs_conn(conn)

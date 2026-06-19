@@ -21,12 +21,7 @@ from core import create_default_kernel
 
 # New architectural imports (Dependency Inversion)
 from core.repository import DownloadJobRepository
-from core.services import (
-    DownloadQueueService,
-)
-from core.services import (
-    DownloadQueueService as ModernDownloadQueueService,
-)
+from core.services import DownloadQueueService
 from core.session_store import SessionStore
 from core.validators import (
     ValidationError,
@@ -80,7 +75,7 @@ def _build_download_queue(
         )
 
     # Inyección de dependencias al service layer
-    queue = ModernDownloadQueueService(
+    queue = DownloadQueueService(
         kernel_factory=_async_kernel_factory,
         repository=repository,  # Inyección del repository
         error_log_dir=DOWNLOAD_ERROR_LOG_DIR,
@@ -170,7 +165,7 @@ class DependencyProvider:
     ) -> IDownloadQueueService:
         """Factory para el queue service."""
         if cls._queue_service is None:
-            cls._queue_service = ModernDownloadQueueService(
+            cls._queue_service = DownloadQueueService(
                 kernel_factory=kernel_factory,
                 repository=cls.get_repository(),
                 error_log_dir=DOWNLOAD_ERROR_LOG_DIR,

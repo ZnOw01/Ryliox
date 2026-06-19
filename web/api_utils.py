@@ -35,6 +35,7 @@ class ErrorCode(StrEnum):
     SEARCH_FAILED = "search_failed"
     INVALID_PROGRESS_SNAPSHOT = "invalid_progress_snapshot"
     JOB_NOT_FOUND = "job_not_found"
+    CROSS_ORIGIN_BLOCKED = "cross_origin_blocked"
 
 
 def error_response(

@@ -213,13 +213,15 @@
 }
 
 ::selection {
-  background-color: color-mix(in oklch, var(--primary) 20%, transparent);
+  background-color: color-mix(in oklch, var(--primary) 25%, transparent);
   color: var(--primary-foreground);
+  text-shadow: none;
 }
 
 .dark ::selection {
-  background-color: color-mix(in oklch, var(--primary) 30%, transparent);
+  background-color: color-mix(in oklch, var(--primary) 35%, transparent);
   color: var(--foreground);
+  text-shadow: none;
 }
 
 html {
@@ -237,22 +239,31 @@ body {
   min-height: 100vh;
   color: var(--foreground);
   font-family: var(--font-sans);
-  background:
-    radial-gradient(circle at 14% 8%, oklch(78% 0.14 20 / 0.22) 0%, transparent 34%),
-    radial-gradient(circle at 86% 6%, oklch(75% 0.14 10 / 0.18) 0%, transparent 30%),
-    radial-gradient(circle at 50% 100%, oklch(95% 0.03 20 / 0.25) 0%, transparent 50%),
-    linear-gradient(180deg, var(--background) 0%, var(--muted) 100%);
+  background: linear-gradient(180deg, var(--background) 0%, var(--muted) 100%);
+  background-attachment: fixed;
 }
 
-.dark body {
-  background:
-    radial-gradient(circle at 14% 8%, oklch(58% 0.2 20 / 0.15) 0%, transparent 34%),
-    radial-gradient(circle at 86% 6%, oklch(48% 0.18 20 / 0.12) 0%, transparent 30%),
-    radial-gradient(circle at 50% 100%, oklch(32% 0.12 20 / 0.2) 0%, transparent 50%),
-    linear-gradient(180deg, var(--background) 0%, var(--muted) 100%);
-}
-
+/* Decorative ambient gradients on pseudo-elements — avoids repaints on body content changes */
 body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 600px 400px at 14% 8%, oklch(78% 0.14 20 / 0.18) 0%, transparent 70%),
+    radial-gradient(ellipse 500px 400px at 86% 6%, oklch(75% 0.14 10 / 0.14) 0%, transparent 70%),
+    radial-gradient(ellipse 800px 300px at 50% 100%, oklch(95% 0.03 20 / 0.2) 0%, transparent 70%);
+}
+
+.dark body::before {
+  background:
+    radial-gradient(ellipse 600px 400px at 14% 8%, oklch(58% 0.2 20 / 0.12) 0%, transparent 70%),
+    radial-gradient(ellipse 500px 400px at 86% 6%, oklch(48% 0.18 20 / 0.1) 0%, transparent 70%),
+    radial-gradient(ellipse 800px 300px at 50% 100%, oklch(32% 0.12 20 / 0.15) 0%, transparent 70%);
+}
+
+/* Grid overlay — separate pseudo-element to avoid blending issues */
+body::after {
   content: '';
   position: fixed;
   inset: 0;
@@ -261,10 +272,11 @@ body::before {
     linear-gradient(oklch(78% 0.14 20 / 0.06) 1px, transparent 1px),
     linear-gradient(90deg, oklch(78% 0.14 20 / 0.06) 1px, transparent 1px);
   background-size: 28px 28px;
-  opacity: 0.3;
+  opacity: 0.15;
+  z-index: -1;
 }
 
-.dark body::before {
+.dark body::after {
   background-image:
     linear-gradient(oklch(78% 0.14 20 / 0.04) 1px, transparent 1px),
     linear-gradient(90deg, oklch(78% 0.14 20 / 0.04) 1px, transparent 1px);
@@ -308,6 +320,12 @@ pre {
 :focus-visible {
   outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
+  transition: outline-offset 0.15s var(--ease-smooth), outline-color 0.15s var(--ease-smooth);
+}
+
+/* Dark mode heading readability */
+.dark h1, .dark h2, .dark h3, .dark h4 {
+  text-shadow: 0 1px 3px oklch(0% 0 0 / 0.15);
 }
 
 /* Keyframes */
@@ -443,6 +461,37 @@ pre {
     outline: 3px solid currentColor;
     outline-offset: 3px;
   }
+}
+
+/* Backdrop blur utilities */
+@utility backdrop-blur-panel {
+  backdrop-filter: blur(16px) saturate(1.2);
+  -webkit-backdrop-filter: blur(16px) saturate(1.2);
+}
+
+@utility backdrop-blur-header {
+  backdrop-filter: blur(20px) saturate(1.3);
+  -webkit-backdrop-filter: blur(20px) saturate(1.3);
+}
+
+/* Dark mode scrollbar overrides (global) */
+.dark ::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.dark ::-webkit-scrollbar-track {
+  background: var(--scroll-track);
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: var(--scroll-thumb);
+  border-radius: 999px;
+  border: 2px solid var(--scroll-track);
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: var(--scroll-thumb-hover);
 }
 
 /* Screen Reader Only */

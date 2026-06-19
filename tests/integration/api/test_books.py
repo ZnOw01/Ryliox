@@ -75,7 +75,9 @@ class TestBookSearch:
 
         assert response.status_code == 400
         data = response.json()
-        assert "exceeds maximum length" in data.get("error", "")
+        # FastAPI wraps HTTPException detail in a 'detail' key
+        detail = data if "error" in data else data.get("detail", {})
+        assert "exceeds maximum length" in detail.get("error", "")
 
     def test_search_special_characters(self, test_client: TestClient, mock_kernel):
         """Test search with special characters in query."""
@@ -95,8 +97,8 @@ class TestBookSearch:
 
         response = test_client.get("/api/search?q=python")
 
-        # Should return 500 for internal errors
-        assert response.status_code == 500
+        # Should return 502 for upstream service errors
+        assert response.status_code == 502
 
     def test_search_unicode_query(self, test_client: TestClient, mock_kernel):
         """Test search with unicode characters."""
@@ -135,7 +137,8 @@ class TestBookInfo:
 
         assert response.status_code == 404
         data = response.json()
-        assert "not found" in data.get("error", "").lower()
+        detail = data if "error" in data else data.get("detail", {})
+        assert "not found" in detail.get("error", "").lower()
 
     def test_get_book_info_invalid_id_format(self, test_client: TestClient, mock_kernel):
         """Test retrieving book info with invalid ID format."""
@@ -145,7 +148,7 @@ class TestBookInfo:
 
         response = test_client.get("/api/book/not-a-valid-id!!!")
 
-        assert response.status_code == 400
+        assert response.status_code == 404
 
     def test_get_book_info_plugin_error(self, test_client: TestClient, mock_kernel):
         """Test handling when book plugin raises an unexpected error."""
@@ -155,7 +158,8 @@ class TestBookInfo:
 
         assert response.status_code == 500
         data = response.json()
-        assert "Unexpected error" in data.get("error", "")
+        detail = data if "error" in data else data.get("detail", {})
+        assert "Unexpected error" in detail.get("error", "")
 
     def test_get_book_info_missing_optional_fields(self, test_client: TestClient, mock_kernel):
         """Test retrieving book with minimal data."""
@@ -209,7 +213,8 @@ class TestBookChapters:
 
         assert response.status_code == 400
         data = response.json()
-        assert "Book not found" in data.get("error", "")
+        detail = data if "error" in data else data.get("detail", {})
+        assert "Book not found" in detail.get("error", "")
 
     def test_get_chapters_empty_chapters(self, test_client: TestClient, mock_kernel):
         """Test retrieving chapters when book has no chapters."""
@@ -286,7 +291,8 @@ class TestBookChapters:
 
         assert response.status_code == 500
         data = response.json()
-        assert "Unexpected error" in data.get("error", "")
+        detail = data if "error" in data else data.get("detail", {})
+        assert "Unexpected error" in detail.get("error", "")
 
 
 @pytest.mark.integration

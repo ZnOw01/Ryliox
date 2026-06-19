@@ -167,7 +167,7 @@ class DownloadQueueService:
         self._wake_event.set()
         self._notify_progress_change()
 
-        logger.info(f"Enqueued job {job_dto.job_id[:8]} for book {book_id}")
+        logger.info("Enqueued job %s for book %s", job_dto.job_id[:8], book_id)
         return snapshot
 
     def get_progress(self, job_id: str | None = None) -> dict[str, Any]:
@@ -266,7 +266,7 @@ class DownloadQueueService:
             trace_log = self._write_error_trace(trace_text, job_id)
             self._last_worker_error_signature = signature
             self._last_worker_error_logged_at = now
-            logger.exception(f"Worker error in job {job_id}")
+            logger.exception("Worker error in job %s", job_id)
 
         if job_dto is not None:
             try:
@@ -353,7 +353,7 @@ class DownloadQueueService:
 
             self._repository.mark_completed(job.job_id, result_dto)
             self._notify_progress_change()
-            logger.info(f"Job {job.job_id[:8]} completed successfully")
+            logger.info("Job %s completed successfully", job.job_id[:8])
 
         except Exception as exc:
             self._handle_job_exception(job, exc, cancel_event)
@@ -394,7 +394,7 @@ class DownloadQueueService:
                 error_dto,
                 status="cancelled",
             )
-            logger.info(f"Job {job.job_id[:8]} cancelled by user")
+            logger.info("Job %s cancelled by user", job.job_id[:8])
         else:
             error_dto = DownloadErrorDTO(
                 error=message or "Download failed",
@@ -407,7 +407,7 @@ class DownloadQueueService:
                 error_dto,
                 status="error",
             )
-            logger.error(f"Job {job.job_id[:8]} failed: {message}")
+            logger.error("Job %s failed: %s", job.job_id[:8], message)
 
         self._notify_progress_change()
 
@@ -432,5 +432,5 @@ class DownloadQueueService:
             log_path.write_text(trace_text, encoding="utf-8")
             return str(log_path)
         except Exception as exc:
-            logger.warning(f"Failed to write error trace: {exc}")
+            logger.warning("Failed to write error trace: %s", exc)
             return None

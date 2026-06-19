@@ -12,7 +12,7 @@ Tests cover:
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -34,7 +34,7 @@ class TestDownloadQueue:
         mock_kernel._plugins["downloader"].parse_formats = MagicMock(return_value=["epub"])
 
         request_data = {
-            "book_id": "9780134685991",
+            "book_id": "urn:orm:book:a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6",
             "format": ["epub"],
             "output_dir": "/tmp/output",
         }
@@ -42,13 +42,13 @@ class TestDownloadQueue:
         response = test_client.post(
             "/api/download",
             json=request_data,
-            headers={"Origin": "http://localhost:8000"},
+            headers={"Origin": "http://testserver"},
         )
 
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == "queued"
-        assert data["book_id"] == "9780134685991"
+        assert data["book_id"] == "urn:orm:book:a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6"
         assert "job_id" in data
         assert data["queue_position"] is not None
 
@@ -61,33 +61,34 @@ class TestDownloadQueue:
         response = test_client.post(
             "/api/download",
             json=request_data,
-            headers={"Origin": "http://localhost:8000"},
+            headers={"Origin": "http://testserver"},
         )
 
         assert response.status_code == 400
         data = response.json()
-        assert "book_id required" in data.get("error", "")
+        detail = data if "error" in data else data.get("detail", {})
+        assert "Book ID is required" in detail.get("error", "")
 
     def test_download_invalid_format(self, test_client: TestClient, mock_kernel):
         """Test download with invalid format."""
-        mock_kernel._plugins["downloader"].parse_formats = MagicMock(
-            side_effect=ValueError("Invalid format: xyz")
-        )
+        from plugins.downloader import DownloaderPlugin
 
-        request_data = {
-            "book_id": "9780134685991",
-            "format": ["xyz"],
-        }
+        with patch.object(DownloaderPlugin, "parse_formats", side_effect=ValueError("Invalid format: xyz")):
+            request_data = {
+                "book_id": "urn:orm:book:a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6",
+                "format": ["xyz"],
+            }
 
-        response = test_client.post(
-            "/api/download",
-            json=request_data,
-            headers={"Origin": "http://localhost:8000"},
-        )
+            response = test_client.post(
+                "/api/download",
+                json=request_data,
+                headers={"Origin": "http://testserver"},
+            )
 
-        assert response.status_code == 400
-        data = response.json()
-        assert "Invalid format" in data.get("error", "")
+            assert response.status_code == 400
+            data = response.json()
+            detail = data if "error" in data else data.get("detail", {})
+            assert "Invalid format" in detail.get("error", "")
 
     def test_download_invalid_output_dir(self, test_client: TestClient, mock_kernel):
         """Test download with invalid output directory."""
@@ -96,7 +97,7 @@ class TestDownloadQueue:
         )
 
         request_data = {
-            "book_id": "9780134685991",
+            "book_id": "urn:orm:book:a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6",
             "format": ["epub"],
             "output_dir": "/nonexistent/path",
         }
@@ -104,70 +105,72 @@ class TestDownloadQueue:
         response = test_client.post(
             "/api/download",
             json=request_data,
-            headers={"Origin": "http://localhost:8000"},
+            headers={"Origin": "http://testserver"},
         )
 
         assert response.status_code == 400
         data = response.json()
-        assert "Directory not writable" in data.get("error", "")
+        detail = data if "error" in data else data.get("detail", {})
+        assert "Directory not writable" in detail.get("error", "")
 
     def test_download_chapter_selection(
         self, test_client: TestClient, mock_kernel, mock_download_queue
     ):
         """Test download with specific chapters selected."""
+        from plugins.downloader import DownloaderPlugin
+
         mock_kernel._plugins["output"].validate_dir = MagicMock(
             return_value=(True, None, "/tmp/output")
         )
-        mock_kernel._plugins["downloader"].parse_formats = MagicMock(return_value=["epub"])
-        mock_kernel._plugins["downloader"].supports_chapter_selection = MagicMock(return_value=True)
 
-        request_data = {
-            "book_id": "9780134685991",
-            "format": ["epub"],
-            "chapters": [0, 1, 2],
-            "skip_images": True,
-        }
+        with patch.object(DownloaderPlugin, "supports_chapter_selection", return_value=True):
+            request_data = {
+                "book_id": "urn:orm:book:a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6",
+                "format": ["epub"],
+                "chapters": [0, 1, 2],
+                "skip_images": True,
+            }
 
-        response = test_client.post(
-            "/api/download",
-            json=request_data,
-            headers={"Origin": "http://localhost:8000"},
-        )
+            response = test_client.post(
+                "/api/download",
+                json=request_data,
+                headers={"Origin": "http://testserver"},
+            )
 
-        assert response.status_code == 200
-        data = response.json()
-        assert data["status"] == "queued"
+            assert response.status_code == 200
+            data = response.json()
+            assert data["status"] == "queued"
 
     def test_download_chapters_not_supported_for_format(self, test_client: TestClient, mock_kernel):
         """Test download with chapter selection on unsupported format."""
+        from plugins.downloader import DownloaderPlugin
+
         mock_kernel._plugins["output"].validate_dir = MagicMock(
             return_value=(True, None, "/tmp/output")
         )
-        mock_kernel._plugins["downloader"].parse_formats = MagicMock(return_value=["pdf"])
-        mock_kernel._plugins["downloader"].supports_chapter_selection = MagicMock(
-            return_value=False
-        )
 
-        request_data = {
-            "book_id": "9780134685991",
-            "format": ["pdf"],
-            "chapters": [0, 1],
-        }
+        with patch.object(DownloaderPlugin, "supports_chapter_selection", return_value=False):
+            request_data = {
+                "book_id": "urn:orm:book:a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6",
+                "format": ["pdf"],
+                "chapters": [0, 1],
+            }
 
-        response = test_client.post(
-            "/api/download",
-            json=request_data,
-            headers={"Origin": "http://localhost:8000"},
-        )
+            response = test_client.post(
+                "/api/download",
+                json=request_data,
+                headers={"Origin": "http://testserver"},
+            )
 
-        assert response.status_code == 400
-        data = response.json()
-        assert "Chapter selection not supported" in data.get("error", "")
+            assert response.status_code == 400
+            data = response.json()
+            detail = data if "error" in data else data.get("detail", {})
+            assert "Chapter selection not supported" in detail.get("error", "")
 
     def test_download_cross_origin_blocked(self, test_client: TestClient):
         """Test that cross-origin download requests are blocked."""
         request_data = {
-            "book_id": "9780134685991",
+            "book_id": "urn:orm:book:a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6",
             "format": ["epub"],
         }
 
@@ -189,14 +192,14 @@ class TestDownloadQueue:
         mock_kernel._plugins["downloader"].parse_formats = MagicMock(return_value=["epub", "pdf"])
 
         request_data = {
-            "book_id": "9780134685991",
+            "book_id": "urn:orm:book:a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6",
             "format": ["epub", "pdf"],
         }
 
         response = test_client.post(
             "/api/download",
             json=request_data,
-            headers={"Origin": "http://localhost:8000"},
+            headers={"Origin": "http://testserver"},
         )
 
         assert response.status_code == 200
@@ -213,14 +216,14 @@ class TestDownloadQueue:
         mock_kernel._plugins["downloader"].parse_formats = MagicMock(return_value=["epub"])
 
         request_data = {
-            "book_id": "9780134685991",
+            "book_id": "urn:orm:book:a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6",
             "format": "epub",  # String instead of list
         }
 
         response = test_client.post(
             "/api/download",
             json=request_data,
-            headers={"Origin": "http://localhost:8000"},
+            headers={"Origin": "http://testserver"},
         )
 
         assert response.status_code == 200
@@ -228,7 +231,7 @@ class TestDownloadQueue:
     def test_download_negative_chapter_indexes(self, test_client: TestClient):
         """Test download with negative chapter indexes."""
         request_data = {
-            "book_id": "9780134685991",
+            "book_id": "urn:orm:book:a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6",
             "format": ["epub"],
             "chapters": [-1, 0, 1],  # Negative index
         }
@@ -236,7 +239,7 @@ class TestDownloadQueue:
         response = test_client.post(
             "/api/download",
             json=request_data,
-            headers={"Origin": "http://localhost:8000"},
+            headers={"Origin": "http://testserver"},
         )
 
         assert response.status_code == 422  # Validation error
@@ -267,8 +270,8 @@ class TestDownloadProgress:
         # First, queue a download
         download_response = test_client.post(
             "/api/download",
-            json={"book_id": "9780134685991", "format": ["epub"]},
-            headers={"Origin": "http://localhost:8000"},
+            json={"book_id": "urn:orm:book:a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6", "format": ["epub"]},
+            headers={"Origin": "http://testserver"},
         )
         job_id = download_response.json()["job_id"]
 
@@ -284,9 +287,10 @@ class TestDownloadProgress:
         """Test getting progress for non-existent job."""
         response = test_client.get("/api/progress?job_id=invalid-job-id-123")
 
-        assert response.status_code == 200
+        assert response.status_code == 404
         data = response.json()
-        assert data["status"] == "idle"
+        detail = data if "error" in data else data.get("detail", {})
+        assert "Job not found" in detail.get("error", "")
 
 
 @pytest.mark.integration
@@ -305,8 +309,8 @@ class TestDownloadCancel:
         # First, queue a download
         download_response = test_client.post(
             "/api/download",
-            json={"book_id": "9780134685991", "format": ["epub"]},
-            headers={"Origin": "http://localhost:8000"},
+            json={"book_id": "urn:orm:book:a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6", "format": ["epub"]},
+            headers={"Origin": "http://testserver"},
         )
         job_id = download_response.json()["job_id"]
 
@@ -314,17 +318,17 @@ class TestDownloadCancel:
         response = test_client.post(
             "/api/cancel",
             json={"job_id": job_id},
-            headers={"Origin": "http://localhost:8000"},
+            headers={"Origin": "http://testserver"},
         )
 
         assert response.status_code == 200
         data = response.json()
         assert data["success"] is True
-        assert "Cancel" in data.get("message", "")
+        assert "cancelled" in data.get("message", "")
 
     def test_cancel_no_active_job(self, test_client: TestClient):
         """Test cancelling when no job is active."""
-        response = test_client.post("/api/cancel", headers={"Origin": "http://localhost:8000"})
+        response = test_client.post("/api/cancel", headers={"Origin": "http://testserver"})
 
         assert response.status_code == 200
         data = response.json()
@@ -336,7 +340,7 @@ class TestDownloadCancel:
         response = test_client.post(
             "/api/cancel",
             json={"job_id": "nonexistent-job"},
-            headers={"Origin": "http://localhost:8000"},
+            headers={"Origin": "http://testserver"},
         )
 
         assert response.status_code == 200
@@ -356,14 +360,14 @@ class TestDownloadCancel:
         # Queue a download
         download_response = test_client.post(
             "/api/download",
-            json={"book_id": "9780134685991", "format": ["epub"]},
-            headers={"Origin": "http://localhost:8000"},
+            json={"book_id": "urn:orm:book:a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6", "format": ["epub"]},
+            headers={"Origin": "http://testserver"},
         )
         job_id = download_response.json()["job_id"]
 
         # Cancel using query parameter
         response = test_client.post(
-            f"/api/cancel?job_id={job_id}", headers={"Origin": "http://localhost:8000"}
+            f"/api/cancel?job_id={job_id}", headers={"Origin": "http://testserver"}
         )
 
         assert response.status_code == 200
@@ -389,14 +393,14 @@ class TestDownloadRateLimiting:
         )
         mock_kernel._plugins["downloader"].parse_formats = MagicMock(return_value=["epub"])
 
-        headers = {"Origin": "http://localhost:8000"}
+        headers = {"Origin": "http://testserver"}
         responses = []
 
         # Make multiple rapid requests
         for _ in range(10):
             response = test_client.post(
                 "/api/download",
-                json={"book_id": "9780134685991", "format": ["epub"]},
+                json={"book_id": "urn:orm:book:a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6", "format": ["epub"]},
                 headers=headers,
             )
             responses.append(response.status_code)
@@ -425,7 +429,7 @@ class TestDownloadProgressStream:
         response = test_client.get(
             "/api/progress/stream",
             headers={
-                "Origin": "http://localhost:8000",
+                "Origin": "http://testserver",
                 "Accept": "text/event-stream",
             },
         )
@@ -456,8 +460,8 @@ class TestDownloadFormats:
 
         response = test_client.post(
             "/api/download",
-            json={"book_id": "9780134685991", "format": ["pdf"]},
-            headers={"Origin": "http://localhost:8000"},
+            json={"book_id": "urn:orm:book:a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6", "format": ["pdf"]},
+            headers={"Origin": "http://testserver"},
         )
 
         assert response.status_code == 200
@@ -471,8 +475,8 @@ class TestDownloadFormats:
 
         response = test_client.post(
             "/api/download",
-            json={"book_id": "9780134685991", "format": ["epub"]},
-            headers={"Origin": "http://localhost:8000"},
+            json={"book_id": "urn:orm:book:a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6", "format": ["epub"]},
+            headers={"Origin": "http://testserver"},
         )
 
         assert response.status_code == 200
@@ -488,8 +492,8 @@ class TestDownloadFormats:
 
         response = test_client.post(
             "/api/download",
-            json={"book_id": "9780134685991", "format": ["epub", "pdf"]},
-            headers={"Origin": "http://localhost:8000"},
+            json={"book_id": "urn:orm:book:a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6", "format": ["epub", "pdf"]},
+            headers={"Origin": "http://testserver"},
         )
 
         assert response.status_code == 200
@@ -512,8 +516,8 @@ class TestDownloadWorkflow:
         # Step 1: Queue download
         download_response = test_client.post(
             "/api/download",
-            json={"book_id": "9780134685991", "format": ["epub"]},
-            headers={"Origin": "http://localhost:8000"},
+            json={"book_id": "urn:orm:book:a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6", "format": ["epub"]},
+            headers={"Origin": "http://testserver"},
         )
         assert download_response.status_code == 200
         job_data = download_response.json()
@@ -529,7 +533,7 @@ class TestDownloadWorkflow:
         cancel_response = test_client.post(
             "/api/cancel",
             json={"job_id": job_id},
-            headers={"Origin": "http://localhost:8000"},
+            headers={"Origin": "http://testserver"},
         )
         assert cancel_response.status_code == 200
         cancel_data = cancel_response.json()
@@ -551,7 +555,7 @@ class TestDownloadWorkflow:
             response = test_client.post(
                 "/api/download",
                 json={"book_id": f"book-{i}", "format": ["epub"]},
-                headers={"Origin": "http://localhost:8000"},
+                headers={"Origin": "http://testserver"},
             )
             assert response.status_code == 200
             data = response.json()

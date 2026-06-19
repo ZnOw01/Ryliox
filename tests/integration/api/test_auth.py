@@ -22,8 +22,11 @@ if TYPE_CHECKING:
 class TestAuthStatus:
     """Tests for GET /api/status endpoint."""
 
-    def test_status_no_session(self, test_client: TestClient, mock_kernel):
+    def test_status_no_session(self, test_client: TestClient, mock_kernel, mock_session_store):
         """Test status check with no valid session."""
+        # Clear cookies so has_cookies reflects the empty state
+        mock_session_store.save_cookies({})
+
         # Mock auth to return invalid status
         mock_kernel._plugins["auth"].get_status = AsyncMock(
             return_value={"valid": False, "reason": "no_session"}
@@ -81,7 +84,7 @@ class TestSaveCookies:
         response = test_client.post(
             "/api/cookies",
             json=sample_cookies,
-            headers={"Origin": "http://localhost:8000"},
+            headers={"Origin": "http://testserver"},
         )
 
         assert response.status_code == 200
@@ -98,7 +101,8 @@ class TestSaveCookies:
 
         assert response.status_code == 403
         data = response.json()
-        assert "Cross-origin request blocked" in data.get("error", "")
+        detail = data if "error" in data else data.get("detail", {})
+        assert "Cross-origin request blocked" in detail.get("error", "")
 
     def test_save_cookies_invalid_payload(self, test_client: TestClient, mock_kernel):
         """Test saving invalid cookie payload."""
@@ -109,7 +113,7 @@ class TestSaveCookies:
         response = test_client.post(
             "/api/cookies",
             json={"invalid": {"nested": "object"}},  # Invalid cookie structure
-            headers={"Origin": "http://localhost:8000"},
+            headers={"Origin": "http://testserver"},
         )
 
         # Should still succeed as empty cookies are normalized
@@ -126,17 +130,18 @@ class TestSaveCookies:
         response = test_client.post(
             "/api/cookies",
             json=sample_cookies,
-            headers={"Origin": "http://localhost:8000"},
+            headers={"Origin": "http://testserver"},
         )
 
         assert response.status_code == 401
         data = response.json()
-        assert "Cookies saved but session is still invalid" in data.get("error", "")
+        detail = data.get("detail", data)
+        assert "Cookies saved but session is still invalid" in detail.get("error", "")
 
     def test_save_cookies_empty_payload(self, test_client: TestClient):
         """Test saving empty cookie payload."""
         response = test_client.post(
-            "/api/cookies", json={}, headers={"Origin": "http://localhost:8000"}
+            "/api/cookies", json={}, headers={"Origin": "http://testserver"}
         )
 
         # Should return 400 for invalid payload
@@ -145,7 +150,7 @@ class TestSaveCookies:
     def test_save_cookies_none_payload(self, test_client: TestClient):
         """Test saving None as cookie payload."""
         response = test_client.post(
-            "/api/cookies", json=None, headers={"Origin": "http://localhost:8000"}
+            "/api/cookies", json=None, headers={"Origin": "http://testserver"}
         )
 
         assert response.status_code == 400
@@ -158,7 +163,7 @@ class TestGetCookies:
     def test_get_cookies_same_origin(self, authenticated_client: TestClient, sample_cookies):
         """Test retrieving cookies with same-origin header."""
         response = authenticated_client.get(
-            "/api/cookies", headers={"Origin": "http://localhost:8000"}
+            "/api/cookies", headers={"Origin": "http://testserver"}
         )
 
         assert response.status_code == 200
@@ -173,7 +178,8 @@ class TestGetCookies:
 
         assert response.status_code == 403
         data = response.json()
-        assert "Cross-origin request blocked" in data.get("error", "")
+        detail = data if "error" in data else data.get("detail", {})
+        assert "Cross-origin request blocked" in detail.get("error", "")
 
     def test_get_cookies_no_origin_header_safe_method(self, test_client: TestClient):
         """Test GET request without Origin header (should be allowed for safe methods)."""
@@ -181,8 +187,9 @@ class TestGetCookies:
 
         assert response.status_code == 200
 
-    def test_get_empty_cookies(self, test_client: TestClient):
+    def test_get_empty_cookies(self, test_client: TestClient, mock_session_store):
         """Test retrieving cookies when none are stored."""
+        mock_session_store.save_cookies({})
         response = test_client.get("/api/cookies")
 
         assert response.status_code == 200
@@ -204,7 +211,7 @@ class TestAuthRateLimiting:
         )
 
         # Make multiple rapid requests
-        headers = {"Origin": "http://localhost:8000"}
+        headers = {"Origin": "http://testserver"}
         responses = []
         for _ in range(10):
             response = test_client.post("/api/cookies", json=sample_cookies, headers=headers)
@@ -240,7 +247,7 @@ class TestCookieFormats:
         response = test_client.post(
             "/api/cookies",
             json=cookie_string,
-            headers={"Origin": "http://localhost:8000"},
+            headers={"Origin": "http://testserver"},
         )
 
         assert response.status_code == 200
@@ -265,7 +272,7 @@ class TestCookieFormats:
         response = test_client.post(
             "/api/cookies",
             json=edithiscookie_format,
-            headers={"Origin": "http://localhost:8000"},
+            headers={"Origin": "http://testserver"},
         )
 
         assert response.status_code == 200
@@ -291,7 +298,7 @@ class TestCookieFormats:
         response = test_client.post(
             "/api/cookies",
             json=nested_format,
-            headers={"Origin": "http://localhost:8000"},
+            headers={"Origin": "http://testserver"},
         )
 
         assert response.status_code == 200

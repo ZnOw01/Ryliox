@@ -8,9 +8,23 @@ import App from '../components/App';
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="description" content="Descarga libros de O'Reilly Learning en PDF y EPUB." />
-    <meta name="theme-color" content="#dc2626" />
+    <meta name="description" content="Descarga libros técnicos de O'Reilly Learning en formato PDF y EPUB. Gestiona tu biblioteca técnica offline con descargas rápidas por capítulos y múltiples formatos." />
+    <meta name="theme-color" content="#dc2626" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#d64a2c" media="(prefers-color-scheme: dark)" />
     <meta name="color-scheme" content="light dark" />
+
+    <!-- Open Graph / Twitter -->
+    <meta property="og:title" content="Ryliox — Descargador de libros O'Reilly" />
+    <meta property="og:description" content="Descarga y gestiona tu biblioteca técnica de O'Reilly Learning en PDF y EPUB. Rápido, por capítulos y sin complicaciones." />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://ryliox.app" />
+    <meta property="og:image" content="/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Ryliox — Descargador de libros O'Reilly" />
+    <meta name="twitter:description" content="Descarga y gestiona tu biblioteca técnica de O'Reilly Learning." />
+    <meta name="twitter:image" content="/og-image.png" />
 
     <!-- PWA -->
     <link rel="manifest" href="/manifest.json" />
@@ -19,9 +33,22 @@ import App from '../components/App';
     <meta name="apple-mobile-web-app-title" content="Ryliox" />
     <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
 
-    <!-- Preconnect -->
+    <!-- Preconnect & DNS-Prefetch -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="dns-prefetch" href="https://fonts.gstatic.com" />
+    <link rel="preconnect" href="https://learning.oreilly.com" />
+    <link rel="dns-prefetch" href="https://learning.oreilly.com" />
+
+    <!-- Font preload (IBM Plex Sans 400 woff2) -->
+    <link
+      rel="preload"
+      href="https://fonts.gstatic.com/s/ibmplexsans/v19/zYXgKVElMYYaJe8bpLHnCwDKhdHeFQ.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+
     <link
       rel="stylesheet"
       href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap"
@@ -32,6 +59,29 @@ import App from '../components/App';
     <link rel="icon" type="image/png" href="/favicon.png" />
 
     <title>Ryliox — Descargador de libros O'Reilly</title>
+
+    <!-- JSON-LD Structured Data -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "Ryliox",
+        "description": "Descargador de libros t\u00e9cnicos de O'Reilly Learning en formato PDF y EPUB.",
+        "url": "https://ryliox.app",
+        "applicationCategory": "Multimedia",
+        "operatingSystem": "All",
+        "browserRequirements": "Requiere JavaScript. Compatible con Chrome, Firefox, Safari y Edge.",
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "USD"
+        },
+        "author": {
+          "@type": "Organization",
+          "name": "Ryliox"
+        }
+      }
+    </script>
 
     <script is:inline>
       // Theme initialization - prevent flash

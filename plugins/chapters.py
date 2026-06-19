@@ -5,7 +5,7 @@ from __future__ import annotations
 from urllib.parse import urlparse
 
 import config
-from core.types import ChapterInfo
+from core.contracts import ChapterInfo
 
 from .base import Plugin
 

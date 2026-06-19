@@ -212,7 +212,7 @@ indent-style = "space"
 
 [tool.mypy]
 python_version = "3.11"
-mypy_path = ["core", "plugins", "utils", "web"]
+mypy_path = ["."]
 files = ["core", "plugins", "utils", "web", "main.py"]
 check_untyped_defs = true
 disallow_untyped_defs = false
@@ -265,6 +265,9 @@ filterwarnings = [
     "error",
     "ignore::DeprecationWarning:botocore.*",
     "ignore::DeprecationWarning:curl_cffi.*",
+    # Starlette's TestClient warning subclasses UserWarning (not DeprecationWarning),
+    # so it must be filtered by its concrete class. The deprecation only concerns
+    # using `httpx` instead of `httpx2` for the test client — not a runtime issue.
     "ignore::starlette.exceptions.StarletteDeprecationWarning",
     "ignore::PendingDeprecationWarning",
 ]

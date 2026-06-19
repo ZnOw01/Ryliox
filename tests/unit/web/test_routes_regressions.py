@@ -27,7 +27,7 @@ def _build_client(
     monkeypatch: pytest.MonkeyPatch, *, kernel: DummyKernel | None = None, queue=None
 ):
     async def fake_initialize(app):
-        app.state.session_store = object()
+        app.state.session_store = SimpleNamespace(count_stored_cookies=lambda: 1)
         app.state.kernel = kernel or DummyKernel(
             auth=SimpleNamespace(get_status=lambda: {"valid": False}),
             book=SimpleNamespace(),

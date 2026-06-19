@@ -44,13 +44,6 @@ class PathSettings(BaseSettings):
     audit_log_dir: Path = Field(default=Path("./data/audit"))
     audit_log_file: Path = Field(default=Path("./data/audit.log"))
 
-    @field_validator("*", mode="before")
-    @classmethod
-    def _coerce_paths(cls, value: Any) -> Any:
-        if isinstance(value, str):
-            return value
-        return value
-
 
 class HttpSettings(BaseSettings):
     delay: float = 0.5

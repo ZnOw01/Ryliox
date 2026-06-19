@@ -5,13 +5,12 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import ValidationError
 
-import config
 from core.session_store import SessionStore
 from web.api_utils import ErrorCode
-from web.dependencies import get_kernel
+from web.dependencies import get_kernel, get_session_store
 from web.schemas import (
     BookChaptersResponse,
     BookInfoResponse,
@@ -28,39 +27,47 @@ router = APIRouter(prefix="/api", tags=["books"])
 MAX_SEARCH_LENGTH = 200
 
 
-def _has_valid_cookies(request: Request | None = None) -> tuple[bool, int]:
-    """Check if valid cookies are configured. Returns ``(has_cookies, count)``.
+def _has_valid_cookies(store: SessionStore | None) -> tuple[bool, int]:
+    """Return ``(has_cookies, count)`` for the given session store.
 
-    In test contexts where the application state does not expose a real
-    :class:`SessionStore`, the check is bypassed so unit tests can exercise
-    downstream plugin logic without standing up a real session store.
+    A ``None`` store is treated as "no cookies available" so callers fail
+    safely. Storage errors are swallowed into ``(False, 0)`` so transient
+    issues don't crash the request — they surface as a 503 to the client.
     """
-    if request is not None:
-        store = getattr(request.app.state, "session_store", None)
-        if store is None or not hasattr(store, "count_stored_cookies"):
-            return True, 0
-        try:
-            count = store.count_stored_cookies()
-        except Exception as exc:
-            logger.warning("Failed to check cookies: %s", exc)
-            return False, 0
-        return count > 0, count
-
+    if store is None:
+        return False, 0
     try:
-        store = SessionStore(
-            db_path=config.SESSION_DB_FILE,
-            legacy_cookies_file=config.COOKIES_FILE,
-        )
         count = store.count_stored_cookies()
-        return count > 0, count
     except Exception as exc:
         logger.warning("Failed to check cookies: %s", exc)
         return False, 0
+    return count > 0, count
+
+
+def _require_cookies(store: SessionStore, operation: str, book_id: str | None = None) -> None:
+    """Raise 503 with a helpful message when no cookies are configured.
+
+    Centralises the auth-required response so the three book routes stay
+    consistent. ``operation`` is used in the log line; ``book_id`` is
+    included in the log when relevant.
+    """
+    has_cookies, _ = _has_valid_cookies(store)
+    if has_cookies:
+        return
+    detail = "Book " + book_id if book_id else operation
+    logger.warning("%s attempted without cookies configured", detail)
+    raise HTTPException(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        detail={
+            "error": "No session cookies configured. Please configure cookies first.",
+            "code": ErrorCode.AUTH_REQUIRED,
+            "suggestion": "Go to Settings > Cookies to configure your session cookies",
+        },
+    )
 
 
 @router.get("/search", response_model=SearchResponse)
 async def search(
-    request: Request,
     q: str = Query(
         default="",
         alias="q",
@@ -68,6 +75,7 @@ async def search(
     ),
     query: str = Query(default="", include_in_schema=False),  # alias legacy, oculto en docs
     kernel: Kernel = Depends(get_kernel),
+    session_store: SessionStore = Depends(get_session_store),
 ) -> SearchResponse:
     """Busca libros por título, autor o ISBN."""
     search_term = (q or query).strip()
@@ -83,25 +91,14 @@ async def search(
             },
         )
 
-    # Check if cookies are configured
-    has_cookies, cookie_count = _has_valid_cookies(request)
-    if not has_cookies:
-        logger.warning("Search attempted without cookies configured")
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail={
-                "error": "No session cookies configured. Please configure cookies first.",
-                "code": ErrorCode.AUTH_REQUIRED,
-                "suggestion": "Go to Settings > Cookies to configure your session cookies",
-            },
-        )
+    _require_cookies(session_store, "Search")
 
     book_plugin = kernel["book"]
     try:
         results = await book_plugin.search(search_term)
         return SearchResponse(results=results)
     except Exception as exc:
-        logger.exception(f"Error searching for '{search_term}': {exc}")
+        logger.exception("Error searching for '%s'", search_term)
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail={
@@ -115,25 +112,12 @@ async def search(
 @router.get("/book/{book_id}/chapters", response_model=BookChaptersResponse)
 async def book_chapters(
     book_id: str,
-    request: Request,
     kernel: Kernel = Depends(get_kernel),
+    session_store: SessionStore = Depends(get_session_store),
 ) -> BookChaptersResponse:
     """Retorna la lista de capítulos de un libro."""
+    _require_cookies(session_store, "Chapters fetch", book_id=book_id)
 
-    # Check if cookies are configured first
-    has_cookies, cookie_count = _has_valid_cookies(request)
-    if not has_cookies:
-        logger.warning(f"Chapters fetch attempted without cookies for book {book_id}")
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail={
-                "error": "No session cookies configured. Please configure cookies first.",
-                "code": ErrorCode.AUTH_REQUIRED,
-                "suggestion": "Go to Settings > Cookies to configure your session cookies",
-            },
-        )
-
-    # Verify chapters plugin is available
     try:
         chapters_plugin = kernel["chapters"]
     except KeyError:
@@ -149,16 +133,13 @@ async def book_chapters(
     try:
         raw_chapters: list[dict] = await chapters_plugin.fetch_list(book_id)
     except (LookupError, ValueError) as exc:
-        logger.warning(f"Chapters fetch failed for book {book_id}: {exc}")
+        logger.warning("Chapters fetch failed for book %s: %s", book_id, exc)
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail={"error": str(exc), "code": ErrorCode.BOOK_CHAPTERS_FAILED},
         ) from exc
     except Exception as exc:
-        logger.exception(f"Unexpected error fetching chapters for book {book_id}: {exc}")
-        # Log additional context for debugging
-        logger.error(f"Exception type: {type(exc).__name__}")
-        logger.error(f"Exception args: {getattr(exc, 'args', 'N/A')}")
+        logger.exception("Unexpected error fetching chapters for book %s", book_id)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail={
@@ -192,7 +173,7 @@ async def book_chapters(
                 )
             )
     except (TypeError, ValueError, ValidationError) as exc:
-        logger.warning("Datos de capitulo invalidos recibidos para %r: %s", book_id, exc)
+        logger.warning("Datos de capítulo inválidos recibidos para %r: %s", book_id, exc)
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail={
@@ -207,23 +188,11 @@ async def book_chapters(
 @router.get("/book/{book_id}", response_model=BookInfoResponse)
 async def book_info(
     book_id: str,
-    request: Request,
     kernel: Kernel = Depends(get_kernel),
+    session_store: SessionStore = Depends(get_session_store),
 ) -> BookInfoResponse:
     """Retorna los metadatos de un libro por su ID."""
-
-    # Check if cookies are configured
-    has_cookies, cookie_count = _has_valid_cookies(request)
-    if not has_cookies:
-        logger.warning(f"Book info fetch attempted without cookies for book {book_id}")
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail={
-                "error": "No session cookies configured. Please configure cookies first.",
-                "code": ErrorCode.AUTH_REQUIRED,
-                "suggestion": "Go to Settings > Cookies to configure your session cookies",
-            },
-        )
+    _require_cookies(session_store, "Book info fetch", book_id=book_id)
 
     book_plugin = kernel["book"]
     try:

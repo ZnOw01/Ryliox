@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from typing import Any
 
 from .http_client import HttpClient
@@ -82,7 +83,7 @@ class Kernel:
     def __contains__(self, name: str) -> bool:
         return name in self._plugins
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[str]:
         return iter(self._plugins)
 
 
