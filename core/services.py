@@ -315,6 +315,10 @@ class DownloadQueueService:
 
             async def run_download() -> DownloadResult:
                 kernel = await self._kernel_factory()
+                entered_kernel = False
+                if not getattr(kernel, "_entered", False):
+                    await kernel.__aenter__()
+                    entered_kernel = True
                 downloader = kernel["downloader"]
 
                 try:
@@ -330,8 +334,9 @@ class DownloadQueueService:
                         ),
                     )
                 finally:
-                    with contextlib.suppress(Exception):
-                        await kernel.__aexit__(None, None, None)
+                    if entered_kernel:
+                        with contextlib.suppress(Exception):
+                            await kernel.__aexit__(None, None, None)
 
             with runner:
                 result = runner.run(

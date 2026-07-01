@@ -111,6 +111,24 @@ class HttpClient:
     # ---- cookies ---------------------------------------------------------
 
     def _load_cookies(self, path: Path) -> None:
+        if Path(path) == Path(config.COOKIES_FILE):
+            try:
+                from core.session_store import SessionStore
+
+                records = SessionStore(
+                    db_path=config.SESSION_DB_FILE,
+                    legacy_cookies_file=config.COOKIES_FILE,
+                ).load_cookie_records(migrate_legacy=True)
+                if records:
+                    self._auth_cookies = {
+                        str(record["name"]): str(record["value"])
+                        for record in records
+                        if not self._is_akamai_cookie(str(record["name"]))
+                    }
+                    return
+            except Exception as exc:
+                logger.debug("Could not load cookies from SessionStore: %s", exc)
+
         if not path or not path.exists():
             return
         try:

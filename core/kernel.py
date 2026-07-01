@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import inspect
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -35,7 +36,11 @@ class Kernel:
         if self._http is None:
             self._http = HttpClient()
             self._owns_http = True
-        await self._http.__aenter__()
+        enter = getattr(self._http, "__aenter__", None)
+        if callable(enter):
+            result = enter()
+            if inspect.isawaitable(result):
+                await result
         self._entered = True
         for plugin in self._plugins.values():
             plugin.kernel = self
@@ -43,7 +48,11 @@ class Kernel:
 
     async def __aexit__(self, *_exc: object) -> None:
         if self._http is not None and self._owns_http:
-            await self._http.close()
+            close = getattr(self._http, "close", None)
+            if callable(close):
+                result = close()
+                if inspect.isawaitable(result):
+                    await result
         self._entered = False
 
     # ---- http accessors -------------------------------------------------

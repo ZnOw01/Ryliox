@@ -27,7 +27,13 @@ class EpubPlugin(Plugin):
 
         self._write_mimetype(output_dir)
         self._write_container_xml(output_dir)
-        self._write_content_opf(oebps, book_info, chapters, css_files, cover_image)
+        self._write_content_opf(
+            oebps=oebps,
+            book_info=book_info,
+            chapter_entries=chapters,
+            css_files=css_files,
+            cover_image=cover_image,
+        )
         self._write_toc_ncx(oebps, book_info, toc)
         self._write_nav_xhtml(oebps, book_info, toc)
 

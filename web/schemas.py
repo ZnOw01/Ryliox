@@ -266,19 +266,12 @@ class DownloadRequest(_RequestModel):
     @field_validator("book_id", mode="after")
     @classmethod
     def _validate_book_id(cls, v: str | None) -> str | None:
-        """Validate book_id format (urn:orm:book:*).
-
-        Bare ISBNs are intentionally not accepted here — the download
-        endpoint should always work with the canonical O'Reilly URN form
-        to avoid ambiguity between ISBN-10/13 and the internal ID.
-        """
+        """Validate book_id format accepted by the O'Reilly APIs."""
         if v is None:
             return v
-        from core.validators import _BOOK_ID_PATTERN
+        from core.validators import validate_book_id
 
-        if not _BOOK_ID_PATTERN.match(v.lower()):
-            raise ValueError("Invalid book_id format. Expected: urn:orm:book:<32-char-hex>")
-        return v.lower()
+        return validate_book_id(v)
 
     @field_validator("format", mode="before")
     @classmethod

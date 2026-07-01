@@ -13,6 +13,10 @@ _COVER_WIDTH_RE = re.compile(r"/\d+w/?$")
 _HIGH_RES_COVER_WIDTH = "1200w"
 
 
+def _book_urn(book_id: str) -> str:
+    return book_id if book_id.startswith("urn:orm:book:") else f"urn:orm:book:{book_id}"
+
+
 def _upgrade_cover_url(url: str) -> str:
     """Upgrade an O'Reilly cover URL to a high-resolution variant.
 
@@ -131,11 +135,11 @@ class BookPlugin(Plugin):
         return {}
 
     async def _fetch_epub(self, book_id: str) -> dict:
-        url = f"{config.API_V2}/epubs/urn:orm:book:{book_id}/"
+        url = f"{config.API_V2}/epubs/{quote(_book_urn(book_id), safe=':')}/"
         return await self.http.get_json(url)
 
     async def _fetch_epub_file(self, book_id: str, relative_path: str) -> str:
-        url = f"{config.API_V2}/epubs/urn:orm:book:{book_id}/files/{quote(relative_path, safe='/')}"
+        url = f"{config.API_V2}/epubs/{quote(_book_urn(book_id), safe=':')}/files/{quote(relative_path, safe='/')}"
         return await self.http.get_text(url)
 
     async def search(self, query: str, limit: int = 10) -> list[dict]:

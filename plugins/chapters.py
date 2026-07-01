@@ -17,12 +17,16 @@ _DEFAULT_ALLOWED_HOSTS: tuple[str, ...] = (
 )
 
 
+def _book_urn(book_id: str) -> str:
+    return book_id if book_id.startswith("urn:orm:book:") else f"urn:orm:book:{book_id}"
+
+
 class ChaptersPlugin(Plugin):
     """Plugin for fetching book chapters and their content."""
 
     async def fetch_list(self, book_id: str) -> list[ChapterInfo]:
         """Fetch list of chapters for a book, paginating until ``next`` is missing or repeats."""
-        url: str | None = f"{config.API_V2}/epub-chapters/?epub_identifier=urn:orm:book:{book_id}"
+        url: str | None = f"{config.API_V2}/epub-chapters/?epub_identifier={_book_urn(book_id)}"
         chapters: list[ChapterInfo] = []
         seen_urls: set[str] = set()
 
@@ -49,7 +53,7 @@ class ChaptersPlugin(Plugin):
         return chapters
 
     async def fetch_toc(self, book_id: str) -> list[dict]:
-        url = f"{config.API_V2}/epubs/urn:orm:book:{book_id}/table-of-contents/"
+        url = f"{config.API_V2}/epubs/{_book_urn(book_id)}/table-of-contents/"
         data = await self.http.get_json(url)
         if isinstance(data, list):
             return data

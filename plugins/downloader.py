@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import inspect
 import shutil
 import time
 from collections.abc import Callable
@@ -156,6 +157,12 @@ class DownloaderPlugin(Plugin):
                 return url
         return ""
 
+    @staticmethod
+    async def _resolve_result(value):
+        if inspect.isawaitable(value):
+            return await value
+        return value
+
     async def download(
         self,
         book_id: str,
@@ -244,6 +251,11 @@ class DownloaderPlugin(Plugin):
         reorder = getattr(chapters_plugin, "reorder_by_toc", None)
         if callable(reorder):
             all_chapters = reorder(all_chapters, toc)
+            if selected_chapters is not None:
+                selected_set = set(selected_chapters)
+                chapters = [ch for i, ch in enumerate(all_chapters) if i in selected_set]
+            else:
+                chapters = all_chapters
 
         # Create output directory
         book_dir = output_plugin.create_book_dir(
@@ -384,13 +396,15 @@ class DownloaderPlugin(Plugin):
         if "epub" in formats:
             report("generating_epub", 90)
             epub_plugin = self._plugin("epub")
-            epub_path = await epub_plugin.generate(
-                book_info=book_info,
-                chapters=chapters,
-                toc=toc,
-                output_dir=book_dir,
-                css_files=css_list,
-                cover_image="cover.jpg",
+            epub_path = await self._resolve_result(
+                epub_plugin.generate(
+                    book_info=book_info,
+                    chapters=chapters,
+                    toc=toc,
+                    output_dir=book_dir,
+                    css_files=css_list,
+                    cover_image="cover.jpg",
+                )
             )
             result.files["epub"] = str(epub_path)
 
@@ -399,22 +413,26 @@ class DownloaderPlugin(Plugin):
 
             if "pdf-chapters" in formats:
                 report("generating_pdf_chapters", 95)
-                pdf_paths = await pdf_plugin.generate_chapters(
-                    book_info=book_info,
-                    chapters=chapters,
-                    output_dir=book_dir,
-                    css_files=css_list,
+                pdf_paths = await self._resolve_result(
+                    pdf_plugin.generate_chapters(
+                        book_info=book_info,
+                        chapters=chapters,
+                        output_dir=book_dir,
+                        css_files=css_list,
+                    )
                 )
                 result.files["pdf"] = [str(p) for p in pdf_paths]
             else:
                 report("generating_pdf", 95)
-                pdf_path = await pdf_plugin.generate(
-                    book_info=book_info,
-                    chapters=chapters,
-                    toc=toc,
-                    output_dir=book_dir,
-                    css_files=css_list,
-                    cover_image="cover.jpg",
+                pdf_path = await self._resolve_result(
+                    pdf_plugin.generate(
+                        book_info=book_info,
+                        chapters=chapters,
+                        toc=toc,
+                        output_dir=book_dir,
+                        css_files=css_list,
+                        cover_image="cover.jpg",
+                    )
                 )
                 result.files["pdf"] = str(pdf_path)
 
