@@ -144,10 +144,6 @@ uv run pytest tests/unit -q    # fast unit tests
 uv run pytest tests/integration -q  # API integration tests
 ```
 
-The CI matrix (`.github/workflows/ci.yml`) runs **ruff**, **mypy**,
-**pytest** (Python 3.11 / 3.12 / 3.13), **pip-audit**, **bandit** and
-**detect-secrets** on every push and pull request.
-
 ## Project layout
 
 ```
