@@ -6,7 +6,10 @@ import asyncio
 import os
 import time
 from contextlib import contextmanager
-from typing import Any, Final
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 try:
     from prometheus_client import (
@@ -19,7 +22,7 @@ try:
         generate_latest,
     )
 
-    PROMETHEUS_AVAILABLE: Final[bool] = True
+    PROMETHEUS_AVAILABLE = True
 except ImportError:
     PROMETHEUS_AVAILABLE = False
 
@@ -253,7 +256,7 @@ metrics = MetricsManager()
 
 
 @contextmanager
-def timed_download(fmt: str):
+def timed_download(fmt: str) -> Iterator[None]:
     """Context manager for timing downloads."""
     start_time = time.time()
     metrics.record_download_started(fmt)

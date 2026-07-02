@@ -196,13 +196,12 @@ class LRUCache(Generic[K, V]):
 
     def __contains__(self, key: K) -> bool:
         """Check if key exists and is not expired. Thread-safe."""
-        with self._lock:
-            entry = self._cache.get(key)
-            if entry is None:
-                return False
-            if entry.is_expired():
-                return False
-            return True
+        entry = self._cache.get(key)
+        if entry is None:
+            return False
+        if entry.is_expired():
+            return False
+        return True
 
 
 class SimpleSyncLRUCache(Generic[K, V]):
@@ -299,12 +298,12 @@ def cached(
     cache_instance: LRUCache[Any, Any],
     key_func: Callable[..., str] | None = None,
     ttl: float | None = None,
-):
+) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
     """Decorator to cache async function results."""
     _key_delim = "\x00"
 
-    def _make_key(func_name: str, args: tuple, kwargs: dict) -> str:
-        key_parts = [func_name]
+    def _make_key(func_name: str, args: tuple[Any, ...], kwargs: dict[str, Any]) -> str:
+        key_parts: list[str] = [func_name]
         key_parts.extend(str(arg) for arg in args)
         key_parts.extend(f"{k}={v}" for k, v in sorted(kwargs.items()))
         return hashlib.sha256(_key_delim.join(key_parts).encode()).hexdigest()[:32]
@@ -333,12 +332,13 @@ def cached(
 
             return result
 
-        wrapper.cache = cache_instance
-        wrapper.cache_key = lambda *a, **kw: (
+        wrapped: Any = wrapper
+        wrapped.cache = cache_instance
+        wrapped.cache_key = lambda *a, **kw: (
             key_func(*a, **kw) if key_func else _make_key(func.__name__, a, kw)
         )
 
-        return wrapper
+        return wrapped
 
     return decorator
 
@@ -346,7 +346,7 @@ def cached(
 def make_cache_key(*args: Any, **kwargs: Any) -> str:
     """Generate a deterministic cache key from arguments."""
     _key_delim = "\x00"
-    key_parts = []
+    key_parts: list[str] = []
     key_parts.extend(str(arg) for arg in args)
     key_parts.extend(f"{k}={v}" for k, v in sorted(kwargs.items()))
     return hashlib.sha256(_key_delim.join(key_parts).encode()).hexdigest()[:32]

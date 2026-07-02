@@ -369,7 +369,7 @@ class AuditLogger:
 
     def _sanitize_details(self, details: dict[str, Any]) -> dict[str, Any]:
         """Sanitize sensitive data from audit details."""
-        sanitized = {}
+        sanitized: dict[str, Any] = {}
 
         sensitive_keys = {
             "password",
@@ -502,7 +502,7 @@ class AuditLogger:
         limit: int = 100,
     ) -> list[AuditEntry]:
         """Search audit log entries."""
-        results = []
+        results: list[AuditEntry] = []
 
         if not self._log_file.exists():
             return results

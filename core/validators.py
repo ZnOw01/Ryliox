@@ -161,7 +161,7 @@ def _resolve_and_validate_dns(hostname: str, url: str) -> str | None:
     try:
         addr_info = socket.getaddrinfo(hostname, None)
         for _, _, _, _, sockaddr in addr_info:
-            ip_str = sockaddr[0]
+            ip_str = str(sockaddr[0])
             if _is_dangerous_ip(ip_str):
                 raise ValidationError(
                     "url",
@@ -301,7 +301,7 @@ def validate_url_sync(url: str, allowed_hosts: set[str] | None = None) -> str:
         try:
             addr_info = socket.getaddrinfo(hostname, None)
             for _, _, _, _, sockaddr in addr_info:
-                ip_str = sockaddr[0]
+                ip_str = str(sockaddr[0])
                 if _is_dangerous_ip(ip_str):
                     raise ValidationError(
                         "url",
@@ -489,28 +489,28 @@ class PydanticValidators:
     """Pydantic-compatible validator functions for use in schemas."""
 
     @classmethod
-    def validate_book_id_pydantic(cls, v: Any) -> str:
+    def validate_book_id_pydantic(cls, v: Any) -> str | None:
         """Pydantic field validator for book IDs."""
         if v is None:
             return v
         return validate_book_id(str(v))
 
     @classmethod
-    def validate_url_pydantic(cls, v: Any, allowed_hosts: set[str] | None = None) -> str:
+    def validate_url_pydantic(cls, v: Any, allowed_hosts: set[str] | None = None) -> str | None:
         """Pydantic field validator for URLs."""
         if v is None:
             return v
         return validate_url_sync(str(v), allowed_hosts)
 
     @classmethod
-    def validate_safe_string(cls, v: Any, max_length: int = MAX_INPUT_LENGTH) -> str:
+    def validate_safe_string(cls, v: Any, max_length: int = MAX_INPUT_LENGTH) -> str | None:
         """Pydantic field validator for safe strings."""
         if v is None:
             return v
         return validate_user_input(str(v), allow_html=False, max_length=max_length)
 
     @classmethod
-    def validate_filename_pydantic(cls, v: Any) -> str:
+    def validate_filename_pydantic(cls, v: Any) -> str | None:
         """Pydantic field validator for filenames."""
         if v is None:
             return v

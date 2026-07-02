@@ -212,7 +212,8 @@ def configure_logging(
     enable_context: bool = True,
 ) -> None:
     """Configure structured logging for the application."""
-    log_level = (level or os.getenv("LOG_LEVEL", "INFO")).upper()
+    raw_level = level if level is not None else os.getenv("LOG_LEVEL") or "INFO"
+    log_level = raw_level.upper()
 
     is_production = os.getenv("ENVIRONMENT", "development").lower() in (
         "production",
