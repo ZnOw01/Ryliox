@@ -7,7 +7,7 @@ import os
 import re
 import shutil
 import signal
-import subprocess
+import subprocess  # nosec B404
 import time
 from io import StringIO
 from typing import TYPE_CHECKING
@@ -22,7 +22,7 @@ def is_process_alive(pid: int) -> bool:
         return False
 
     if os.name == "nt":
-        result = subprocess.run(
+        result = subprocess.run(  # nosec B603 B607
             ["tasklist", "/FI", f"PID eq {pid}", "/FO", "CSV", "/NH"],
             capture_output=True,
             text=True,
@@ -60,7 +60,7 @@ def _address_matches_port(address: str, expected_port: int) -> bool:
 
 def _find_listener_pids_windows(port: int) -> set[int]:
     pids: set[int] = set()
-    result = subprocess.run(
+    result = subprocess.run(  # nosec B603 B607
         ["netstat", "-ano", "-p", "tcp"],
         capture_output=True,
         text=True,
@@ -93,7 +93,7 @@ def _find_listener_pids_posix(port: int) -> set[int]:
     pids: set[int] = set()
 
     if shutil.which("lsof"):
-        result = subprocess.run(
+        result = subprocess.run(  # nosec B603 B607
             ["lsof", "-ti", f"tcp:{port}", "-sTCP:LISTEN"],
             capture_output=True,
             text=True,
@@ -106,7 +106,7 @@ def _find_listener_pids_posix(port: int) -> set[int]:
             return pids
 
     if shutil.which("fuser"):
-        result = subprocess.run(
+        result = subprocess.run(  # nosec B603 B607
             ["fuser", f"{port}/tcp"],
             capture_output=True,
             text=True,
@@ -118,7 +118,7 @@ def _find_listener_pids_posix(port: int) -> set[int]:
             return pids
 
     if shutil.which("ss"):
-        result = subprocess.run(
+        result = subprocess.run(  # nosec B603 B607
             ["ss", "-ltnp"],
             capture_output=True,
             text=True,
@@ -137,7 +137,7 @@ def _find_listener_pids_posix(port: int) -> set[int]:
             return pids
 
     if shutil.which("netstat"):
-        result = subprocess.run(
+        result = subprocess.run(  # nosec B603 B607
             ["netstat", "-ltnp"],
             capture_output=True,
             text=True,
@@ -217,7 +217,7 @@ def start_background_process(
         else:
             popen_kwargs["start_new_session"] = True
 
-        subprocess.Popen(command, **popen_kwargs)
+        subprocess.Popen(command, **popen_kwargs)  # nosec B603
 
 
 def write_background_pid(pid_file: Path, pid: int) -> None:
@@ -272,7 +272,7 @@ def stop_pid(pid: int) -> None:
         return
 
     if os.name == "nt":
-        result = subprocess.run(
+        result = subprocess.run(  # nosec B603 B607
             ["taskkill", "/PID", str(pid), "/T", "/F"],
             check=False,
             capture_output=True,

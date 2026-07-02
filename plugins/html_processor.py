@@ -1,3 +1,4 @@
+import logging
 import re
 import shutil
 from pathlib import Path
@@ -7,6 +8,8 @@ from urllib.parse import urlsplit, urlunsplit
 from bs4 import BeautifulSoup, CData
 
 from .base import Plugin
+
+logger = logging.getLogger(__name__)
 
 
 class HtmlProcessorPlugin(Plugin):
@@ -370,7 +373,8 @@ body{{margin:1em;background-color:transparent!important;}}
         for selector, img_src, is_before in rules:
             try:
                 elements = soup.select(selector)
-            except Exception:
+            except Exception as exc:
+                logger.debug("Skipping invalid CSS selector %r: %s", selector, exc)
                 continue
 
             for el in elements:

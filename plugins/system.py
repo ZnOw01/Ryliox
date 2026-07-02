@@ -2,7 +2,7 @@
 
 import platform
 import shutil
-import subprocess
+import subprocess  # nosec B404
 from pathlib import Path
 
 from plugins.base import Plugin
@@ -45,7 +45,7 @@ class SystemPlugin(Plugin):
         else:
             script = 'POSIX path of (choose folder with prompt "Select Download Folder")'
 
-        result = subprocess.run(
+        result = subprocess.run(  # nosec B603 B607
             ["osascript", "-e", script],
             capture_output=True,
             text=True,
@@ -78,7 +78,7 @@ class SystemPlugin(Plugin):
         else:
             return None  # No dialog tool available
 
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)  # nosec B603
 
         if result.returncode == 0:
             return Path(result.stdout.strip())
@@ -95,7 +95,7 @@ if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
     Write-Output $dialog.SelectedPath
 }
 """
-        result = subprocess.run(
+        result = subprocess.run(  # nosec B603 B607
             ["powershell", "-Command", ps_script],
             capture_output=True,
             text=True,
@@ -117,12 +117,12 @@ if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
 
         try:
             if system == "Darwin":  # macOS
-                subprocess.run(["open", "-R", str(path)], check=True)
+                subprocess.run(["open", "-R", str(path)], check=True)  # nosec B603 B607
             elif system == "Windows":
-                subprocess.run(["explorer", "/select,", str(path)], check=True)
+                subprocess.run(["explorer", "/select,", str(path)], check=True)  # nosec B603 B607
             else:  # Linux
                 parent = path.parent if path.is_file() else path
-                subprocess.run(["xdg-open", str(parent)], check=True)
+                subprocess.run(["xdg-open", str(parent)], check=True)  # nosec B603 B607
             return True
         except Exception:
             return False

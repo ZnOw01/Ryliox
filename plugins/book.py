@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import re
 from urllib.parse import quote
 
@@ -11,6 +12,8 @@ from .base import Plugin
 
 _COVER_WIDTH_RE = re.compile(r"/\d+w/?$")
 _HIGH_RES_COVER_WIDTH = "1200w"
+
+logger = logging.getLogger(__name__)
 
 
 def _book_urn(book_id: str) -> str:
@@ -91,14 +94,14 @@ class BookPlugin(Plugin):
                         sub = sub.strip()
                         if sub:
                             authors.append(sub)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("Could not extract title-page metadata for %s: %s", book_id, exc)
         try:
             copyright_html = await self._fetch_epub_file(book_id, "copyright-page01.html")
             for match in re.finditer(r'<span class="publishername">([^<]+)</span>', copyright_html):
                 publishers = [match.group(1).strip()]
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("Could not extract copyright metadata for %s: %s", book_id, exc)
         try:
             cover_html = await self._fetch_epub_file(book_id, "cover.html")
             for match in re.finditer(r'<img\s+src="([^"]+)"', cover_html):
@@ -107,8 +110,8 @@ class BookPlugin(Plugin):
                     src = f"https://learning.oreilly.com{src}"
                 cover_url = src
                 break
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("Could not extract cover metadata for %s: %s", book_id, exc)
         return authors, publishers, cover_url
 
     async def _fetch_search(self, book_id: str) -> dict:
@@ -130,8 +133,8 @@ class BookPlugin(Plugin):
                         "publishers": epub_data.get("publishers", []),
                         "content_format": epub_data.get("content_format", "book"),
                     }
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("Could not fetch EPUB fallback metadata for %s: %s", book_id, exc)
         return {}
 
     async def _fetch_epub(self, book_id: str) -> dict:
@@ -178,6 +181,6 @@ class BookPlugin(Plugin):
                             "publishers": epub_data.get("publishers", []),
                         }
                     )
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("Could not fetch EPUB fallback search result for %s: %s", query, exc)
         return results
