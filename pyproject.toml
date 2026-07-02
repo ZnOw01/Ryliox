@@ -63,13 +63,11 @@ dependencies = [
 dev = [
     "pytest>=8.3.0",
     "pytest-asyncio>=0.24.0",
-    "pytest-cov>=5.0.0",
     "pytest-mock>=3.14.0",
     "pytest-timeout>=2.3.0",
     "pytest-xdist>=3.6.0",
     "ruff>=0.6.0",
     "mypy>=1.11.0",
-    "pre-commit>=4.0.0",
     "types-requests",
     "types-beautifulsoup4",
     "types-PyYAML",
@@ -271,30 +269,6 @@ filterwarnings = [
     "ignore::starlette.exceptions.StarletteDeprecationWarning",
     "ignore::PendingDeprecationWarning",
 ]
-
-[tool.coverage.run]
-branch = true
-source = ["core", "plugins", "utils", "web"]
-omit = [
-    "tests/*",
-    "data/*",
-    "output/*",
-    "frontend/*",
-    ".venv/*",
-    "*/__pycache__/*",
-]
-
-[tool.coverage.report]
-exclude_lines = [
-    "pragma: no cover",
-    "raise NotImplementedError",
-    "if __name__ == .__main__.:",
-    "if TYPE_CHECKING:",
-    "\\.\\.\\.",
-]
-show_missing = true
-skip_covered = false
-precision = 2
 
 [tool.bandit]
 exclude_dirs = ["tests", "frontend", "data", "output", "node_modules"]

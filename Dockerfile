@@ -88,7 +88,7 @@ RUN mkdir -p ${DATA_DIR}/logs ${OUTPUT_DIR} \
 COPY --from=builder --chown=${APP_USER}:${APP_USER} /opt/venv /opt/venv
 COPY --from=builder --chown=${APP_USER}:${APP_USER} /app /app
 
-# Pre-built frontend is expected to be COPY'd in by docker-compose or CI
+# Pre-built frontend is expected to be copied in by docker-compose or a local build.
 # COPY --chown=${APP_USER}:${APP_USER} frontend/dist ./frontend/dist
 
 USER ${APP_USER}

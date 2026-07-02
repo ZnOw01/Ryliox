@@ -23,7 +23,7 @@ adheres to [Semantic Versioning](https://semver.org/).
   but each file is now focused and testable.
 - **`pyproject.toml`**: fixed the `ryilox` typo, added 20+ missing runtime
   dependencies, added `[project.optional-dependencies]` (dev / e2e / security /
-  all) and configured `ruff`, `mypy`, `pytest`, `coverage` and `bandit`.
+  all) and configured `ruff`, `mypy`, `pytest` and `bandit`.
 
 ### Removed
 - `core/download_queue.py` (legacy `DownloadJobStore` + 1188-line queue impl).
@@ -64,8 +64,6 @@ adheres to [Semantic Versioning](https://semver.org/).
 - Documented the OWASP production checklist in `.env.example`.
 
 ### Added
-- `.github/workflows/ci.yml` (ruff, mypy, pytest matrix, pip-audit, bandit,
-  detect-secrets).
 - `__init__.py` files for every test sub-directory so `pytest` collects them
   cleanly.
 - `launcher/` package (six focused modules).
