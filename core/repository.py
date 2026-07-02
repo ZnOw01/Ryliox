@@ -304,13 +304,11 @@ class DownloadJobRepository:
         if self.terminal_job_retention <= 0:
             return
 
-        placeholders = ",".join(["?"] * len(TERMINAL_STATES))
-        # nosec: B608 - placeholders are from hardcoded TERMINAL_STATES
         conn.execute(
-            f"""DELETE FROM download_jobs
+            """DELETE FROM download_jobs
             WHERE seq IN (
                 SELECT seq FROM download_jobs
-                WHERE status IN ({placeholders})
+                WHERE status IN (?,?,?)
                 ORDER BY seq DESC
                 LIMIT -1 OFFSET ?
             )
@@ -351,13 +349,10 @@ class DownloadJobRepository:
             return self._snapshot_mapper.to_dict(row, queue_position)
 
     def get_latest_cancellable(self) -> str | None:
-        placeholders = ",".join(["?"] * len(TERMINAL_STATES))
-
         with self._lock, self._connect() as conn:
-            # nosec: B608 - placeholders are from hardcoded TERMINAL_STATES
             row = conn.execute(
-                f"""SELECT job_id FROM download_jobs
-                WHERE status NOT IN ({placeholders})
+                """SELECT job_id FROM download_jobs
+                WHERE status NOT IN (?,?,?)
                     AND status <> 'queued'
                 ORDER BY seq DESC
                 LIMIT 1""",
@@ -367,9 +362,8 @@ class DownloadJobRepository:
             if row is not None:
                 return str(row["job_id"])
 
-            # nosec: B608 - placeholders are from hardcoded TERMINAL_STATES
             row = conn.execute(
-                f"SELECT job_id FROM download_jobs WHERE status NOT IN ({placeholders}) ORDER BY seq DESC LIMIT 1",
+                "SELECT job_id FROM download_jobs WHERE status NOT IN (?,?,?) ORDER BY seq DESC LIMIT 1",
                 tuple(TERMINAL_STATES),
             ).fetchone()
 
@@ -471,9 +465,9 @@ class DownloadJobRepository:
             )
             values = [*filtered_updates.values(), job_id]
 
-            # nosec: B608 - column names are from ALLOWED_UPDATE_COLUMNS whitelist
+            query = f"UPDATE download_jobs SET {set_clause} WHERE job_id = ?"  # nosec B608
             cursor = conn.execute(
-                f"UPDATE download_jobs SET {set_clause} WHERE job_id = ?",
+                query,
                 values,
             )
 
@@ -599,26 +593,23 @@ class DownloadJobRepository:
 
     @sqlite_retry()
     def requeue_inflight(self) -> None:
-        placeholders = ",".join(["?"] * len(TERMINAL_STATES))
         terminal_params = tuple(TERMINAL_STATES)
         now = time.time()
 
         with self._lock, self._connect() as conn:
-            # nosec: B608 - placeholders are from hardcoded TERMINAL_STATES
             conn.execute(
-                f"""UPDATE download_jobs SET status = 'cancelled',
+                """UPDATE download_jobs SET status = 'cancelled',
                     error = COALESCE(error, 'Download cancelled before restart'),
                     code = COALESCE(code, 'download_cancelled'),
                     message = COALESCE(message, 'Cancelled'),
                     finished_at = COALESCE(finished_at, ?),
                     updated_at = ?
-                WHERE status NOT IN ({placeholders}) AND cancel_requested = 1""",
+                WHERE status NOT IN (?,?,?) AND cancel_requested = 1""",
                 (now, now, *terminal_params),
             )
 
-            # nosec: B608 - placeholders are from hardcoded TERMINAL_STATES
             conn.execute(
-                f"""UPDATE download_jobs SET status = 'queued',
+                """UPDATE download_jobs SET status = 'queued',
                     percentage = 0,
                     eta_seconds = NULL,
                     current_chapter = NULL,
@@ -628,7 +619,7 @@ class DownloadJobRepository:
                     started_at = NULL,
                     updated_at = ?,
                     cancel_requested = 0
-                WHERE status NOT IN ({placeholders}) AND cancel_requested = 0""",
+                WHERE status NOT IN (?,?,?) AND cancel_requested = 0""",
                 (now, *terminal_params),
             )
 

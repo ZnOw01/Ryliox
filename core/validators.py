@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import concurrent.futures
 import ipaddress
+import logging
 import re
 import socket
 import unicodedata
@@ -12,6 +13,8 @@ from pathlib import Path
 from re import Pattern
 from typing import Any
 from urllib.parse import unquote, urlparse
+
+logger = logging.getLogger(__name__)
 
 # MED-001: DNS rebinding protection
 _DNS_CACHE: dict[str, tuple[str, float]] = {}
@@ -39,7 +42,7 @@ _DANGEROUS_URL_HOSTS: frozenset[str] = frozenset(  # nosec B104
         "127.0.0.01",  # Leading zero variant
         "0177.0.0.1",  # Octal notation
         "2130706433",  # Decimal notation for 127.0.0.1
-        "0.0.0.0",  # nosec B104: intentionally blocking all-interfaces IP
+        "0.0.0.0",  # nosec B104
         "::1",
         "[::1]",
         "0000:0000:0000:0000:0000:0000:0000:0001",  # Full IPv6 localhost
@@ -173,8 +176,8 @@ def _resolve_and_validate_dns(hostname: str, url: str) -> str | None:
             return ip_str
     except ValidationError:
         raise
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.debug("DNS validation failed for %s: %s", hostname, exc)
     return None
 
 
@@ -234,9 +237,9 @@ async def validate_url(url: str, allowed_hosts: set[str] | None = None) -> str:
         pass
     except ValidationError:
         raise
-    except Exception:
+    except Exception as exc:
         # Other socket errors - continue with hostname validation
-        pass
+        logger.debug("Async DNS validation failed for %s: %s", hostname, exc)
 
     # Block localhost/private IPs (SSRF protection)
     if hostname_lower in _DANGEROUS_URL_HOSTS:
@@ -314,8 +317,8 @@ def validate_url_sync(url: str, allowed_hosts: set[str] | None = None) -> str:
         pass
     except ValidationError:
         raise
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.debug("Sync DNS validation failed for %s: %s", hostname, exc)
 
     if hostname_lower in _DANGEROUS_URL_HOSTS:
         raise ValidationError(

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import os
 import time
 from contextlib import contextmanager
@@ -10,6 +11,8 @@ from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
+
+logger = logging.getLogger(__name__)
 
 try:
     from prometheus_client import (
@@ -240,8 +243,8 @@ class MetricsManager:
             usage = shutil.disk_usage(path)
             self.disk_usage_bytes.labels(path=path).set(usage.used)
             self.disk_free_bytes.labels(path=path).set(usage.free)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("Failed to update disk usage metrics for %s: %s", path, exc)
 
     def generate_metrics(self) -> tuple[bytes, str]:
         """Generate Prometheus metrics output."""

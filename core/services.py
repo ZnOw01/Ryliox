@@ -368,8 +368,8 @@ class DownloadQueueService:
                     if self._active_job_id == job.job_id:
                         self._active_job_id = None
                         self._active_cancel_event = None
-            except Exception:
-                pass
+            except Exception as cleanup_exc:
+                logger.debug("Failed to clear active job state: %s", cleanup_exc)
             with contextlib.suppress(Exception):
                 self._wake_event.set()
 

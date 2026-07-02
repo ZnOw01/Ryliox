@@ -43,8 +43,8 @@ def _is_blocked_host(host: str) -> bool:
         if len(parts) == 4 and all(p.isdigit() for p in parts):
             if any(len(p) > 1 and p.startswith("0") for p in parts):
                 return True
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.debug("Failed to inspect numeric host encoding for %s: %s", host, exc)
 
     try:
         ip = ipaddress.ip_address(host)

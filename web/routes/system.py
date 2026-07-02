@@ -381,16 +381,16 @@ def _check_sqlite_connections(request: Request) -> SQLiteConnectionsInfo:
             # Connection is active if repository exists and has _conn
             repository = download_queue.repository
             download_queue_conn = 1 if getattr(repository, "_conn", None) else 0
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.debug("Failed to inspect download queue SQLite connection: %s", exc)
 
     try:
         from core.session_store import SessionStore
 
         session_store = SessionStore()
         session_store_conn = 1 if getattr(session_store, "_conn", None) else 0
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.debug("Failed to inspect session store SQLite connection: %s", exc)
 
     return SQLiteConnectionsInfo(
         download_queue_connections=download_queue_conn,
