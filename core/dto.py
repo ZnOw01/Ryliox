@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import secrets
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -12,7 +12,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 class DownloadJobDTO(BaseModel):
     """DTO for download jobs."""
 
-    model_config = ConfigDict(frozen=True, slots=True)
+    model_config = ConfigDict(frozen=True)
 
     job_id: str = Field(default_factory=lambda: secrets.token_hex(16))
     book_id: str
@@ -29,10 +29,10 @@ class DownloadJobDTO(BaseModel):
             return Path(v)
         return v
 
-    def model_dump(self, **kwargs) -> dict[str, Any]:
+    def model_dump(self, **kwargs: Any) -> dict[str, Any]:
         """Custom serialization for JSON compatibility."""
         data = super().model_dump(**kwargs)
-        data["output_dir"] = str(self.output_dir)
+        data["output_dir"] = self.output_dir.as_posix()
         if self.selected_chapters is not None:
             data["selected_chapters"] = list(self.selected_chapters)
         else:
@@ -40,8 +40,29 @@ class DownloadJobDTO(BaseModel):
         return data
 
     @classmethod
-    def model_validate(cls, data: dict[str, Any]) -> DownloadJobDTO:
+    def model_validate(
+        cls,
+        obj: Any,
+        *,
+        strict: bool | None = None,
+        extra: Literal["allow", "ignore", "forbid"] | None = None,
+        from_attributes: bool | None = None,
+        context: Any | None = None,
+        by_alias: bool | None = None,
+        by_name: bool | None = None,
+    ) -> DownloadJobDTO:
         """Custom deserialization from dict."""
+        if not isinstance(obj, dict):
+            return super().model_validate(
+                obj,
+                strict=strict,
+                extra=extra,
+                from_attributes=from_attributes,
+                context=context,
+                by_alias=by_alias,
+                by_name=by_name,
+            )
+        data: dict[str, Any] = obj
         processed = dict(data)
         processed["job_id"] = str(data.get("job_id", secrets.token_hex(16)))
         processed["book_id"] = str(data["book_id"])
@@ -50,7 +71,15 @@ class DownloadJobDTO(BaseModel):
         if data.get("selected_chapters") is not None:
             processed["selected_chapters"] = [int(i) for i in data["selected_chapters"]]
         processed["skip_images"] = bool(data.get("skip_images", False))
-        return super().model_validate(processed)
+        return super().model_validate(
+            processed,
+            strict=strict,
+            extra=extra,
+            from_attributes=from_attributes,
+            context=context,
+            by_alias=by_alias,
+            by_name=by_name,
+        )
 
     @classmethod
     def create(
@@ -85,7 +114,7 @@ class DownloadJobDTO(BaseModel):
 class DownloadProgressDTO(BaseModel):
     """DTO for download progress."""
 
-    model_config = ConfigDict(frozen=True, slots=True)
+    model_config = ConfigDict(frozen=True)
 
     status: str = "queued"
     percentage: int = 0
@@ -96,7 +125,7 @@ class DownloadProgressDTO(BaseModel):
     chapter_title: str = ""
     queue_position: int | None = None
 
-    def model_dump(self, **kwargs) -> dict[str, Any]:
+    def model_dump(self, **kwargs: Any) -> dict[str, Any]:
         """Custom serialization - only include non-null values."""
         data: dict[str, Any] = {
             "status": self.status,
@@ -114,8 +143,29 @@ class DownloadProgressDTO(BaseModel):
         return {k: v for k, v in data.items() if v is not None and v != ""}
 
     @classmethod
-    def model_validate(cls, data: dict[str, Any]) -> DownloadProgressDTO:
+    def model_validate(
+        cls,
+        obj: Any,
+        *,
+        strict: bool | None = None,
+        extra: Literal["allow", "ignore", "forbid"] | None = None,
+        from_attributes: bool | None = None,
+        context: Any | None = None,
+        by_alias: bool | None = None,
+        by_name: bool | None = None,
+    ) -> DownloadProgressDTO:
         """Custom deserialization from dict."""
+        if not isinstance(obj, dict):
+            return super().model_validate(
+                obj,
+                strict=strict,
+                extra=extra,
+                from_attributes=from_attributes,
+                context=context,
+                by_alias=by_alias,
+                by_name=by_name,
+            )
+        data: dict[str, Any] = obj
         processed = {
             "status": str(data.get("status", "queued")),
             "percentage": int(data.get("percentage", 0)),
@@ -126,9 +176,17 @@ class DownloadProgressDTO(BaseModel):
             "chapter_title": str(data.get("chapter_title", "")),
             "queue_position": data.get("queue_position"),
         }
-        return super().model_validate(processed)
+        return super().model_validate(
+            processed,
+            strict=strict,
+            extra=extra,
+            from_attributes=from_attributes,
+            context=context,
+            by_alias=by_alias,
+            by_name=by_name,
+        )
 
-    def with_updates(self, **kwargs) -> DownloadProgressDTO:
+    def with_updates(self, **kwargs: Any) -> DownloadProgressDTO:
         """Create a copy with updates (immutable pattern)."""
         current = self.model_dump()
         current.update(kwargs)
@@ -148,7 +206,7 @@ class DownloadProgressDTO(BaseModel):
 class DownloadResultDTO(BaseModel):
     """DTO for completed download result."""
 
-    model_config = ConfigDict(frozen=True, slots=True)
+    model_config = ConfigDict(frozen=True)
 
     book_id: str
     title: str
@@ -156,7 +214,7 @@ class DownloadResultDTO(BaseModel):
     pdf_paths: str | list[str] | None = None
     chapters_count: int = 0
 
-    def model_dump(self, **kwargs) -> dict[str, Any]:
+    def model_dump(self, **kwargs: Any) -> dict[str, Any]:
         """Custom serialization - conditionally include optional fields."""
         result: dict[str, Any] = {
             "book_id": self.book_id,
@@ -170,8 +228,29 @@ class DownloadResultDTO(BaseModel):
         return result
 
     @classmethod
-    def model_validate(cls, data: dict[str, Any]) -> DownloadResultDTO:
+    def model_validate(
+        cls,
+        obj: Any,
+        *,
+        strict: bool | None = None,
+        extra: Literal["allow", "ignore", "forbid"] | None = None,
+        from_attributes: bool | None = None,
+        context: Any | None = None,
+        by_alias: bool | None = None,
+        by_name: bool | None = None,
+    ) -> DownloadResultDTO:
         """Custom deserialization from dict."""
+        if not isinstance(obj, dict):
+            return super().model_validate(
+                obj,
+                strict=strict,
+                extra=extra,
+                from_attributes=from_attributes,
+                context=context,
+                by_alias=by_alias,
+                by_name=by_name,
+            )
+        data: dict[str, Any] = obj
         pdf_value = data.get("pdf")
         processed = {
             "book_id": str(data.get("book_id", "")),
@@ -180,7 +259,15 @@ class DownloadResultDTO(BaseModel):
             "pdf_paths": pdf_value,
             "chapters_count": int(data.get("chapters_count", 0)),
         }
-        return super().model_validate(processed)
+        return super().model_validate(
+            processed,
+            strict=strict,
+            extra=extra,
+            from_attributes=from_attributes,
+            context=context,
+            by_alias=by_alias,
+            by_name=by_name,
+        )
 
     # Backward compatibility aliases
     def to_dict(self) -> dict[str, Any]:
@@ -196,14 +283,14 @@ class DownloadResultDTO(BaseModel):
 class DownloadErrorDTO(BaseModel):
     """DTO for download errors."""
 
-    model_config = ConfigDict(frozen=True, slots=True)
+    model_config = ConfigDict(frozen=True)
 
     error: str
     code: str = "unknown_error"
     details: dict[str, Any] | None = None
     trace_log: str | None = None
 
-    def model_dump(self, **kwargs) -> dict[str, Any]:
+    def model_dump(self, **kwargs: Any) -> dict[str, Any]:
         """Custom serialization - conditionally include optional fields."""
         result: dict[str, Any] = {
             "error": self.error,
@@ -216,15 +303,44 @@ class DownloadErrorDTO(BaseModel):
         return result
 
     @classmethod
-    def model_validate(cls, data: dict[str, Any]) -> DownloadErrorDTO:
+    def model_validate(
+        cls,
+        obj: Any,
+        *,
+        strict: bool | None = None,
+        extra: Literal["allow", "ignore", "forbid"] | None = None,
+        from_attributes: bool | None = None,
+        context: Any | None = None,
+        by_alias: bool | None = None,
+        by_name: bool | None = None,
+    ) -> DownloadErrorDTO:
         """Custom deserialization from dict."""
+        if not isinstance(obj, dict):
+            return super().model_validate(
+                obj,
+                strict=strict,
+                extra=extra,
+                from_attributes=from_attributes,
+                context=context,
+                by_alias=by_alias,
+                by_name=by_name,
+            )
+        data: dict[str, Any] = obj
         processed = {
             "error": str(data.get("error", "Unknown error")),
             "code": str(data.get("code", "unknown_error")),
             "details": data.get("details"),
             "trace_log": data.get("trace_log"),
         }
-        return super().model_validate(processed)
+        return super().model_validate(
+            processed,
+            strict=strict,
+            extra=extra,
+            from_attributes=from_attributes,
+            context=context,
+            by_alias=by_alias,
+            by_name=by_name,
+        )
 
     # Backward compatibility aliases
     def to_dict(self) -> dict[str, Any]:
@@ -240,7 +356,7 @@ class DownloadErrorDTO(BaseModel):
 class JobSnapshotDTO(BaseModel):
     """Complete DTO for current job state (API response)."""
 
-    model_config = ConfigDict(frozen=True, slots=True)
+    model_config = ConfigDict(frozen=True)
 
     job_id: str
     book_id: str
@@ -260,7 +376,7 @@ class JobSnapshotDTO(BaseModel):
     trace_log: str | None = None
     queue_position: int | None = None
 
-    def model_dump(self, **kwargs) -> dict[str, Any]:
+    def model_dump(self, **kwargs: Any) -> dict[str, Any]:
         """Custom serialization - only include non-null/non-empty values."""
         data: dict[str, Any] = {
             "job_id": self.job_id,
@@ -299,8 +415,29 @@ class JobSnapshotDTO(BaseModel):
         return data
 
     @classmethod
-    def model_validate(cls, data: dict[str, Any]) -> JobSnapshotDTO:
+    def model_validate(
+        cls,
+        obj: Any,
+        *,
+        strict: bool | None = None,
+        extra: Literal["allow", "ignore", "forbid"] | None = None,
+        from_attributes: bool | None = None,
+        context: Any | None = None,
+        by_alias: bool | None = None,
+        by_name: bool | None = None,
+    ) -> JobSnapshotDTO:
         """Custom deserialization from dict."""
+        if not isinstance(obj, dict):
+            return super().model_validate(
+                obj,
+                strict=strict,
+                extra=extra,
+                from_attributes=from_attributes,
+                context=context,
+                by_alias=by_alias,
+                by_name=by_name,
+            )
+        data: dict[str, Any] = obj
         processed = {
             "job_id": str(data["job_id"]),
             "book_id": str(data["book_id"]),
@@ -320,7 +457,15 @@ class JobSnapshotDTO(BaseModel):
             "trace_log": data.get("trace_log"),
             "queue_position": data.get("queue_position"),
         }
-        return super().model_validate(processed)
+        return super().model_validate(
+            processed,
+            strict=strict,
+            extra=extra,
+            from_attributes=from_attributes,
+            context=context,
+            by_alias=by_alias,
+            by_name=by_name,
+        )
 
     # Backward compatibility aliases
     def to_dict(self) -> dict[str, Any]:

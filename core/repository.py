@@ -10,7 +10,7 @@ from collections.abc import Callable, Generator
 from contextlib import contextmanager, suppress
 from functools import wraps
 from pathlib import Path
-from typing import Any, TypeVar
+from typing import Any, Literal, TypeVar
 
 from core.dto import (
     DownloadErrorDTO,
@@ -134,7 +134,7 @@ class UnitOfWork:
         self._committed = False
         return self
 
-    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> bool:
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> Literal[False]:
         """Exit the database transaction context."""
         if not self._active:
             return False
@@ -538,6 +538,7 @@ class DownloadJobRepository:
                     return None
 
                 return self._job_mapper.to_dto(claimed)
+        return None
 
     def is_cancel_requested(self, job_id: str) -> bool:
         with self._lock, self._connect() as conn:

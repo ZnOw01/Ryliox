@@ -5,8 +5,9 @@ from __future__ import annotations
 import json
 import logging
 import time
+from collections.abc import Mapping
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from core.dto import (
     DownloadErrorDTO,
@@ -16,10 +17,9 @@ from core.dto import (
     JobSnapshotDTO,
 )
 
-if TYPE_CHECKING:
-    import sqlite3
-
 logger = logging.getLogger(__name__)
+
+DbRow = Mapping[str, Any]
 
 
 class JSONMapperMixin:
@@ -84,7 +84,7 @@ class DownloadJobMapper(JSONMapperMixin):
 
         return data
 
-    def to_dto(self, row: sqlite3.Row | dict[str, Any]) -> DownloadJobDTO:
+    def to_dto(self, row: DbRow) -> DownloadJobDTO:
         """Convert DB row to DTO."""
         formats = self._json_loads(row.get("formats_json"), "formats_json")
         chapters = self._json_loads(row.get("chapters_json"), "chapters_json")
@@ -120,7 +120,7 @@ class DownloadProgressMapper(JSONMapperMixin):
 
         return data
 
-    def to_dto(self, row: sqlite3.Row | dict[str, Any]) -> DownloadProgressDTO:
+    def to_dto(self, row: DbRow) -> DownloadProgressDTO:
         """Convert DB row to DTO."""
         return DownloadProgressDTO(
             status=str(row.get("status", "queued")),
@@ -157,7 +157,7 @@ class DownloadResultMapper(JSONMapperMixin):
             "updated_at": time.time(),
         }
 
-    def to_dto(self, row: sqlite3.Row | dict[str, Any]) -> DownloadResultDTO:
+    def to_dto(self, row: DbRow) -> DownloadResultDTO:
         """Convert DB row to DTO."""
         pdf_value = self._json_loads(row.get("pdf_json"), "pdf_json")
         if pdf_value is None and row.get("pdf_json") is not None:
@@ -188,7 +188,7 @@ class DownloadErrorMapper(JSONMapperMixin):
             "message": None,
         }
 
-    def to_dto(self, row: sqlite3.Row | dict[str, Any]) -> DownloadErrorDTO:
+    def to_dto(self, row: DbRow) -> DownloadErrorDTO:
         """Convert DB row to DTO."""
         details = self._json_loads(row.get("details_json"), "details_json")
 
@@ -211,7 +211,7 @@ class JobSnapshotMapper(JSONMapperMixin):
 
     def to_dto(
         self,
-        row: sqlite3.Row | dict[str, Any],
+        row: DbRow,
         queue_position: int | None = None,
     ) -> JobSnapshotDTO:
         """Convert DB row to snapshot DTO."""
@@ -243,7 +243,7 @@ class JobSnapshotMapper(JSONMapperMixin):
 
     def to_dict(
         self,
-        row: sqlite3.Row | dict[str, Any],
+        row: DbRow,
         queue_position: int | None = None,
     ) -> dict[str, Any]:
         """Convert DB row directly to dict (API response)."""

@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Literal, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
     from core.dto import (
+        DownloadErrorDTO,
         DownloadJobDTO,
         DownloadProgressDTO,
         DownloadResultDTO,
@@ -42,16 +43,16 @@ class IDownloadJobRepository(Protocol):
 
     def request_cancel(self, job_id: str) -> tuple[str, dict[str, Any] | None]: ...
 
-    def update_progress(self, job_id: str, progress: DownloadProgressDTO) -> None: ...
+    def update_progress(self, job_id: str, progress: DownloadProgressDTO) -> bool: ...
 
-    def mark_completed(self, job_id: str, result: DownloadResultDTO) -> None: ...
+    def mark_completed(self, job_id: str, result: DownloadResultDTO) -> bool: ...
 
     def mark_failed(
         self,
         job_id: str,
-        error_dto: Any,
+        error_dto: DownloadErrorDTO,
         status: str = "error",
-    ) -> None: ...
+    ) -> bool: ...
 
     def close(self) -> None: ...
 
@@ -64,7 +65,7 @@ class IUnitOfWork(Protocol):
         """Enter the runtime context."""
         ...
 
-    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> bool:
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> Literal[False]:
         """Exit the runtime context."""
         ...
 
