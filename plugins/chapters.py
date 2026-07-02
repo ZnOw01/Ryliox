@@ -128,7 +128,7 @@ class ChaptersPlugin(Plugin):
         result: list[str] = []
         seen: set[str] = set()
 
-        def walk(items: list[dict]):
+        def walk(items: list[dict]) -> None:
             for item in items:
                 ref_id = item.get("reference_id", "")
                 if ref_id:

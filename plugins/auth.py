@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from typing import Any
 
 from .base import Plugin
 
@@ -15,7 +16,7 @@ class AuthPlugin(Plugin):
         status = await self.get_status()
         return bool(status.get("valid"))
 
-    async def get_status(self) -> dict:
+    async def get_status(self) -> dict[str, Any]:
         """Return a structured session status.
 
         Returns a dict with at least ``valid`` and ``reason`` keys.
@@ -29,7 +30,7 @@ class AuthPlugin(Plugin):
         response = await self.http.get("/profile/", allow_redirects=False)
         return self._parse_profile_response(response)
 
-    def _safe_jwt_status(self) -> dict | None:
+    def _safe_jwt_status(self) -> dict[str, Any] | None:
         """Call ``http.get_jwt_status`` defensively — may not exist on mocks."""
         get_jwt = getattr(self.http, "get_jwt_status", None)
         if get_jwt is None:
@@ -40,7 +41,7 @@ class AuthPlugin(Plugin):
             return None
 
     @staticmethod
-    def _parse_profile_response(response) -> dict:
+    def _parse_profile_response(response: Any) -> dict[str, Any]:
         url_attr = getattr(response, "url", "") or ""
         url = str(url_attr)
         text = getattr(response, "text", "") or ""

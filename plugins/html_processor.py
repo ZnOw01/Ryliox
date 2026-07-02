@@ -1,6 +1,7 @@
 import re
 import shutil
 from pathlib import Path
+from typing import Any
 from urllib.parse import urlsplit, urlunsplit
 
 from bs4 import BeautifulSoup, CData
@@ -58,7 +59,7 @@ class HtmlProcessorPlugin(Plugin):
         self, html: str, book_id: str, skip_images: bool = False, path_prefix: str = ""
     ) -> tuple[str, list[str]]:
         soup = BeautifulSoup(html, "lxml")
-        images_found = []
+        images_found: list[str] = []
 
         content_div = soup.find("div", id="sbo-rt-content")
         if not content_div:
@@ -81,12 +82,12 @@ class HtmlProcessorPlugin(Plugin):
 
         return content, images_found
 
-    def _remove_images(self, soup) -> None:
+    def _remove_images(self, soup: Any) -> None:
         """Remove all img tags from content"""
         for img in soup.find_all("img"):
             img.decompose()
 
-    def _convert_svg_images(self, content_div, soup):
+    def _convert_svg_images(self, content_div: Any, soup: Any) -> None:
         for image_tag in content_div.find_all("image"):
             href = image_tag.get("href") or image_tag.get("xlink:href")
             if not href:
@@ -102,8 +103,8 @@ class HtmlProcessorPlugin(Plugin):
             else:
                 image_tag.replace_with(img_tag)
 
-    def _rewrite_image_links(self, soup, path_prefix: str = "") -> list[str]:
-        images = []
+    def _rewrite_image_links(self, soup: Any, path_prefix: str = "") -> list[str]:
+        images: list[str] = []
         for img in soup.find_all("img"):
             src = img.get("src", "")
             if not src:
@@ -209,7 +210,7 @@ class HtmlProcessorPlugin(Plugin):
             path = urlunsplit(parts._replace(path=new_path))
         return path
 
-    def _rewrite_href_links(self, soup, book_id: str):
+    def _rewrite_href_links(self, soup: Any, book_id: str) -> None:
         for a in soup.find_all("a", href=True):
             href = a["href"]
 
@@ -235,7 +236,7 @@ class HtmlProcessorPlugin(Plugin):
 
             a["href"] = href
 
-    def _handle_data_template_styles(self, soup):
+    def _handle_data_template_styles(self, soup: Any) -> None:
         for style in soup.find_all("style"):
             if style.has_attr("data-template"):
                 css_text = style["data-template"]
@@ -277,7 +278,7 @@ body{{margin:1em;background-color:transparent!important;}}
 </body>
 </html>"""
 
-    def inline_css_content_images(self, oebps: Path):
+    def inline_css_content_images(self, oebps: Path) -> None:
         """Replace CSS content:url() pseudo-element images with inline <img> tags.
 
         Apple Books doesn't support content:url() in pseudo-elements.
@@ -291,7 +292,7 @@ body{{margin:1em;background-color:transparent!important;}}
             return
 
         # Collect rules from all CSS files
-        rules = []  # (selector, img_src_relative_to_xhtml, is_before)
+        rules: list[tuple[str, str, bool]] = []
         for css_path in sorted(styles_dir.glob("Style*.css")):
             css_text = css_path.read_text(encoding="utf-8")
             found = self._extract_css_content_url_rules(css_text, styles_dir, images_dir)
@@ -321,7 +322,7 @@ body{{margin:1em;background-color:transparent!important;}}
 
         Copies referenced images to Images/ so they appear in the EPUB manifest.
         """
-        results = []
+        results: list[tuple[str, str, bool]] = []
         for match in re.finditer(
             r'([^{}]+?)\s*\{[^}]*?content\s*:\s*url\(["\']?([^)"\']+)["\']?\)[^}]*\}',
             css_text,
@@ -360,7 +361,7 @@ body{{margin:1em;background-color:transparent!important;}}
         self,
         xhtml_path: Path,
         rules: list[tuple[str, str, bool]],
-    ):
+    ) -> None:
         """Inject <img> tags into XHTML for matching CSS content:url() rules."""
         text = xhtml_path.read_text(encoding="utf-8")
         soup = BeautifulSoup(text, "html.parser")
@@ -384,7 +385,7 @@ body{{margin:1em;background-color:transparent!important;}}
         if modified:
             xhtml_path.write_text(self._to_xhtml(str(soup)), encoding="utf-8")
 
-    def detect_cover_image(self, soup) -> str | None:
+    def detect_cover_image(self, soup: Any) -> str | None:
         for img in soup.find_all("img"):
             src = img.get("src", "").lower()
             alt = img.get("alt", "").lower()

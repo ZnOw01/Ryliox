@@ -8,8 +8,10 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any, Protocol, cast
 from urllib.parse import urlparse
 
+from core.contracts import ChapterInfo
 from plugins.base import Plugin
 
 _ALLOWED_DOWNLOAD_HOSTS: tuple[str, ...] = (
@@ -40,8 +42,100 @@ class DownloadResult:
     book_id: str
     title: str
     output_dir: Path
-    files: dict = field(default_factory=dict)  # {"epub": Path, "markdown": Path, ...}
+    files: dict[str, str | list[str]] = field(default_factory=dict)
     chapters_count: int = 0
+
+
+class BookPluginProtocol(Protocol):
+    async def fetch(self, book_id: str) -> dict[str, Any]: ...
+
+
+class ChaptersPluginProtocol(Protocol):
+    async def fetch_list(self, book_id: str) -> list[ChapterInfo]: ...
+
+    async def fetch_toc(self, book_id: str) -> list[dict[str, Any]]: ...
+
+    def reorder_by_toc(
+        self, chapters: list[ChapterInfo], toc: list[dict[str, Any]]
+    ) -> list[ChapterInfo]: ...
+
+    async def fetch_content(self, content_url: str) -> str: ...
+
+
+class AssetsPluginProtocol(Protocol):
+    async def download_image(self, url: str, save_path: Path) -> bool: ...
+
+    async def download_all_css(
+        self,
+        urls: list[str],
+        output_dir: Path,
+        progress_callback: Callable[[int, int], None] | None = None,
+    ) -> dict[str, Path]: ...
+
+    async def download_css_assets(self, css_urls: list[str], oebps: Path) -> None: ...
+
+    async def download_all_images(
+        self,
+        urls: list[str],
+        output_dir: Path,
+        progress_callback: Callable[[int, int], None] | None = None,
+    ) -> dict[str, Path]: ...
+
+
+class HtmlProcessorProtocol(Protocol):
+    def process(
+        self, html: str, book_id: str, skip_images: bool = False, path_prefix: str = ""
+    ) -> tuple[str, list[str]]: ...
+
+    def wrap_xhtml(self, content: str, css_files: list[str], title: str = "") -> str: ...
+
+    def inline_css_content_images(self, oebps: Path) -> None: ...
+
+
+class OutputPluginProtocol(Protocol):
+    def create_book_dir(
+        self,
+        output_dir: Path,
+        book_id: str,
+        title: str,
+        authors: list[str] | None = None,
+    ) -> Path: ...
+
+    def get_oebps_dir(self, book_dir: Path) -> Path: ...
+
+    def get_images_dir(self, book_dir: Path) -> Path: ...
+
+
+class EpubPluginProtocol(Protocol):
+    def generate(
+        self,
+        book_info: dict[str, Any],
+        chapters: list[ChapterInfo],
+        toc: list[dict[str, Any]],
+        output_dir: Path,
+        css_files: list[str],
+        cover_image: str | None = None,
+    ) -> Path: ...
+
+
+class PdfPluginProtocol(Protocol):
+    def generate(
+        self,
+        book_info: dict[str, Any],
+        chapters: list[ChapterInfo],
+        toc: list[dict[str, Any]],
+        output_dir: Path,
+        css_files: list[str],
+        cover_image: str | None = None,
+    ) -> Path: ...
+
+    def generate_chapters(
+        self,
+        book_info: dict[str, Any],
+        chapters: list[ChapterInfo],
+        output_dir: Path,
+        css_files: list[str],
+    ) -> list[Path]: ...
 
 
 class DownloaderPlugin(Plugin):
@@ -133,7 +227,7 @@ class DownloaderPlugin(Plugin):
         return canonical not in cls.BOOK_ONLY_FORMATS
 
     @classmethod
-    def get_formats_info(cls) -> dict:
+    def get_formats_info(cls) -> dict[str, Any]:
         """Return complete format information for discovery endpoints."""
         return {
             "formats": list(cls.PUBLIC_FORMATS),
@@ -158,7 +252,7 @@ class DownloaderPlugin(Plugin):
         return ""
 
     @staticmethod
-    async def _resolve_result(value):
+    async def _resolve_result(value: Any) -> Any:
         if inspect.isawaitable(value):
             return await value
         return value
@@ -185,7 +279,7 @@ class DownloaderPlugin(Plugin):
             current_chapter: int = 0,
             total_chapters: int = 0,
             chapter_title: str = "",
-        ):
+        ) -> None:
             if progress_callback:
                 progress_callback(
                     DownloadProgress(
@@ -208,11 +302,11 @@ class DownloaderPlugin(Plugin):
             if not self.supports_chapter_selection(fmt) and selected_chapters:
                 raise ValueError(f"Chapter selection not supported for: {fmt}")
 
-        book_plugin = self._plugin("book")
-        chapters_plugin = self._plugin("chapters")
-        assets_plugin = self._plugin("assets")
-        html_processor = self._plugin("html_processor")
-        output_plugin = self._plugin("output")
+        book_plugin = cast("BookPluginProtocol", self._plugin("book"))
+        chapters_plugin = cast("ChaptersPluginProtocol", self._plugin("chapters"))
+        assets_plugin = cast("AssetsPluginProtocol", self._plugin("assets"))
+        html_processor = cast("HtmlProcessorProtocol", self._plugin("html_processor"))
+        output_plugin = cast("OutputPluginProtocol", self._plugin("output"))
 
         # Phase 1: Validate session and fetch metadata
         report("starting", 0)
@@ -303,7 +397,7 @@ class DownloaderPlugin(Plugin):
             path_prefix = "../" * depth if depth > 0 else ""
 
             raw_html = await chapters_plugin.fetch_content(ch["content_url"])
-            processed, images = await html_processor.process(
+            processed, images = html_processor.process(
                 raw_html, book_id, skip_images=skip_images, path_prefix=path_prefix
             )
 
@@ -354,7 +448,7 @@ class DownloaderPlugin(Plugin):
 
         css_width = len(str(len(css_list)))
 
-        def css_progress(completed: int, total: int):
+        def css_progress(completed: int, total: int) -> None:
             if total_assets > 0:
                 pct = 80 + int((completed / total_assets) * 10)
                 report(
@@ -372,7 +466,7 @@ class DownloaderPlugin(Plugin):
         if not skip_images:
             img_width = len(str(len(image_list)))
 
-            def image_progress(completed: int, total: int):
+            def image_progress(completed: int, total: int) -> None:
                 if total_assets > 0:
                     pct = 80 + int(((len(css_list) + completed) / total_assets) * 10)
                     report(
@@ -395,7 +489,7 @@ class DownloaderPlugin(Plugin):
 
         if "epub" in formats:
             report("generating_epub", 90)
-            epub_plugin = self._plugin("epub")
+            epub_plugin = cast("EpubPluginProtocol", self._plugin("epub"))
             epub_path = await self._resolve_result(
                 epub_plugin.generate(
                     book_info=book_info,
@@ -409,7 +503,7 @@ class DownloaderPlugin(Plugin):
             result.files["epub"] = str(epub_path)
 
         if any(f in formats for f in ("pdf", "all", "pdf-chapters")):
-            pdf_plugin = self._plugin("pdf")
+            pdf_plugin = cast("PdfPluginProtocol", self._plugin("pdf"))
 
             if "pdf-chapters" in formats:
                 report("generating_pdf_chapters", 95)
@@ -439,7 +533,7 @@ class DownloaderPlugin(Plugin):
         report("completed", 100)
         return result
 
-    def _cleanup_on_cancel(self, book_dir: Path):
+    def _cleanup_on_cancel(self, book_dir: Path) -> None:
         """Clean up partially downloaded book on cancellation."""
         if book_dir.exists():
             shutil.rmtree(book_dir)

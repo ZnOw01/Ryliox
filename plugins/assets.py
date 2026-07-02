@@ -80,7 +80,7 @@ class AssetsPlugin(Plugin):
                 progress_callback(i + 1, total)
         return downloaded
 
-    async def download_css_assets(self, css_urls: list[str], oebps: Path):
+    async def download_css_assets(self, css_urls: list[str], oebps: Path) -> None:
         """Download assets referenced by url() in CSS files."""
         styles_dir = oebps / "Styles"
         if not styles_dir.exists():

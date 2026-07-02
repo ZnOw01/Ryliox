@@ -166,7 +166,7 @@ class PdfPlugin(Plugin):
         print_css = self._get_print_css()
         original_css = self._load_css_files(oebps, css_files)
 
-        pdf_paths = []
+        pdf_paths: list[Path] = []
 
         for i, chapter in enumerate(chapters):
             xhtml_path = oebps / chapter["filename"].replace(".html", ".xhtml")
@@ -221,7 +221,7 @@ class PdfPlugin(Plugin):
         cover_html = self._generate_cover_html(book_info, cover_image)
         toc_html = self._generate_toc_html(toc, chapters)
 
-        chapters_html_parts = []
+        chapters_html_parts: list[str] = []
 
         for chapter in chapters:
             xhtml_path = oebps / chapter["filename"].replace(".html", ".xhtml")

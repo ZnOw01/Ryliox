@@ -49,7 +49,7 @@ class EpubPlugin(Plugin):
 
         return epub_path
 
-    def _cleanup_build_artifacts(self, output_dir: Path):
+    def _cleanup_build_artifacts(self, output_dir: Path) -> None:
         """Remove intermediate EPUB build files after ZIP creation."""
         artifacts = [
             output_dir / "mimetype",
@@ -62,10 +62,10 @@ class EpubPlugin(Plugin):
             elif artifact.is_dir():
                 shutil.rmtree(artifact)
 
-    def _write_mimetype(self, output_dir: Path):
+    def _write_mimetype(self, output_dir: Path) -> None:
         (output_dir / "mimetype").write_text("application/epub+zip", encoding="utf-8")
 
-    def _write_container_xml(self, output_dir: Path):
+    def _write_container_xml(self, output_dir: Path) -> None:
         content = """<?xml version="1.0"?>
 <container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
   <rootfiles>
@@ -105,7 +105,7 @@ class EpubPlugin(Plugin):
         chapters: list[dict] | None = None,
         css_files: list[str] | None = None,
         cover_image: str | None = None,
-    ):
+    ) -> None:
         """Write the EPUB package document.
 
         Accepts ``chapter_entries`` (new) or ``chapters`` (legacy alias).
@@ -198,7 +198,7 @@ class EpubPlugin(Plugin):
 
         (oebps / "content.opf").write_text(content, encoding="utf-8")
 
-    def _write_toc_ncx(self, oebps: Path, book_info: dict, toc: list[dict]):
+    def _write_toc_ncx(self, oebps: Path, book_info: dict, toc: list[dict]) -> None:
         title = html.escape(book_info.get("title", "Unknown"))
         isbn = book_info.get("isbn", book_info.get("id", "unknown"))
         authors = ", ".join(book_info.get("authors", ["Unknown"]))
@@ -228,7 +228,7 @@ class EpubPlugin(Plugin):
 
         (oebps / "toc.ncx").write_text(content, encoding="utf-8")
 
-    def _write_nav_xhtml(self, oebps: Path, book_info: dict, toc: list[dict]):
+    def _write_nav_xhtml(self, oebps: Path, book_info: dict, toc: list[dict]) -> None:
         """Generate EPUB 3 navigation document (nav.xhtml)."""
         title = html.escape(self._sanitize_xml_text(book_info.get("title", "Unknown")))
         nav_items = self._build_nav_ol(toc)
@@ -334,7 +334,7 @@ class EpubPlugin(Plugin):
         }
         return types.get(suffix.lower(), "application/octet-stream")
 
-    def _resolve_internal_links(self, oebps: Path):
+    def _resolve_internal_links(self, oebps: Path) -> None:
         """Rewrite all internal hrefs so every fragment points to the file that
         actually contains it.  Drops fragments that don't exist anywhere, which
         prevents RSC-012 errors in epubcheck."""
@@ -412,7 +412,7 @@ class EpubPlugin(Plugin):
             if text != original:
                 xhtml.write_text(text, encoding="utf-8")
 
-    def _create_epub_zip(self, output_dir: Path, epub_path: Path):
+    def _create_epub_zip(self, output_dir: Path, epub_path: Path) -> None:
         """Create the EPUB zip archive.
 
         Only the EPUB-specific subtrees (``META-INF/`` and ``OEBPS/``) are
