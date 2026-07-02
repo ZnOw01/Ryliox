@@ -86,6 +86,7 @@ class AssetsPlugin(Plugin):
         if not styles_dir.exists():
             return
 
+        safe_styles_dir = styles_dir.resolve()
         for i, css_url in enumerate(css_urls):
             css_path = styles_dir / f"Style{i:02d}.css"
             if not css_path.exists():
@@ -94,10 +95,19 @@ class AssetsPlugin(Plugin):
             css_text = css_path.read_text(encoding="utf-8")
             for match in re.finditer(r'url\(["\']?([^)"\']+)["\']?\)', css_text):
                 ref = match.group(1)
-                if ref.startswith("data:") or ref.startswith("http"):
+                ref_path = Path(ref)
+                if (
+                    ref.startswith(("data:", "http", "/", "\\"))
+                    or ".." in ref_path.parts
+                    or ref_path.is_absolute()
+                ):
                     continue
 
-                save_path = (styles_dir / ref).resolve()
+                save_path = (safe_styles_dir / ref_path).resolve()
+                try:
+                    save_path.relative_to(safe_styles_dir)
+                except ValueError:
+                    continue
                 if save_path.exists():
                     continue
 

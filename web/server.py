@@ -10,8 +10,11 @@ attaches the application-scoped kernel, session store and download queue to
 from __future__ import annotations
 
 import logging
+import threading
 import time
-from contextlib import asynccontextmanager
+import uuid
+from collections import defaultdict
+from contextlib import asynccontextmanager, suppress
 from typing import TYPE_CHECKING
 
 import uvicorn
@@ -23,6 +26,7 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 import config
+from core.metrics import metrics
 from web.api_utils import ErrorCode, error_response
 from web.dependencies import (
     ForbiddenOriginError,
@@ -43,6 +47,90 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+_RATE_LIMITED_ENDPOINTS: frozenset[tuple[str, str]] = frozenset(
+    {
+        ("POST", "/api/cookies"),
+        ("POST", "/api/download"),
+        ("POST", "/api/cancel"),
+        ("POST", "/api/reveal"),
+        ("POST", "/api/settings/output-dir"),
+    }
+)
+
+
+class _RateLimiter:
+    """Small in-memory fixed-window limiter keyed by client IP and endpoint."""
+
+    def __init__(self, max_requests: int, window_seconds: int) -> None:
+        self.max_requests = max(1, int(max_requests))
+        self.window_seconds = max(1, int(window_seconds))
+        self._requests: defaultdict[tuple[str, str], list[float]] = defaultdict(list)
+        self._lock = threading.Lock()
+
+    def is_allowed(self, client_ip: str, endpoint: str) -> bool:
+        now = time.monotonic()
+        cutoff = now - self.window_seconds
+        key = (client_ip, endpoint)
+
+        with self._lock:
+            timestamps = [ts for ts in self._requests[key] if ts > cutoff]
+            if len(timestamps) >= self.max_requests:
+                self._requests[key] = timestamps
+                return False
+
+            timestamps.append(now)
+            self._requests[key] = timestamps
+            return True
+
+    def clear_old_entries(self) -> None:
+        cutoff = time.monotonic() - self.window_seconds
+        with self._lock:
+            stale_keys = []
+            for key, timestamps in self._requests.items():
+                fresh = [ts for ts in timestamps if ts > cutoff]
+                if fresh:
+                    self._requests[key] = fresh
+                else:
+                    stale_keys.append(key)
+            for key in stale_keys:
+                self._requests.pop(key, None)
+
+
+def _client_ip(request: Request) -> str:
+    if request.client and request.client.host:
+        return request.client.host
+    return "unknown"
+
+
+def _request_id_middleware_factory():
+    async def _middleware(request: Request, call_next):
+        request_id = request.headers.get("x-request-id") or uuid.uuid4().hex
+        request.state.request_id = request_id
+        response = await call_next(request)
+        response.headers["X-Request-ID"] = request_id
+        return response
+
+    return _middleware
+
+
+def _rate_limit_middleware_factory(limiter: _RateLimiter):
+    async def _middleware(request: Request, call_next):
+        key = (request.method.upper(), request.url.path)
+        if key in _RATE_LIMITED_ENDPOINTS and not limiter.is_allowed(
+            _client_ip(request), request.url.path
+        ):
+            with suppress(Exception):
+                metrics.record_rate_limit_hit(request.url.path)
+            return error_response(
+                "Too many requests",
+                status.HTTP_429_TOO_MANY_REQUESTS,
+                code=ErrorCode.RATE_LIMITED,
+                details={"retry_after_seconds": limiter.window_seconds},
+            )
+        return await call_next(request)
+
+    return _middleware
+
 
 # ─── Security headers middleware ────────────────────────────────────────────
 
@@ -54,6 +142,7 @@ def _security_headers_middleware_factory():
         response = await call_next(request)
         response.headers.setdefault("X-Content-Type-Options", "nosniff")
         response.headers.setdefault("X-Frame-Options", "DENY")
+        response.headers.setdefault("X-XSS-Protection", "1; mode=block")
         response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
         response.headers.setdefault("Permissions-Policy", "geolocation=(), microphone=()")
         response.headers.setdefault("Cross-Origin-Opener-Policy", "same-origin")
@@ -98,8 +187,11 @@ def _request_size_middleware_factory(max_bytes: int):
         cl = request.headers.get("content-length")
         if cl and cl.isdigit() and int(cl) > max_bytes:
             return JSONResponse(
-                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-                content={"error": "Request body too large", "code": ErrorCode.BAD_REQUEST},
+                status_code=413,
+                content={
+                    "error": "Request body too large",
+                    "code": ErrorCode.REQUEST_TOO_LARGE,
+                },
             )
         return await call_next(request)
 
@@ -142,6 +234,10 @@ def create_app() -> FastAPI:
         openapi_url=None if is_prod else "/api/openapi.json",
         lifespan=_lifespan,
     )
+    app.state.rate_limiter = _RateLimiter(
+        settings.rate_limit.max_requests,
+        settings.rate_limit.window_seconds,
+    )
 
     # ── Middleware ──
     if is_prod and settings.security.allowed_hosts:
@@ -163,6 +259,8 @@ def create_app() -> FastAPI:
     app.middleware("http")(
         _request_size_middleware_factory(settings.security.max_request_size_mb * 1024 * 1024)
     )
+    app.middleware("http")(_rate_limit_middleware_factory(app.state.rate_limiter))
+    app.middleware("http")(_request_id_middleware_factory())
 
     # ── Routers ──
     app.include_router(auth_router)

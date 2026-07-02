@@ -36,6 +36,8 @@ class ErrorCode(StrEnum):
     INVALID_PROGRESS_SNAPSHOT = "invalid_progress_snapshot"
     JOB_NOT_FOUND = "job_not_found"
     CROSS_ORIGIN_BLOCKED = "cross_origin_blocked"
+    RATE_LIMITED = "rate_limited"
+    REQUEST_TOO_LARGE = "request_too_large"
 
 
 def error_response(

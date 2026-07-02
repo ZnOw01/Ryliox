@@ -71,3 +71,27 @@ async def test_download_cover_image_uses_real_media_type_for_extension(tmp_path:
 
     assert result.name == "cover.png"
     assert result.read_bytes().startswith(b"\x89PNG")
+
+
+@pytest.mark.asyncio
+async def test_download_css_assets_blocks_path_traversal(tmp_path: Path):
+    plugin = AssetsPlugin()
+    oebps = tmp_path / "OEBPS"
+    styles = oebps / "Styles"
+    styles.mkdir(parents=True)
+    (styles / "Style00.css").write_text(
+        "body{background:url('../Images/escape.png')} .ok{background:url('safe.png')}",
+        encoding="utf-8",
+    )
+
+    async def fake_download(_url: str, save_path: Path) -> bool:
+        save_path.parent.mkdir(parents=True, exist_ok=True)
+        save_path.write_bytes(b"ok")
+        return True
+
+    plugin.download_image = fake_download  # type: ignore[method-assign]
+
+    await plugin.download_css_assets(["https://learning.oreilly.com/book/style.css"], oebps)
+
+    assert not (oebps / "Images" / "escape.png").exists()
+    assert (styles / "safe.png").read_bytes() == b"ok"

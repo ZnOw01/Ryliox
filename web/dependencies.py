@@ -27,7 +27,7 @@ from core.validators import (
     ValidationError,
     validate_book_id,
     validate_file_path,
-    validate_url,
+    validate_url_sync,
     validate_user_input,
 )
 
@@ -353,7 +353,7 @@ def validate_url_dependency(url: str, allowed_hosts: set[str] | None = None) -> 
         HTTPException: If validation fails
     """
     try:
-        return validate_url(url, allowed_hosts)
+        return validate_url_sync(url, allowed_hosts)
     except ValidationError as exc:
         # Log security event for SSRF attempt
         logger.warning("SSRF prevention: URL validation failed for %s: %s", url[:50], exc.reason)
