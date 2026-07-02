@@ -138,6 +138,7 @@
       "status_running": "En progreso",
       "status_completed": "Completado",
       "status_error": "Error",
+      "status_cancelled": "Cancelado",
       "queued": "En cola (posición {{position}})",
       "connecting": "Conectando...",
       "downloading": "Descargando...",

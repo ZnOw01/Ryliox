@@ -29,7 +29,7 @@ export function ProgressStatus({ currentLabel, progress, progressPercent }: Prog
   const [actionError, setActionError] = useState<string | null>(null);
   const [revealingPath, setRevealingPath] = useState<string | null>(null);
   const etaLabel = formatEta(progress?.eta_seconds);
-  const statusLabel = formatStatusLabel(currentLabel);
+  const statusLabel = formatStatusLabel(currentLabel, t);
   const epubName = outputFileNames(progress?.epub);
   const pdfName = outputFileNames(progress?.pdf);
   const shouldShowSummaryMessage = Boolean(

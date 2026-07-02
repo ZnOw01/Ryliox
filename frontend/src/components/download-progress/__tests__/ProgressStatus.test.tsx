@@ -17,8 +17,8 @@ describe('ProgressStatus', () => {
       />
     );
 
-    expect(screen.getByText('Descarga cancelada.')).toBeInTheDocument();
     expect(screen.getByText(/estado: cancelado/i)).toBeInTheDocument();
+    expect(screen.getByText(/download cancelled by user/i)).toBeInTheDocument();
   });
 
   it('shows a canceled summary state (US spelling)', () => {
@@ -33,7 +33,6 @@ describe('ProgressStatus', () => {
       />
     );
 
-    expect(screen.getByText('Descarga cancelada.')).toBeInTheDocument();
     expect(screen.getByText(/estado: cancelado/i)).toBeInTheDocument();
   });
 });

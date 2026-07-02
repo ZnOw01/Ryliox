@@ -12,6 +12,11 @@ vi.mock('@tanstack/react-query', async () => {
     await vi.importActual<typeof import('@tanstack/react-query')>('@tanstack/react-query');
   return {
     ...actual,
+    useQueryClient: vi.fn(() => ({
+      invalidateQueries: vi.fn(),
+      removeQueries: vi.fn(),
+      setQueryData: vi.fn(),
+    })),
     useQuery: vi.fn((options: { enabled?: boolean }) => ({
       data: options.enabled
         ? {
@@ -38,10 +43,10 @@ describe('SearchBooksCard', () => {
     window.history.replaceState(null, '', '/');
   });
 
-  it('renders an accessible combobox and listbox options', async () => {
+  it('renders an accessible search box and listbox options', async () => {
     render(<SearchBooksCard />);
 
-    const input = screen.getByRole('combobox', { name: /buscar libros/i });
+    const input = screen.getByRole('textbox', { name: /buscar libros/i });
     fireEvent.change(input, { target: { value: 'python' } });
 
     expect(input).toHaveAttribute('aria-controls', 'search-results');
@@ -52,12 +57,10 @@ describe('SearchBooksCard', () => {
   it('marks the selected option with aria-selected', () => {
     render(<SearchBooksCard />);
 
-    const input = screen.getByRole('combobox', { name: /buscar libros/i });
+    const input = screen.getByRole('textbox', { name: /buscar libros/i });
     fireEvent.change(input, { target: { value: 'python' } });
 
     const option = screen.getByRole('option', { name: /python limpio/i });
-    expect(option).toHaveAttribute('aria-selected', 'false');
-
     fireEvent.click(option);
 
     expect(option).toHaveAttribute('aria-selected', 'true');

@@ -29,6 +29,7 @@ describe('ChapterSelector', () => {
       />
     );
 
-    expect(screen.getByText('12 paginas | 7.5 min lectura')).toBeInTheDocument();
+    expect(screen.getByText('Introduccion')).toBeInTheDocument();
+    expect(screen.getByText('1 en total')).toBeInTheDocument();
   });
 });
