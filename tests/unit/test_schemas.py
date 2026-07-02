@@ -135,10 +135,16 @@ class TestDownloadRequest:
         with pytest.raises(ValidationError):
             DownloadRequest(book_id="ab")  # Too short (min 10 chars) and wrong format
 
+    def test_book_id_isbn_format_allowed(self):
+        """Test book_id accepts ISBN format without a URN prefix."""
+        request = DownloadRequest(book_id="9780134685991")
+
+        assert request.book_id == "9780134685991"
+
     def test_book_id_wrong_format(self):
-        """Test book_id format validation for non-urn format."""
+        """Test book_id rejects unsupported identifiers."""
         with pytest.raises(ValidationError):
-            DownloadRequest(book_id="9780134685991")  # ISBN without urn:orm:book: prefix
+            DownloadRequest(book_id="not-a-valid-book-id")
 
     def test_output_dir_min_length(self):
         """Test output_dir minimum length validation."""

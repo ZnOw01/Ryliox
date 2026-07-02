@@ -8,7 +8,7 @@ import sqlite3
 import threading
 import time
 from collections.abc import Mapping
-from contextlib import contextmanager
+from contextlib import closing, contextmanager
 from pathlib import Path
 from typing import Any
 
@@ -289,8 +289,12 @@ class SessionStore:
         """
         if not path.exists() or not path.is_file():
             return []
+        sqlite_suffixes = {".db", ".sqlite", ".sqlite3"}
+        if path.suffix.lower() not in sqlite_suffixes:
+            return []
+
         try:
-            with sqlite3.connect(str(path)) as conn:
+            with closing(sqlite3.connect(str(path))) as conn:
                 rows = conn.execute("SELECT name, value FROM session_cookies").fetchall()
         except sqlite3.Error:
             return []
