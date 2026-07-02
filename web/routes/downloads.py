@@ -38,7 +38,10 @@ from web.schemas import (
 )
 
 if TYPE_CHECKING:
+    from collections.abc import AsyncIterator
     from pathlib import Path
+
+    from fastapi.responses import JSONResponse
 
     from core.kernel import Kernel
     from core.services import DownloadQueueService
@@ -244,7 +247,7 @@ async def notify_progress_task(
 def progress(
     job_id: str | None = Query(default=None),
     download_queue: DownloadQueueService = Depends(get_download_queue),
-) -> dict[str, Any]:
+) -> dict[str, Any] | JSONResponse:
     snapshot = download_queue.get_progress(job_id=job_id)
     if job_id and not snapshot:
         return error_response(
@@ -271,7 +274,7 @@ async def progress_stream(
     """
     logger.info("[%s] Starting SSE stream for job_id=%s", request_id, job_id)
 
-    async def event_stream():
+    async def event_stream() -> AsyncIterator[str]:
         last_signature: str | None = None
         last_heartbeat_at = time.monotonic()
         progress_version = download_queue.get_progress_version()
@@ -370,7 +373,7 @@ def cancel_download(
 )
 def download(
     data: DownloadRequest = Body(default_factory=DownloadRequest),
-    background_tasks: BackgroundTasks = None,
+    background_tasks: BackgroundTasks = None,  # type: ignore[assignment]
     kernel: Kernel = Depends(get_kernel),
     download_queue: DownloadQueueService = Depends(get_download_queue),
     request_id: str = Depends(get_request_id),

@@ -102,7 +102,7 @@ class ChapterSummaryResponse(_ResponseModel):
 class BookChaptersResponse(_ResponseModel):
     chapters: list[ChapterSummaryResponse]
 
-    @computed_field  # type: ignore[misc]
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def total(self) -> int:
         """Total derived from the list; avoids desynchronization."""

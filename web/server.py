@@ -14,8 +14,9 @@ import threading
 import time
 import uuid
 from collections import defaultdict
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 from contextlib import asynccontextmanager, suppress
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import uvicorn
 from fastapi import FastAPI, Request, status
@@ -24,6 +25,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.responses import Response
 
 import config
 from core.metrics import metrics
@@ -102,8 +104,12 @@ def _client_ip(request: Request) -> str:
     return "unknown"
 
 
-def _request_id_middleware_factory():
-    async def _middleware(request: Request, call_next):
+NextHandler = Callable[[Request], Awaitable[Response]]
+MiddlewareHandler = Callable[[Request, NextHandler], Awaitable[Response]]
+
+
+def _request_id_middleware_factory() -> MiddlewareHandler:
+    async def _middleware(request: Request, call_next: NextHandler) -> Response:
         request_id = request.headers.get("x-request-id") or uuid.uuid4().hex
         request.state.request_id = request_id
         response = await call_next(request)
@@ -113,8 +119,8 @@ def _request_id_middleware_factory():
     return _middleware
 
 
-def _rate_limit_middleware_factory(limiter: _RateLimiter):
-    async def _middleware(request: Request, call_next):
+def _rate_limit_middleware_factory(limiter: _RateLimiter) -> MiddlewareHandler:
+    async def _middleware(request: Request, call_next: NextHandler) -> Response:
         key = (request.method.upper(), request.url.path)
         if key in _RATE_LIMITED_ENDPOINTS and not limiter.is_allowed(
             _client_ip(request), request.url.path
@@ -135,8 +141,8 @@ def _rate_limit_middleware_factory(limiter: _RateLimiter):
 # ─── Security headers middleware ────────────────────────────────────────────
 
 
-def _security_headers_middleware_factory():
-    async def _middleware(request: Request, call_next):
+def _security_headers_middleware_factory() -> MiddlewareHandler:
+    async def _middleware(request: Request, call_next: NextHandler) -> Response:
         if not config.SETTINGS.security.enable_security_headers:
             return await call_next(request)
         response = await call_next(request)
@@ -164,9 +170,9 @@ def _security_headers_middleware_factory():
 # ─── Error sanitisation ─────────────────────────────────────────────────────
 
 
-def _sanitize_errors(errors: list[dict]) -> list[dict]:
+def _sanitize_errors(errors: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
     """Strip non-JSON-serializable values from Pydantic validation errors."""
-    safe: list[dict] = []
+    safe: list[dict[str, Any]] = []
     for err in errors:
         item = dict(err)
         ctx = item.get("ctx")
@@ -182,8 +188,8 @@ def _sanitize_errors(errors: list[dict]) -> list[dict]:
 # ─── Request size / timeout middleware ───────────────────────────────────────
 
 
-def _request_size_middleware_factory(max_bytes: int):
-    async def _middleware(request: Request, call_next):
+def _request_size_middleware_factory(max_bytes: int) -> MiddlewareHandler:
+    async def _middleware(request: Request, call_next: NextHandler) -> Response:
         cl = request.headers.get("content-length")
         if cl and cl.isdigit() and int(cl) > max_bytes:
             return JSONResponse(
@@ -274,7 +280,7 @@ def create_app() -> FastAPI:
 
     # ── Exception handlers ──
     @app.exception_handler(RequestValidationError)
-    async def _validation_handler(request: Request, exc: RequestValidationError):
+    async def _validation_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
         logger.debug("Validation error: %s", exc.errors())
         errors = _sanitize_errors(exc.errors())
         return error_response(
@@ -285,7 +291,9 @@ def create_app() -> FastAPI:
         )
 
     @app.exception_handler(ForbiddenOriginError)
-    async def _forbidden_origin_handler(request: Request, exc: ForbiddenOriginError):
+    async def _forbidden_origin_handler(
+        request: Request, exc: ForbiddenOriginError
+    ) -> JSONResponse:
         logger.warning("Cross-origin request blocked: %s", exc)
         return error_response(
             f"Cross-origin request blocked for '{exc.args[0]}'.",
@@ -294,7 +302,7 @@ def create_app() -> FastAPI:
         )
 
     @app.exception_handler(Exception)
-    async def _unhandled_handler(request: Request, exc: Exception):
+    async def _unhandled_handler(request: Request, exc: Exception) -> JSONResponse:
         logger.exception("Unhandled exception: %s", exc)
         return error_response(
             "Internal server error",

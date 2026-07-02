@@ -29,6 +29,8 @@ from web.schemas import (
 )
 
 if TYPE_CHECKING:
+    from fastapi.responses import JSONResponse
+
     from core.kernel import Kernel
 
 router = APIRouter(prefix="/api", tags=["system"])
@@ -458,7 +460,7 @@ async def reveal_file(
 async def set_output_dir(
     data: OutputDirRequest = Body(default_factory=OutputDirRequest),
     kernel: Kernel = Depends(get_kernel),
-) -> SetOutputDirResponse:
+) -> SetOutputDirResponse | JSONResponse:
     system_plugin = kernel["system"]
     output_plugin = kernel["output"]
 
@@ -518,7 +520,7 @@ class SingleFeatureFlagResponse(BaseModel):
 
 
 @router.get("/feature-flags", response_model=FeatureFlagsResponse)
-async def get_feature_flags_api():
+async def get_feature_flags_api() -> FeatureFlagsResponse:
     """Get all feature flags and their current states.
 
     Returns:
@@ -528,7 +530,7 @@ async def get_feature_flags_api():
 
 
 @router.get("/feature-flags/{flag_name}", response_model=SingleFeatureFlagResponse)
-async def get_single_feature_flag(flag_name: str):
+async def get_single_feature_flag(flag_name: str) -> SingleFeatureFlagResponse:
     """Get the state of a single feature flag.
 
     Args:
