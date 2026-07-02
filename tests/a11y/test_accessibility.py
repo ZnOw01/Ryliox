@@ -1,6 +1,9 @@
 """Accessibility tests for Ryliox frontend using axe-core/Playwright patterns."""
 
 import pytest
+
+pytest.importorskip("playwright")
+
 from playwright.async_api import async_playwright
 
 pytestmark = [pytest.mark.a11y, pytest.mark.e2e]

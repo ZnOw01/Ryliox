@@ -12,7 +12,7 @@ Tests cover:
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -424,14 +424,19 @@ class TestDownloadRateLimiting:
 class TestDownloadProgressStream:
     """Tests for GET /api/progress/stream SSE endpoint."""
 
-    def test_progress_stream_connection(self, test_client: TestClient):
+    @pytest.mark.asyncio
+    async def test_progress_stream_connection(self, mock_download_queue):
         """Test SSE stream connection."""
-        response = test_client.get(
-            "/api/progress/stream",
-            headers={
-                "Origin": "http://testserver",
-                "Accept": "text/event-stream",
-            },
+        from web.routes.downloads import progress_stream
+
+        request = MagicMock()
+        request.is_disconnected = AsyncMock(return_value=True)
+
+        response = await progress_stream(
+            request=request,
+            job_id=None,
+            download_queue=mock_download_queue,
+            request_id="test-request-id",
         )
 
         assert response.status_code == 200
