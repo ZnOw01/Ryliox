@@ -50,7 +50,7 @@ class HttpSettings(BaseSettings):
     timeout: int = 30
     retries: int = 2
     retry_backoff: float = 0.5
-    request_timeout_seconds: int = 60
+    request_timeout_seconds: int = 600
     user_agent: str | None = None
     enable_fake_useragent: bool = False
     accept: str = "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8"
