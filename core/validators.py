@@ -407,7 +407,9 @@ def validate_filename(filename: str) -> str:
             filename[:50],
         )
 
-    # Remove path components
+    if "/" in filename or "\\" in filename:
+        raise ValidationError("filename", "Filename cannot contain path separators", filename[:50])
+
     filename = Path(filename).name
 
     if not filename.strip():

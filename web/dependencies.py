@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 
 from fastapi import FastAPI, HTTPException, Request, status
+from fastapi.exceptions import RequestValidationError
 
 import config
 from core import create_default_kernel
@@ -179,7 +180,7 @@ def get_kernel(request: Request) -> Generator[Kernel, None, None]:
     kernel = request.app.state.kernel
     try:
         yield kernel
-    except HTTPException:
+    except (HTTPException, RequestValidationError):
         raise
     except Exception as exc:
         logger.exception("Error in kernel dependency: %s", exc)
@@ -194,7 +195,7 @@ def get_session_store(request: Request) -> Generator[SessionStore, None, None]:
     session_store = request.app.state.session_store
     try:
         yield session_store
-    except HTTPException:
+    except (HTTPException, RequestValidationError):
         raise
     except Exception as exc:
         logger.exception("Error in session store dependency: %s", exc)
@@ -209,7 +210,7 @@ def get_download_queue(request: Request) -> Generator[DownloadQueueService, None
     download_queue = request.app.state.download_queue
     try:
         yield download_queue
-    except HTTPException:
+    except (HTTPException, RequestValidationError):
         raise
     except Exception as exc:
         logger.exception("Error in download queue dependency: %s", exc)

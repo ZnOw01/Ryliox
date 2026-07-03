@@ -18,6 +18,7 @@ Usage:
 
 from __future__ import annotations
 
+import asyncio
 import os
 import re
 import tempfile
@@ -92,7 +93,7 @@ class TestBrokenAccessControl:
     def test_book_id_format_validation(self):
         """Test strict book ID format validation."""
         # Valid book ID
-        valid_id = "urn:orm:book:a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6"
+        valid_id = "urn:orm:book:a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6"
         assert validate_book_id(valid_id) == valid_id.lower()
 
         # Invalid formats
@@ -330,6 +331,11 @@ class TestAuthenticationFailures:
 # =============================================================================
 
 
+def _audit_logger(log_file: Path) -> AuditLogger:
+    AuditLogger._reset()
+    return AuditLogger(log_file=log_file, enabled=True)
+
+
 class TestDataIntegrity:
     """Tests for OWASP A08: Software and Data Integrity Failures."""
 
@@ -337,10 +343,7 @@ class TestDataIntegrity:
         """Test audit log tamper detection."""
         audit_file = tmp_path / "audit.log"
 
-        logger = AuditLogger(
-            log_file=audit_file,
-            enabled=True,
-        )
+        logger = _audit_logger(audit_file)
 
         # Log some events
         entry1 = logger.log(
@@ -382,10 +385,7 @@ class TestLoggingFailures:
         """Test that security events are audited."""
         audit_file = tmp_path / "audit.log"
 
-        logger = AuditLogger(
-            log_file=audit_file,
-            enabled=True,
-        )
+        logger = _audit_logger(audit_file)
 
         # Log security event
         logger.log(
@@ -407,10 +407,7 @@ class TestLoggingFailures:
         """Test that sensitive data is not logged."""
         audit_file = tmp_path / "audit.log"
 
-        logger = AuditLogger(
-            log_file=audit_file,
-            enabled=True,
-        )
+        logger = _audit_logger(audit_file)
 
         # Attempt to log sensitive data
         logger.log(
@@ -467,11 +464,11 @@ class TestSSRF:
         allowed_hosts = {"learning.oreilly.com", "api.example.com"}
 
         # Allowed hosts should work
-        assert validate_url("https://learning.oreilly.com/book/123", allowed_hosts)
+        assert asyncio.run(validate_url("https://learning.oreilly.com/book/123", allowed_hosts))
 
         # Other hosts should fail
         with pytest.raises(ValidationError):
-            validate_url("https://malicious.com/phishing", allowed_hosts)
+            asyncio.run(validate_url("https://malicious.com/phishing", allowed_hosts))
 
 
 # =============================================================================
@@ -485,7 +482,8 @@ def client():
     from web.server import create_app
 
     app = create_app()
-    return TestClient(app)
+    with TestClient(app) as test_client:
+        yield test_client
 
 
 class TestIntegration:
@@ -493,7 +491,11 @@ class TestIntegration:
 
     def test_api_rejects_invalid_book_id(self, client):
         """Test API rejects malformed book IDs."""
-        response = client.post("/api/download", json={"book_id": "invalid-id", "format": ["epub"]})
+        response = client.post(
+            "/api/download",
+            json={"book_id": "invalid-id", "format": ["epub"]},
+            headers={"Origin": "http://testserver"},
+        )
         assert response.status_code == 422  # Validation error
 
     def test_api_rejects_path_traversal(self, client):
@@ -501,10 +503,11 @@ class TestIntegration:
         response = client.post(
             "/api/download",
             json={
-                "book_id": "urn:orm:book:a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6",
+                "book_id": "urn:orm:book:a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6",
                 "format": ["epub"],
                 "output_dir": "../../../etc/passwd",
             },
+            headers={"Origin": "http://testserver"},
         )
         assert response.status_code == 422  # Validation error
 
@@ -566,7 +569,7 @@ class TestFuzzing:
     def test_url_blocks_ssrf_vectors(self, input_val):
         """Test URL validation blocks SSRF vectors."""
         with pytest.raises(ValidationError):
-            validate_url(input_val)
+            asyncio.run(validate_url(input_val))
 
 
 if __name__ == "__main__":

@@ -382,6 +382,8 @@ class AuditLogger:
             "api_key",
             "apikey",
             "private_key",
+            "credit_card",
+            "card_number",
             "access_token",
             "refresh_token",
             "session_token",

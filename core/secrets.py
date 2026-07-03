@@ -73,7 +73,7 @@ class SecretManager:
     _instance: SecretManager | None = None
     _initialized: bool = False
 
-    def __new__(cls) -> SecretManager:
+    def __new__(cls, *args: Any, **kwargs: Any) -> SecretManager:
         if cls._instance is None:
             cls._instance = super().__new__(cls)
         return cls._instance
@@ -93,7 +93,7 @@ class SecretManager:
         self._fernet: Fernet | None = None
         self._secrets: dict[str, tuple[str, SecretMetadata]] = {}
         self._backend: SecretBackend | None = None
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
 
         self._initialized = True
 

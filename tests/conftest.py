@@ -18,6 +18,8 @@ import tempfile
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 from unittest.mock import AsyncMock, MagicMock
+from urllib.error import URLError
+from urllib.request import urlopen
 
 import pytest
 import pytest_asyncio
@@ -304,7 +306,9 @@ def mock_session_store(temp_db_path: Path) -> SessionStore:
 
 
 @pytest.fixture(scope="function")
-def mock_download_queue(temp_dir: Path, mock_kernel: Kernel) -> Generator[DownloadQueueService, None, None]:
+def mock_download_queue(
+    temp_dir: Path, mock_kernel: Kernel
+) -> Generator[DownloadQueueService, None, None]:
     """Create a download queue service with temporary database."""
     db_path = temp_dir / "downloads.db"
     error_log_dir = temp_dir / "logs"
@@ -423,7 +427,13 @@ async def running_download_queue(
 @pytest.fixture(scope="session")
 def base_url() -> str:
     """Return the base URL for E2E tests."""
-    return os.getenv("TEST_BASE_URL", "http://localhost:8000")
+    url = os.getenv("TEST_BASE_URL", "http://localhost:8000").rstrip("/")
+    try:
+        with urlopen(f"{url}/api/health", timeout=1):  # nosec B310 - test availability probe
+            pass
+    except (OSError, URLError):
+        pytest.skip(f"Live server is not available at {url}; set TEST_BASE_URL or start the API")
+    return url
 
 
 # ============================================================================
