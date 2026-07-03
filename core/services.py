@@ -34,7 +34,6 @@ DEFAULT_QUEUE_POLL_INTERVAL_SECONDS = 0.5
 DEFAULT_TERMINAL_JOB_RETENTION = 500
 MIN_QUEUE_POLL_INTERVAL_SECONDS = 0.1
 WORKER_ERROR_LOG_COOLDOWN_SECONDS = 60.0
-DOWNLOAD_TIMEOUT_SECONDS = getattr(config, "DOWNLOAD_TIMEOUT_SECONDS", 600)
 
 TERMINAL_STATES = frozenset(["completed", "error", "cancelled"])
 
@@ -339,9 +338,9 @@ class DownloadQueueService:
                             await kernel.__aexit__(None, None, None)
 
             with runner:
-                result = runner.run(
-                    asyncio.wait_for(run_download(), timeout=DOWNLOAD_TIMEOUT_SECONDS)
-                )
+                # ponytail: no overall timeout — individual HTTP requests have
+                # their own timeout (30s) and the user can cancel via the UI.
+                result = runner.run(run_download())
 
             if result.files.get("pdf"):
                 pdf_paths = result.files["pdf"]
