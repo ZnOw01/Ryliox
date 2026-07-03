@@ -45,9 +45,7 @@ class TestDownloadJobDTO:
         assert dto.formats == ["pdf", "epub"]
 
     def test_selected_chapters(self):
-        dto = DownloadJobDTO(
-            book_id="b1", output_dir=Path("/tmp"), selected_chapters=[0, 1, 2]
-        )
+        dto = DownloadJobDTO(book_id="b1", output_dir=Path("/tmp"), selected_chapters=[0, 1, 2])
         assert dto.selected_chapters == [0, 1, 2]
 
     def test_skip_images(self):
@@ -61,9 +59,7 @@ class TestDownloadJobDTO:
         assert isinstance(dumped["output_dir"], str)
 
     def test_model_dump_handles_selected_chapters(self):
-        dto = DownloadJobDTO(
-            book_id="b1", output_dir=Path("/tmp"), selected_chapters=[0, 1]
-        )
+        dto = DownloadJobDTO(book_id="b1", output_dir=Path("/tmp"), selected_chapters=[0, 1])
         dumped = dto.model_dump()
         assert dumped["selected_chapters"] == [0, 1]
 
@@ -393,9 +389,7 @@ class TestDownloadResultDTO:
         assert dto.to_dict() == dto.model_dump()
 
     def test_from_dict_backward_compat(self):
-        dto = DownloadResultDTO.from_dict(
-            {"book_id": "b1", "title": "T", "epub": "/tmp/book.epub"}
-        )
+        dto = DownloadResultDTO.from_dict({"book_id": "b1", "title": "T", "epub": "/tmp/book.epub"})
         assert dto.epub_path == "/tmp/book.epub"
 
 

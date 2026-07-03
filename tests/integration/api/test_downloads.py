@@ -73,7 +73,9 @@ class TestDownloadQueue:
         """Test download with invalid format."""
         from plugins.downloader import DownloaderPlugin
 
-        with patch.object(DownloaderPlugin, "parse_formats", side_effect=ValueError("Invalid format: xyz")):
+        with patch.object(
+            DownloaderPlugin, "parse_formats", side_effect=ValueError("Invalid format: xyz")
+        ):
             request_data = {
                 "book_id": "urn:orm:book:a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6",
                 "format": ["xyz"],
@@ -400,7 +402,10 @@ class TestDownloadRateLimiting:
         for _ in range(10):
             response = test_client.post(
                 "/api/download",
-                json={"book_id": "urn:orm:book:a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6", "format": ["epub"]},
+                json={
+                    "book_id": "urn:orm:book:a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6",
+                    "format": ["epub"],
+                },
                 headers=headers,
             )
             responses.append(response.status_code)
@@ -497,7 +502,10 @@ class TestDownloadFormats:
 
         response = test_client.post(
             "/api/download",
-            json={"book_id": "urn:orm:book:a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6", "format": ["epub", "pdf"]},
+            json={
+                "book_id": "urn:orm:book:a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6",
+                "format": ["epub", "pdf"],
+            },
             headers={"Origin": "http://testserver"},
         )
 

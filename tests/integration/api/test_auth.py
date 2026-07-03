@@ -162,9 +162,7 @@ class TestGetCookies:
 
     def test_get_cookies_same_origin(self, authenticated_client: TestClient, sample_cookies):
         """Test retrieving cookies with same-origin header."""
-        response = authenticated_client.get(
-            "/api/cookies", headers={"Origin": "http://testserver"}
-        )
+        response = authenticated_client.get("/api/cookies", headers={"Origin": "http://testserver"})
 
         assert response.status_code == 200
         data = response.json()

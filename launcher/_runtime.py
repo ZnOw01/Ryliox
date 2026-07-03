@@ -175,7 +175,9 @@ def ensure_python_runtime(steps: Steps) -> Path:
     uv = require_uv()
 
     if not venv.exists():
-        _sync_venv(steps, uv, "Creating virtual environment and synchronising dependencies with uv...")
+        _sync_venv(
+            steps, uv, "Creating virtual environment and synchronising dependencies with uv..."
+        )
     else:
         steps.next("Virtual environment found.")
 
