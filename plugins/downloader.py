@@ -63,7 +63,7 @@ class ChaptersPluginProtocol(Protocol):
 
 
 class AssetsPluginProtocol(Protocol):
-    async def download_image(self, url: str, save_path: Path) -> bool: ...
+    async def download_image(self, url: str, save_path: Path) -> Path | None: ...
 
     async def download_all_css(
         self,

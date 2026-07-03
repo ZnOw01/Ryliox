@@ -12,7 +12,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-import config
 from core.dto import (
     DownloadErrorDTO,
     DownloadJobDTO,
