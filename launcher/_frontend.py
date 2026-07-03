@@ -82,12 +82,12 @@ def current_node_version() -> tuple[int, int, int] | None:
 def is_supported_astro_node(version: tuple[int, int, int] | None) -> bool:
     if version is None:
         return False
-    major, minor, patch = version
+    major, minor, _ = version
     if major < 22:
         return False
-    if major == 22 and (minor, patch) < (12, 0):
+    if major == 22 and minor < 12:
         return False
-    return major % 2 == 0
+    return True
 
 
 def build_command(bun: str) -> list[str]:
