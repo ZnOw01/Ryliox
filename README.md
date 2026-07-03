@@ -39,7 +39,7 @@ docker compose up -d
 git clone https://github.com/ZnOw01/Ryliox.git
 cd Ryliox
 uv sync --extra dev
-bun run dev
+python -m launcher --no-browser
 ```
 
 The launcher (`python -m launcher`) drives the local workflow: it creates
@@ -151,6 +151,10 @@ uv run ruff format --check .   # format
 uv run mypy                    # static types
 uv run pytest tests/unit -q    # fast unit tests
 uv run pytest tests/integration -q  # API integration tests
+cd frontend
+bun run typecheck
+bun run test
+bun run build
 ```
 
 ## Project layout

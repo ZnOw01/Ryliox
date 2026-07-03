@@ -50,7 +50,7 @@ uv run pytest --cov=core --cov=plugins --cov=utils --cov=web --cov-report=term-m
 uv sync --extra e2e
 uv run pytest tests/e2e -m e2e
 uv sync --extra security
-uv run pytest tests/security
+uv run pytest tests/security --run-security
 ```
 
 ## Conventions
@@ -61,9 +61,9 @@ uv run pytest tests/security
 - **No real cookies**: tests inject dummy cookies through `SessionStore` with a `tmp_path` DB.
 - **No `print()`**: use `caplog` / `capsys` assertions.
 
-## Known Pre-Existing Failures
+## Opt-In Suites
 
-Some tests document bugs that the refactor surfaced (e.g. Pydantic validation
-gaps, missing migration logic, kernel lifecycle quirks). They are kept as
-failing tests with a clear name so they act as TODO markers. See
-`tests/TESTING.md` (TODO) for the full list once the codebase is stabilised.
+Security, performance, and e2e suites are opt-in because they may require extra
+dependencies, a live server, browser tooling, or slower runtime flags. Unit,
+contract, and focused integration tests should pass without external network
+access.
