@@ -23,7 +23,7 @@ from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.responses import Response
 
@@ -48,6 +48,9 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 logger = logging.getLogger(__name__)
+
+_FRONTEND_STATIC_DIRS: tuple[str, ...] = ("_astro", "icons", "locales")
+_RESERVED_FRONTEND_PREFIXES: tuple[str, ...] = ("api", "metrics")
 
 _RATE_LIMITED_ENDPOINTS: frozenset[tuple[str, str]] = frozenset(
     {
@@ -320,11 +323,14 @@ def _mount_static(app: FastAPI) -> None:
 
     mounted: list[Path] = []
     if frontend_dist.is_dir():
-        app.mount(
-            "/assets",
-            StaticFiles(directory=frontend_dist / "_astro", check_dir=False),
-            name="frontend-assets",
-        )
+        for directory_name in _FRONTEND_STATIC_DIRS:
+            directory = frontend_dist / directory_name
+            if directory.is_dir():
+                app.mount(
+                    f"/{directory_name}",
+                    StaticFiles(directory=directory, check_dir=False),
+                    name=f"frontend-{directory_name}",
+                )
         mounted.append(frontend_dist)
     if legacy_static.is_dir():
         app.mount("/static", StaticFiles(directory=legacy_static), name="legacy-static")
@@ -333,14 +339,43 @@ def _mount_static(app: FastAPI) -> None:
     if not mounted:
         return
 
-    @app.get("/", include_in_schema=False)
-    async def _root_index() -> object:
-        from fastapi.responses import FileResponse
+    @app.get("/{path:path}", include_in_schema=False)
+    async def _frontend_entry(path: str) -> object:
+        if _is_reserved_frontend_path(path):
+            return JSONResponse({"detail": "Not Found"}, status_code=status.HTTP_404_NOT_FOUND)
 
-        for candidate in (frontend_dist / "index.html", legacy_static / "index.html"):
-            if candidate.is_file():
+        if frontend_dist.is_dir():
+            candidate = _safe_static_file(frontend_dist, path)
+            if candidate and candidate.is_file():
                 return FileResponse(candidate)
+
+            index = frontend_dist / "index.html"
+            if index.is_file():
+                return FileResponse(index)
+
+        legacy_index = legacy_static / "index.html"
+        if legacy_index.is_file():
+            return FileResponse(legacy_index)
+
         return JSONResponse({"name": "Ryliox", "status": "running"})
+
+
+def _is_reserved_frontend_path(path: str) -> bool:
+    first_segment = path.strip("/").split("/", 1)[0]
+    return first_segment in _RESERVED_FRONTEND_PREFIXES
+
+
+def _safe_static_file(root: Path, path: str) -> Path | None:
+    if not path:
+        return None
+
+    root = root.resolve()
+    candidate = (root / path).resolve()
+    try:
+        candidate.relative_to(root)
+    except ValueError:
+        return None
+    return candidate
 
 
 # ─── Entrypoint ──────────────────────────────────────────────────────────────

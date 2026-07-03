@@ -263,10 +263,7 @@ filterwarnings = [
     "error",
     "ignore::DeprecationWarning:botocore.*",
     "ignore::DeprecationWarning:curl_cffi.*",
-    # Starlette's TestClient warning subclasses UserWarning (not DeprecationWarning),
-    # so it must be filtered by its concrete class. The deprecation only concerns
-    # using `httpx` instead of `httpx2` for the test client — not a runtime issue.
-    "ignore::starlette.exceptions.StarletteDeprecationWarning",
+    "ignore:Using `httpx` with `starlette.testclient` is deprecated.*:Warning",
     "ignore::PendingDeprecationWarning",
 ]
 
