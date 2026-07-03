@@ -28,15 +28,40 @@ _CONTENT_TYPE_TO_EXT: dict[str, str] = {
 }
 
 
+_IMAGE_MAGIC: dict[bytes, str] = {
+    b"\x89PNG": ".png",
+    b"\xff\xd8\xff": ".jpg",
+    b"GIF87a": ".gif",
+    b"GIF89a": ".gif",
+    b"RIFF": ".webp",
+}
+
+
+def _detect_image_ext(data: bytes) -> str | None:
+    for magic, ext in _IMAGE_MAGIC.items():
+        if data.startswith(magic):
+            if ext == ".webp" and len(data) > 8 and data[8:12] == b"WEBP":
+                return ext
+            return ext
+    if data.startswith((b"<svg", b"<?xml", b"<html")):
+        return ".svg"
+    return None
+
+
 class AssetsPlugin(Plugin):
-    async def download_image(self, url: str, save_path: Path) -> bool:
+    async def download_image(self, url: str, save_path: Path) -> Path | None:
         if save_path.exists():
-            return True
+            return save_path
 
         save_path.parent.mkdir(parents=True, exist_ok=True)
         content = await self.http.get_bytes(url)
+        if not content:
+            return None
+        actual_ext = _detect_image_ext(content)
+        if actual_ext and save_path.suffix.lower() != actual_ext:
+            save_path = save_path.with_suffix(actual_ext)
         save_path.write_bytes(content)
-        return True
+        return save_path
 
     async def download_css(self, url: str, save_path: Path) -> bool:
         if save_path.exists():

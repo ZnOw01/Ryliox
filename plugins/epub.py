@@ -162,6 +162,8 @@ class EpubPlugin(Plugin):
         if images_dir.exists():
             for img_file in images_dir.iterdir():
                 img_id = f"img_{img_file.stem}"
+                if cover_image_id and img_file.name == cover_image:
+                    continue
                 if img_id in used_img_ids:
                     img_id = f"{img_id}_{img_file.suffix.lstrip('.')}"
                 used_img_ids.add(img_id)

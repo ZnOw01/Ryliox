@@ -361,13 +361,16 @@ class DownloaderPlugin(Plugin):
         oebps = output_plugin.get_oebps_dir(book_dir)
 
         # Phase 3: Download cover
+        cover_image_name: str | None = None
         if not skip_images:
             report("downloading_cover", 12)
             cover_url = book_info.get("cover_url")
             if cover_url:
                 images_dir = output_plugin.get_images_dir(book_dir)
                 images_dir.mkdir(parents=True, exist_ok=True)
-                await assets_plugin.download_image(cover_url, images_dir / "cover.jpg")
+                cover_path = await assets_plugin.download_image(cover_url, images_dir / "cover")
+                if cover_path:
+                    cover_image_name = cover_path.relative_to(images_dir).as_posix()
 
         # Phase 4: Process chapters
         all_css_urls: set[str] = set()
@@ -497,7 +500,7 @@ class DownloaderPlugin(Plugin):
                     toc=toc,
                     output_dir=book_dir,
                     css_files=css_list,
-                    cover_image="cover.jpg",
+                    cover_image=cover_image_name or "cover.jpg",
                 )
             )
             result.files["epub"] = str(epub_path)
@@ -525,7 +528,7 @@ class DownloaderPlugin(Plugin):
                         toc=toc,
                         output_dir=book_dir,
                         css_files=css_list,
-                        cover_image="cover.jpg",
+                        cover_image=cover_image_name or "cover.jpg",
                     )
                 )
                 result.files["pdf"] = str(pdf_path)
