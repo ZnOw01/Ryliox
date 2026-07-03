@@ -59,3 +59,19 @@ def test_write_content_opf_escapes_text_once(tmp_path: Path):
     assert "<dc:title>A &amp; B</dc:title>" in content
     assert "<dc:creator>X &amp; Y</dc:creator>" in content
     assert "&amp;amp;" not in content
+
+
+def test_validate_manifest_files_rejects_missing_chapter(tmp_path: Path):
+    plugin = EpubPlugin()
+    oebps = tmp_path / "OEBPS"
+    oebps.mkdir()
+    (oebps / "chapter01.xhtml").write_text("<html />", encoding="utf-8")
+
+    with pytest.raises(RuntimeError, match="chapter02.xhtml"):
+        plugin._validate_manifest_files(
+            oebps,
+            [
+                {"filename": "chapter01.html"},
+                {"filename": "chapter02.html"},
+            ],
+        )

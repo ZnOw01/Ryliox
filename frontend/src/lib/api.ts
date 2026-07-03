@@ -52,12 +52,31 @@ function parseApiErrorPayload(data: unknown, status: number): ApiErrorPayload {
 		return { error: `Request failed with status ${status}` };
 	}
 
+	// FastAPI wraps errors in {"detail": {"error": "...", "code": "..."}}
+	// or {"detail": "string message"}
+	const detail = isRecord(data.detail)
+		? (data.detail as Record<string, unknown>)
+		: null;
+
 	const message =
-		typeof data.error === "string"
-			? data.error
-			: `Request failed with status ${status}`;
-	const code = typeof data.code === "string" ? data.code : undefined;
-	const details = isRecord(data.details) ? data.details : undefined;
+		typeof detail?.error === "string"
+			? detail.error
+			: typeof data.error === "string"
+				? data.error
+				: typeof data.detail === "string"
+					? data.detail
+					: `Request failed with status ${status}`;
+	const code =
+		typeof detail?.code === "string"
+			? detail.code
+			: typeof data.code === "string"
+				? data.code
+				: undefined;
+	const details = isRecord(detail?.details)
+		? (detail.details as Record<string, unknown>)
+		: isRecord(data.details)
+			? (data.details as Record<string, unknown>)
+			: undefined;
 
 	return { error: message, code, details };
 }

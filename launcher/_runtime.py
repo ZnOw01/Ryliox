@@ -175,25 +175,43 @@ def ensure_python_runtime(steps: Steps) -> Path:
     uv = require_uv()
 
     if not venv.exists():
-        run_checked(
-            [uv, "sync", "--frozen"],
-            steps.format("Creating virtual environment and synchronising dependencies with uv..."),
-            timeout=TIMEOUT_UV_SECONDS,
-            env=uv_env(),
-        )
+        _sync_venv(steps, uv, "Creating virtual environment and synchronising dependencies with uv...")
     else:
         steps.next("Virtual environment found.")
 
     if _venv_has_runtime_dependencies(venv):
         steps.next("Python dependencies already installed.")
-    else:
+    elif _sync_venv(steps, uv, "Installing/updating Python dependencies with uv..."):
+        if not _venv_has_runtime_dependencies(venv):
+            _recover_corrupt_venv(steps, uv)
+    return venv
+
+
+def _sync_venv(steps: Steps, uv: str, label: str) -> bool:
+    try:
         run_checked(
             [uv, "sync", "--frozen"],
-            steps.format("Installing/updating Python dependencies with uv..."),
+            steps.format(label),
             timeout=TIMEOUT_UV_SECONDS,
             env=uv_env(),
         )
-    return venv
+        return True
+    except RuntimeError:
+        if VENV_DIR.exists():
+            shutil.rmtree(VENV_DIR, ignore_errors=True)
+        return False
+
+
+def _recover_corrupt_venv(steps: Steps, uv: str) -> None:
+    print("   [WARN] Virtual environment appears corrupt. Recreating from scratch...")
+    if VENV_DIR.exists():
+        shutil.rmtree(VENV_DIR, ignore_errors=True)
+    run_checked(
+        [uv, "sync", "--frozen"],
+        steps.format("Recreating virtual environment with uv..."),
+        timeout=TIMEOUT_UV_SECONDS,
+        env=uv_env(),
+    )
 
 
 def clean_runtime_cache() -> bool:

@@ -202,7 +202,7 @@ unfixable = ["ERA001"]
 "core/http_client.py" = ["TC003"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["core", "plugins", "utils", "web", "config"]
+known-first-party = ["config", "core", "launcher", "plugins", "utils", "web"]
 
 [tool.ruff.format]
 quote-style = "double"

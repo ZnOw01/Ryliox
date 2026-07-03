@@ -500,6 +500,11 @@ export function AuthStatusCard() {
 	);
 }
 
+function maskValue(value: string): string {
+	if (value.length <= 8) return "****";
+	return `${value.slice(0, 4)}...${value.slice(-4)}`;
+}
+
 function FormattedJsonPreview({ json }: { json: string }) {
 	let parsed: Record<string, unknown> | null = null;
 	try {
@@ -521,7 +526,9 @@ function FormattedJsonPreview({ json }: { json: string }) {
 					<div key={key} className="flex items-start gap-2 px-3 py-2 text-xs">
 						<span className="shrink-0 font-medium text-brand">{key}</span>
 						<span className="min-w-0 break-all text-foreground/80 font-mono">
-							{typeof value === "string" ? `"${value}"` : JSON.stringify(value)}
+							{typeof value === "string"
+								? `"${maskValue(value)}"`
+								: JSON.stringify(value)}
 						</span>
 					</div>
 				))}

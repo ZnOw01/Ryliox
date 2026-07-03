@@ -40,6 +40,7 @@ class EpubPlugin(Plugin):
         # Resolve all internal links so every fragment points to the file
         # that actually contains it. This prevents RSC-012 errors in epubcheck.
         self._resolve_internal_links(oebps)
+        self._validate_manifest_files(oebps, chapters)
 
         # Use sanitized title for epub filename
         epub_name = sanitize_filename(book_info.get("title", book_info["id"]))
@@ -333,6 +334,19 @@ class EpubPlugin(Plugin):
             ".svg": "image/svg+xml",
         }
         return types.get(suffix.lower(), "application/octet-stream")
+
+    def _validate_manifest_files(self, oebps: Path, chapters: list[dict]) -> None:
+        missing = []
+        for chapter in chapters:
+            filename = chapter["filename"].replace(".html", ".xhtml")
+            if not (oebps / filename).is_file():
+                missing.append(filename)
+
+        if missing:
+            preview = ", ".join(missing[:6])
+            remaining = len(missing) - 6
+            suffix = f" and {remaining} more" if remaining > 0 else ""
+            raise RuntimeError(f"EPUB build is missing chapter files: {preview}{suffix}")
 
     def _resolve_internal_links(self, oebps: Path) -> None:
         """Rewrite all internal hrefs so every fragment points to the file that
