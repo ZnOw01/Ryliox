@@ -15,6 +15,7 @@
     "lint:fix": "tsc --noEmit && prettier --write \"src/**/*.{ts,tsx,astro}\" \"astro.config.mjs\"",
     "format": "prettier --write \"src/**/*.{ts,tsx,astro}\" \"astro.config.mjs\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx,astro}\" \"astro.config.mjs\"",
+    "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
   "overrides": {
