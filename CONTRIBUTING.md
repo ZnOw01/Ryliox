@@ -19,7 +19,7 @@
 git clone https://github.com/ZnOw01/Ryliox.git
 cd Ryliox
 cp .env.example .env
-python -m launcher  # Setup automático
+python -m launcher  # setup automático en .run/venv
 ```
 
 ---
@@ -65,11 +65,11 @@ Formato: `<type>(<scope>): <subject>`
 # Python
 pytest
 
-# Con cobertura
-pytest --cov=. --cov-report=html
+# Suite completa
+uv run python -m pytest tests -q --timeout=60
 
 # Frontend
-cd frontend && bun install --frozen-lockfile && bun run check && bun run lint && bun run build
+cd frontend && bun install --frozen-lockfile && bun run typecheck && bunx vitest run && bun run build
 ```
 
 ---
@@ -85,4 +85,4 @@ cd frontend && bun install --frozen-lockfile && bun run check && bun run lint &&
 
 ## Licencia
 
-Al contribuir, aceptas que tu código se licencie bajo GPL v3.
+Al contribuir, aceptas que tu código se licencie bajo MIT.

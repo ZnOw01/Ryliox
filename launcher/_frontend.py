@@ -112,7 +112,7 @@ def build_command(bun: str) -> list[str]:
 
     found = f"v{version[0]}.{version[1]}.{version[2]}" if version else "unknown"
     raise RuntimeError(
-        "Astro 5 requires an even Node.js version >= 22.12.0. "
+        "Astro 7 requires an even Node.js version >= 22.12.0. "
         f"Detected version: {found}. Install Node 22/24 or ensure npx is available."
     )
 

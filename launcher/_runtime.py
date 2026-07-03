@@ -37,7 +37,6 @@ _ALLOWED_RUNTIME_PACKAGES: frozenset[str] = frozenset(
         "pydantic_settings",
         "fake_useragent",
         "cryptography",
-        "aiosqlite",
         "jinja2",
         "markdown",
         "PIL",
@@ -45,15 +44,12 @@ _ALLOWED_RUNTIME_PACKAGES: frozenset[str] = frozenset(
         "ebooklib",
         "starlette",
         "anyio",
-        "sniffio",
         "h11",
-        "h2",
         "certifi",
         "charset_normalizer",
         "idna",
         "urllib3",
         "yaml",
-        "toml",
         "click",
         "rich",
         "pygments",
@@ -61,6 +57,7 @@ _ALLOWED_RUNTIME_PACKAGES: frozenset[str] = frozenset(
 )
 
 RUN_DIR: Path = REPO_ROOT / ".run"
+VENV_DIR: Path = Path(os.getenv("RYLIOX_VENV", RUN_DIR / "venv")).resolve()
 PID_FILE: Path = RUN_DIR / "web-server.pid"
 LOG_FILE: Path = RUN_DIR / "web-server.log"
 
@@ -84,15 +81,15 @@ def server_url(port: int) -> str:
 
 def venv_python() -> Path:
     if os.name == "nt":
-        return REPO_ROOT / ".venv" / "Scripts" / "python.exe"
-    return REPO_ROOT / ".venv" / "bin" / "python"
+        return VENV_DIR / "Scripts" / "python.exe"
+    return VENV_DIR / "bin" / "python"
 
 
 def server_env() -> dict[str, str]:
     env = os.environ.copy()
     env.setdefault("PYTHONUTF8", "1")
     env.setdefault("PYTHONIOENCODING", "utf-8")
-    venv_dir = REPO_ROOT / ".venv"
+    venv_dir = VENV_DIR
     if env.get("VIRTUAL_ENV") != str(venv_dir):
         env["VIRTUAL_ENV"] = str(venv_dir)
     venv_bin = venv_dir / ("Scripts" if os.name == "nt" else "bin")
@@ -109,6 +106,7 @@ def run_checked(
     step: str,
     cwd: Path | None = None,
     timeout: int | None = None,
+    env: dict[str, str] | None = None,
 ) -> None:
     """Print the step and execute the command. Raises RuntimeError on failure."""
     print(step)
@@ -116,6 +114,7 @@ def run_checked(
         subprocess.run(
             command,
             cwd=cwd or REPO_ROOT,
+            env=env,
             check=True,
             capture_output=True,
             timeout=timeout,
@@ -145,6 +144,14 @@ def require_uv() -> str:
     return uv
 
 
+def uv_env() -> dict[str, str]:
+    env = os.environ.copy()
+    env.setdefault("PYTHONUTF8", "1")
+    env.setdefault("PYTHONIOENCODING", "utf-8")
+    env["UV_PROJECT_ENVIRONMENT"] = str(VENV_DIR)
+    return env
+
+
 def _venv_has_runtime_dependencies(venv_python: Path) -> bool:
     """Verify the venv can import every whitelisted runtime package."""
     for name in sorted(_ALLOWED_RUNTIME_PACKAGES):
@@ -172,6 +179,7 @@ def ensure_python_runtime(steps: Steps) -> Path:
             [uv, "sync", "--frozen"],
             steps.format("Creating virtual environment and synchronising dependencies with uv..."),
             timeout=TIMEOUT_UV_SECONDS,
+            env=uv_env(),
         )
     else:
         steps.next("Virtual environment found.")
@@ -183,6 +191,7 @@ def ensure_python_runtime(steps: Steps) -> Path:
             [uv, "sync", "--frozen"],
             steps.format("Installing/updating Python dependencies with uv..."),
             timeout=TIMEOUT_UV_SECONDS,
+            env=uv_env(),
         )
     return venv
 

@@ -28,6 +28,7 @@ htmlcov/
 venv/
 
 # ─── Runtime / downloads / secrets ──────────────────────
+.run/
 output/
 data/
 logs/

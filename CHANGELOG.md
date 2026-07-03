@@ -38,6 +38,11 @@ adheres to [Semantic Versioning](https://semver.org/).
   `tests/test_performance.py` (demo script, not a test).
 
 ### Fixed
+- `python -m launcher` now has a committed package entry point, uses `.run/venv`
+  instead of a potentially stale `.venv`, and no longer releases the same port
+  twice in interactive mode.
+- Simplified the launcher command surface by dropping the unused backend-only
+  mode and documenting the SQLite-first cookie store.
 - `.gitignore` was missing entries for `node_modules/`, `epubcheck-*/`, `.idea/`,
   `.codex_test_runtime_local/`, `bun/`, `frontend/dist/`, agent configs
   (`.opencode/`, `.claude/`, `.agents/`).

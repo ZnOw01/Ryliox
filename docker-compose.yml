@@ -29,7 +29,7 @@ services:
       PYTHONUNBUFFERED: "1"
       PYTHONDEVMODE: "1"
       LOG_LEVEL: info
-      RYLIOX_TRUSTED_HOSTS: "localhost,127.0.0.1,oreilly-ingest"
+      RYLIOX_TRUSTED_HOSTS: "localhost,127.0.0.1,ryliox-dev"
 
     volumes:
       # Source mounts (read-write so uvicorn --reload can work if you add it)

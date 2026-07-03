@@ -47,18 +47,6 @@ _INTERACTIVE_STEPS: Callable[[], Steps] = lambda: Steps(total=6)
 # ── Mode implementations ────────────────────────────────────────────────────
 
 
-def _run_backend_only(port: int, open_browser: bool) -> None:
-    steps = Steps(total=4)
-    stop_port(steps, port)
-    steps.next("Mode: backend only")
-    venv = ensure_python_runtime(steps)
-    if not clean_runtime_cache():
-        print("   [WARN] Cache cleanup had errors, but continuing...")
-    if open_browser:
-        open_browser_async(server_url(port))
-    launch_server(venv, steps, label=f"Starting API at {server_url(port)}...")
-
-
 def _run_unified(port: int, open_browser: bool, rebuild: bool) -> None:
     steps = Steps(total=6)
     stop_port(steps, port)
@@ -90,7 +78,6 @@ def _build_dispatch(port: int, open_browser: bool, rebuild: bool) -> dict[str, C
         "status": lambda: run_status(port),
         "stop": lambda: run_stop(port),
         "docker": lambda: _run_docker(port, open_browser),
-        "backend_only": lambda: _run_backend_only(port, open_browser),
         "unified": lambda: _run_unified(port, open_browser, rebuild),
     }
 
@@ -154,7 +141,6 @@ def _interactive_loop(dispatch: dict[str, Callable[[], None]], port: int) -> int
         try:
             print()
             ensure_run_dir()
-            stop_port(_INTERACTIVE_STEPS(), port)
             action()
         except KeyboardInterrupt:
             print("\n  Stopped.")
@@ -167,7 +153,7 @@ def _interactive_loop(dispatch: dict[str, Callable[[], None]], port: int) -> int
             print(f"\nERROR: I/O error ({safe_error(exc)})")
         except ValueError as exc:
             print(f"\nERROR: Invalid value ({safe_error(exc)})")
-        print("\n" + "─" * 44 + "\n")
+        print("\n" + "=" * 44 + "\n")
 
 
 if __name__ == "__main__":

@@ -42,6 +42,7 @@ id_rsa*
 .gpg/
 
 # ─── Runtime data (regenerated on run) ──────────────────
+.run/
 output/
 output-*/
 data/

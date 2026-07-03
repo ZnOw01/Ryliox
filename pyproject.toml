@@ -89,10 +89,10 @@ all = [
 ryliox = "main:main"
 
 [project.urls]
-Homepage = "https://github.com/ryliox/ryliox"
-Documentation = "https://github.com/ryliox/ryliox/blob/main/README.md"
-Source = "https://github.com/ryliox/ryliox"
-Issues = "https://github.com/ryliox/ryliox/issues"
+Homepage = "https://github.com/ZnOw01/Ryliox"
+Documentation = "https://github.com/ZnOw01/Ryliox/blob/main/README.md"
+Source = "https://github.com/ZnOw01/Ryliox"
+Issues = "https://github.com/ZnOw01/Ryliox/issues"
 
 # ─── uv / build ─────────────────────────────────────────────────────────────
 [build-system]

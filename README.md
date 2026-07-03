@@ -16,7 +16,7 @@ modern Astro/React frontend served from the same origin.
   official web reader.
 - **Queue + progress streaming** — Server-Sent Events push live progress
   per job; multiple downloads can run in series.
-- **Modern frontend** — Astro 5 + React 19 + Radix, with i18n (English /
+- **Modern frontend** — Astro 7 + React 19 + Radix, with i18n (English /
   Spanish), framer-motion transitions, and a fully accessible design.
 - **Hardened by default** — OWASP-aware security headers, CSRF tokens,
   rate-limiting, immutable audit log, encrypted secret storage, Prometheus
@@ -27,8 +27,8 @@ modern Astro/React frontend served from the same origin.
 ### Docker
 
 ```bash
-git clone https://github.com/ryliox/ryliox.git
-cd ryliox
+git clone https://github.com/ZnOw01/Ryliox.git
+cd Ryliox
 docker compose up -d
 # open http://localhost:8000
 ```
@@ -36,16 +36,17 @@ docker compose up -d
 ### Local development (uv + bun)
 
 ```bash
-git clone https://github.com/ryliox/ryliox.git
-cd ryliox
+git clone https://github.com/ZnOw01/Ryliox.git
+cd Ryliox
 uv sync --extra dev
 bun run dev
 ```
 
 The launcher (`python -m launcher`) drives the local workflow: it creates
-the Python venv with `uv`, installs / builds the frontend with `bun`, and
-spawns `uvicorn web.server:app`. Pass `--no-browser` to skip the auto-open
-or `--docker` to use Compose instead of running the stack locally.
+an isolated Python venv at `.run/venv` with `uv`, installs / builds the
+frontend with `bun`, and starts `web.server`. Pass `--no-browser` to skip
+the auto-open or `--docker` to use Compose instead of running the stack
+locally.
 
 Requires **Python 3.11 → 3.13** and **Node ≥ 22.12 (even minor)**. PDF
 export uses WeasyPrint, which on Windows needs the [GTK3 runtime][gtk].
@@ -62,11 +63,19 @@ export uses WeasyPrint, which on Windows needs the [GTK3 runtime][gtk].
    `document.cookie`, so `orm-rt` will be missing and the session may
    expire within minutes.
 
+Cookie storage is SQLite-first. The web UI writes cookies to
+`data/session.sqlite3` through `POST /api/cookies`, and `GET /api/cookies`
+reads them back from the same store. `data/cookies.json` is only a legacy
+import path: if the SQLite store is empty, Ryliox can migrate a JSON cookie
+file into `data/session.sqlite3`. After that, editing `data/cookies.json` will
+not override cookies already present in SQLite; use the web UI/API, or remove
+the SQLite session DB before importing a fresh legacy file.
+
 ## Architecture
 
 ```
 ┌───────────────────────────────┐
-│  frontend/  (Astro 5 + React) │  served by FastAPI as static files
+│  frontend/  (Astro 7 + React) │  served by FastAPI as static files
 └───────────────────────────────┘
               ▲
               │ JSON / SSE
@@ -170,7 +179,7 @@ core/                    – domain layer
   validators.py          – input/output validation
 plugins/                 – pluggable functionality (auth, book, …, epub, pdf, …)
 utils/files.py           – filename sanitisation, slugify, accent removal
-frontend/                – Astro 5 + React 19 frontend (separate npm project)
+frontend/                – Astro 7 + React 19 frontend (Bun project)
 tests/                   – unit, integration, e2e, security, performance, contract, a11y
 ```
 

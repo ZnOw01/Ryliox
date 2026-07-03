@@ -49,18 +49,16 @@ def open_browser_async(url: str, delay: float = 1.5) -> None:
 
 
 def interactive_mode() -> str:
-    if not is_stdin_interactive():
-        print("  (stdin is not TTY, default mode: unified)")
-        return "unified"
-    print("Select mode:")
-    for label in MODE_LABELS.values():
-        print(f"  {label}")
-    print("  q) Exit")
+    if is_stdin_interactive():
+        print("Select mode:")
+        for label in MODE_LABELS.values():
+            print(f"  {label}")
+        print("  q) Exit")
     try:
         choice = input("Option [1]: ").strip().lower() or "1"
     except (EOFError, OSError):
-        print("  (stdin unavailable, using default mode: unified)")
-        return "unified"
+        print("  (stdin unavailable; use --help for non-interactive mode)")
+        return "quit"
     mode = MODES.get(choice)
     if mode is None:
         print(f"  [WARN] Unrecognised option {choice!r}, using default mode: unified")
@@ -74,7 +72,6 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     mode.add_argument("--stop", action="store_true")
     mode.add_argument("--docker", action="store_true")
     mode.add_argument("--status", action="store_true")
-    mode.add_argument("--backend-only", action="store_true")
     parser.add_argument("--no-browser", action="store_true")
     parser.add_argument("--rebuild-frontend", action="store_true")
     parser.add_argument(
@@ -95,18 +92,18 @@ def resolve_mode(argv: list[str], args: argparse.Namespace) -> str:
         return "stop"
     if args.docker:
         return "docker"
-    if args.backend_only:
-        return "backend_only"
     return "unified"
 
 
 def safe_error(exc: Exception) -> str:
     msg = str(exc)
-    if REPO_ROOT.as_posix() in msg:
-        msg = msg.replace(REPO_ROOT.as_posix(), "<REPO_ROOT>")
-    home = str(Path.home())
-    if home in msg:
-        msg = msg.replace(home, "<HOME>")
+    for root in {str(REPO_ROOT), REPO_ROOT.as_posix()}:
+        if root in msg:
+            msg = msg.replace(root, "<REPO_ROOT>")
+    home = Path.home()
+    for home_text in {str(home), home.as_posix()}:
+        if home_text in msg:
+            msg = msg.replace(home_text, "<HOME>")
     return f"{type(exc).__name__}: {msg}"
 
 
