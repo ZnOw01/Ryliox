@@ -199,12 +199,17 @@ export function ProgressStatus({ currentLabel, progress, progressPercent }: Prog
             <div className="space-y-3">
               {revealTargets.map(path => (
                 <div key={path} className="rounded-lg border border-border bg-background px-3 py-3">
-                  <p
-                    className="break-all text-xs leading-relaxed text-muted-foreground"
-                    id={`file-path-${path}`}
-                  >
-                    {path.split(/[/\\]/).pop() || path}
-                  </p>
+                  <div className="flex flex-col gap-1">
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-primary">
+                      {getFriendlyTypeName(path, t)}
+                    </span>
+                    <p
+                      className="break-all text-xs leading-relaxed text-muted-foreground"
+                      id={`file-path-${path}`}
+                    >
+                      {path.split(/[/\\]/).pop() || path}
+                    </p>
+                  </div>
                   <div className="mt-3 flex flex-wrap gap-2">
                     <button
                       type="button"
@@ -317,4 +322,18 @@ function outputFileNames(value: string | string[] | null | undefined): string | 
     return parts[parts.length - 1] || normalized;
   });
   return names.join(' | ');
+}
+
+function getFriendlyTypeName(filePath: string, t: any): string {
+  const lower = String(filePath).toLowerCase();
+  if (lower.endsWith('.epub')) {
+    return t('download.progress.file_types.epub', { defaultValue: 'Libro EPUB' });
+  }
+  if (lower.endsWith('.pdf')) {
+    return t('download.progress.file_types.pdf', { defaultValue: 'Libro PDF' });
+  }
+  if (lower.endsWith('.log') || lower.includes('trace')) {
+    return t('download.progress.file_types.log', { defaultValue: 'Log de depuración' });
+  }
+  return t('download.progress.file_types.file', { defaultValue: 'Archivo' });
 }

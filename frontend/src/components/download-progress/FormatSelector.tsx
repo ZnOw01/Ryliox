@@ -66,7 +66,6 @@ export function FormatSelector({
                 }
               >
                 {formatName(item, t)}
-                {descriptions?.[item] ? ` — ${descriptions[item]}` : ''}
               </option>
             ))
           : null}

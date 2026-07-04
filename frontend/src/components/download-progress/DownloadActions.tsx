@@ -131,7 +131,7 @@ export function DownloadActions({
       </div>
 
       {startDisabledReason ? (
-        <div id="start-disabled-reason" className="mb-4 flex items-start gap-1.5" role="alert">
+        <div id="start-disabled-reason" className="mb-4 flex items-start gap-1.5" role="status">
           <Warning
             className="mt-0.5 h-4 w-4 shrink-0 text-warning"
             weight="regular"

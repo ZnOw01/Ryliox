@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import contextlib
 import os
+import queue
 import re
 import shutil
 import subprocess
+import threading
 import time
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import config
 from core import process_manager
@@ -58,9 +60,17 @@ _ALLOWED_RUNTIME_PACKAGES: frozenset[str] = frozenset(
 )
 
 RUN_DIR: Path = REPO_ROOT / ".run"
+PROJECT_LOG_DIR: Path = REPO_ROOT / "logs"
 VENV_DIR: Path = Path(os.getenv("RYLIOX_VENV", RUN_DIR / "venv")).resolve()
 PID_FILE: Path = RUN_DIR / "web-server.pid"
-LOG_FILE: Path = RUN_DIR / "web-server.log"
+LOG_FILE: Path = PROJECT_LOG_DIR / "server-current.log"
+MAX_SERVER_LOG_BYTES: int = int(os.getenv("RYLIOX_MAX_SERVER_LOG_BYTES", str(10 * 1024 * 1024)))
+MAX_SERVER_LOG_BACKUPS: int = int(os.getenv("RYLIOX_MAX_SERVER_LOG_BACKUPS", "5"))
+_DOWNLOAD_PROGRESS_RE: re.Pattern[str] = re.compile(
+    r"download_progress job=(?P<job>[a-zA-Z0-9_-]+) "
+    r"status=(?P<status>\w+) percent=(?P<percent>\d+) "
+    r"message=(?P<message>.*)"
+)
 
 
 def resolve_port(raw: str | None, default: int = 8000) -> int:
@@ -218,7 +228,7 @@ def _recover_corrupt_venv(steps: Steps, uv: str) -> None:
 
 
 def clean_runtime_cache() -> bool:
-    """Remove transient runtime files (queue DB, error logs)."""
+    """Remove transient runtime files without deleting diagnostic logs."""
     print(" - Cleaning runtime cache...")
     if not config.DATA_DIR.exists():
         print(f"   [INFO] DATA_DIR does not exist yet: {config.DATA_DIR}")
@@ -234,11 +244,6 @@ def clean_runtime_cache() -> bool:
     db_name = config.SETTINGS.queue.db_name or config.SETTINGS.download_db_name
     if db_name:
         files.append(config.DATA_DIR / db_name)
-
-    log_dir_name = config.SETTINGS.queue.log_dir or config.SETTINGS.log_dir
-    if log_dir_name:
-        for log_file in (config.DATA_DIR / log_dir_name).glob("download-error-*.log"):
-            files.append(log_file)
 
     for path in files:
         try:
@@ -260,6 +265,7 @@ def clean_runtime_cache() -> bool:
 
 def ensure_run_dir() -> None:
     RUN_DIR.mkdir(exist_ok=True)
+    PROJECT_LOG_DIR.mkdir(exist_ok=True)
 
 
 def stop_port(steps: Steps, port: int) -> None:
@@ -272,15 +278,26 @@ def launch_server(venv: Path, steps: Steps, label: str) -> None:
     creationflags = 0
     if os.name == "nt":
         creationflags = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
-    process: subprocess.Popen[bytes] | None = None
+    process: subprocess.Popen[Any] | None = None
     try:
+        _rotate_log_file(LOG_FILE)
+        print(f" - Live log: {LOG_FILE}")
         process = subprocess.Popen(
             [str(venv), "-X", "utf8", "-m", "web.server"],
             cwd=REPO_ROOT,
             env=server_env(),
             creationflags=creationflags,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            bufsize=1,
         )
+        output = _ServerOutputPump(process, LOG_FILE)
+        output.start()
         returncode = _wait_for_server_process(process)
+        output.stop()
         if returncode != 0:
             raise RuntimeError(f"Server process exited with code {returncode}.")
     except KeyboardInterrupt:
@@ -290,7 +307,7 @@ def launch_server(venv: Path, steps: Steps, label: str) -> None:
         raise RuntimeError(f"Failed to launch server: {exc}") from exc
 
 
-def _wait_for_server_process(process: subprocess.Popen[bytes]) -> int:
+def _wait_for_server_process(process: subprocess.Popen[Any]) -> int:
     while True:
         returncode = process.poll()
         if returncode is not None:
@@ -303,14 +320,18 @@ def _wait_for_server_process(process: subprocess.Popen[bytes]) -> int:
             return 0
 
 
-def _stop_foreground_server(process: subprocess.Popen[bytes] | None) -> None:
+def _stop_foreground_server(process: subprocess.Popen[Any] | None) -> None:
     if process is None or process.poll() is not None:
         return
 
     print("\n  Stopping server...")
     try:
         if os.name == "nt":
-            process.send_signal(subprocess.CTRL_BREAK_EVENT)
+            ctrl_break_event = getattr(subprocess, "CTRL_BREAK_EVENT", None)  # noqa: B009
+            if ctrl_break_event is None:
+                process.terminate()
+            else:
+                process.send_signal(ctrl_break_event)
         else:
             process.terminate()
         _wait_for_exit_or_force(process, timeout=20.0)
@@ -320,7 +341,7 @@ def _stop_foreground_server(process: subprocess.Popen[bytes] | None) -> None:
         _force_stop_process(process)
 
 
-def _wait_for_exit_or_force(process: subprocess.Popen[bytes], timeout: float) -> None:
+def _wait_for_exit_or_force(process: subprocess.Popen[Any], timeout: float) -> None:
     deadline = time.monotonic() + timeout
     while process.poll() is None and time.monotonic() < deadline:
         time.sleep(0.1)
@@ -328,7 +349,7 @@ def _wait_for_exit_or_force(process: subprocess.Popen[bytes], timeout: float) ->
         _force_stop_process(process)
 
 
-def _force_stop_process(process: subprocess.Popen[bytes]) -> None:
+def _force_stop_process(process: subprocess.Popen[Any]) -> None:
     if process.poll() is not None:
         return
     print("  Force stopping server...")
@@ -340,6 +361,92 @@ def _force_stop_process(process: subprocess.Popen[bytes]) -> None:
             process.kill()
         with contextlib.suppress(OSError, subprocess.TimeoutExpired):
             process.wait(timeout=5)
+
+
+def _rotate_log_file(path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if not path.exists() or path.stat().st_size < MAX_SERVER_LOG_BYTES:
+        return
+    for index in range(MAX_SERVER_LOG_BACKUPS - 1, 0, -1):
+        source = path.with_name(f"{path.stem}.{index}{path.suffix}")
+        target = path.with_name(f"{path.stem}.{index + 1}{path.suffix}")
+        if source.exists():
+            if index + 1 > MAX_SERVER_LOG_BACKUPS:
+                source.unlink(missing_ok=True)
+            else:
+                source.replace(target)
+    path.replace(path.with_name(f"{path.stem}.1{path.suffix}"))
+
+
+class _ServerOutputPump:
+    def __init__(self, process: subprocess.Popen[Any], log_file: Path) -> None:
+        self._process = process
+        self._log_file = log_file
+        self._stop = threading.Event()
+        self._lines: queue.Queue[str] = queue.Queue()
+        self._reader = threading.Thread(target=self._read_output, name="server-log-reader")
+        self._writer = threading.Thread(target=self._write_output, name="server-log-writer")
+
+    def start(self) -> None:
+        self._reader.start()
+        self._writer.start()
+
+    def stop(self) -> None:
+        self._stop.set()
+        self._reader.join(timeout=2)
+        self._writer.join(timeout=2)
+
+    def _read_output(self) -> None:
+        stream = self._process.stdout
+        if stream is None:
+            return
+        for line in stream:
+            self._lines.put(line)
+            if self._stop.is_set():
+                break
+
+    def _write_output(self) -> None:
+        with self._log_file.open("a", encoding="utf-8") as handle:
+            while not self._stop.is_set() or not self._lines.empty():
+                try:
+                    line = self._lines.get(timeout=0.2)
+                except queue.Empty:
+                    continue
+                handle.write(line)
+                handle.flush()
+                summary = _summarize_server_line(line)
+                if summary:
+                    print(summary)
+
+
+def _summarize_server_line(line: str) -> str | None:
+    text = _strip_ansi(line).strip()
+    if not text:
+        return None
+    progress = _DOWNLOAD_PROGRESS_RE.search(text)
+    if progress:
+        message = progress.group("message").strip()
+        return (
+            f"[download] {progress.group('percent')}% "
+            f"{progress.group('status')} job={progress.group('job')[:8]} - {message}"
+        )
+    if "Application startup complete" in text or "Ryliox ready" in text:
+        return "[server] ready"
+    if "Uvicorn running on" in text:
+        return f"[server] {text}"
+    if "Enqueued job" in text:
+        return f"[download] {text.rsplit('|', 1)[-1].strip()}"
+    if "completed successfully" in text:
+        return f"[download] {text.rsplit('|', 1)[-1].strip()}"
+    if "cancelled by user" in text:
+        return f"[download] {text.rsplit('|', 1)[-1].strip()}"
+    if "failed:" in text or "ERROR" in text or "CRITICAL" in text:
+        return f"[error] {text}"
+    return None
+
+
+def _strip_ansi(value: str) -> str:
+    return re.sub(r"\x1b\[[0-9;]*m", "", value)
 
 
 def run_status(port: int) -> None:

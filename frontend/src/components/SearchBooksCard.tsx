@@ -138,6 +138,14 @@ export function SearchBooksCard() {
   const resultsListRef = useRef<HTMLUListElement | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const recentRef = useRef<HTMLDivElement | null>(null);
+  const [coverSize, setCoverSize] = useState<'sm' | 'md'>('md');
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.innerWidth < 640) {
+      setCoverSize('sm');
+    }
+  }, []);
+
   const normalizedQuery = queryInput.trim();
   const debouncedQuery = useDebouncedValue(normalizedQuery, SEARCH_DEBOUNCE_MS);
 
@@ -336,6 +344,19 @@ export function SearchBooksCard() {
   const hasStaleResults =
     Boolean(normalizedQuery) && normalizedQuery !== debouncedQuery && visibleResults.length > 0;
 
+  const handleSelectBook = (book: SearchBook) => {
+    setSelectedBook(book);
+    saveRecentSearch(normalizedQuery);
+    if (typeof window !== 'undefined' && window.innerWidth < 1024) {
+      setTimeout(() => {
+        const el = document.getElementById('download-section');
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 120);
+    }
+  };
+
   useEffect(() => {
     if (visibleResults.length === 0) {
       setActiveResultIndex(0);
@@ -428,8 +449,7 @@ export function SearchBooksCard() {
                       return;
                     }
                     event.preventDefault();
-                    setSelectedBook(activeBook);
-                    saveRecentSearch(normalizedQuery);
+                    handleSelectBook(activeBook);
                     return;
                   }
                 }}
@@ -593,120 +613,121 @@ export function SearchBooksCard() {
           ) : null}
 
           <AnimatedLayoutGroup className="relative z-0">
-            <ul
-              id="search-results"
-              ref={resultsListRef}
-              className={`m-0 list-none space-y-2 p-0 ${isSearching ? 'opacity-90' : ''}`}
-              aria-busy={isSearching}
-              role="listbox"
-            >
-              <StaggeredLayoutContainer>
-                {visibleResults.map((book, index) => {
-                  const isSelected = selectedBookId === book.id;
-                  const isActive = visibleResults[activeResultIndex]?.id === book.id;
-                  return (
-                    <StaggeredLayoutItem key={book.id} layoutId={`book-${book.id}`}>
-                      <motion.button
-                        type="button"
-                        layout
-                        onClick={() => {
-                          setSelectedBook(book);
-                          saveRecentSearch(normalizedQuery);
-                        }}
-                        onMouseEnter={() => {
-                          setActiveResultIndex(
-                            visibleResults.findIndex(item => item.id === book.id)
-                          );
-                          prefetchBookData(book.id).catch(() => {
-                            // silent prefetch failure
-                          });
-                        }}
-                        aria-pressed={isSelected}
-                        id={`search-result-${book.id}`}
-                        data-result-index={visibleResults.findIndex(item => item.id === book.id)}
-                        role="option"
-                        aria-selected={isSelected || isActive}
-                        className={cn(
-                          'group min-h-touch w-full rounded-xl border p-3 text-left transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-ring/40',
-                          isSelected
-                            ? 'border-primary/40 bg-accent shadow-panel-md ring-1 ring-primary/20'
-                            : isActive
-                              ? 'border-primary/30 bg-accent/50'
-                              : 'border-border hover:border-primary/40 hover:bg-accent hover:shadow-sm'
-                        )}
-                        whileHover={{ scale: 1.01 }}
-                        whileTap={{ scale: 0.99 }}
-                        transition={{
-                          type: 'spring',
-                          stiffness: 400,
-                          damping: 25,
-                        }}
-                      >
-                        <div className="flex min-w-0 items-start justify-between gap-2 sm:gap-3">
-                          <div className="flex min-w-0 gap-2 sm:gap-3">
-                            <motion.div layoutId={`cover-${book.id}`} className="shrink-0">
-                              <BookCover
-                                src={book.cover_url}
-                                alt={book.title}
-                                size="md"
-                                aspectRatio="book"
-                                showPlaceholderText
-                                placeholderText={t('search.book.no_cover')}
-                              />
-                            </motion.div>
-                            <div className="min-w-0 flex-1">
-                              <motion.p
-                                layoutId={`title-${book.id}`}
-                                className="truncate text-sm font-semibold text-foreground"
-                              >
-                                {book.title}
-                              </motion.p>
+            <div className="chapter-scroll max-h-[360px] overflow-y-auto overflow-x-hidden pr-1">
+              <ul
+                id="search-results"
+                ref={resultsListRef}
+                className={`m-0 list-none space-y-2 p-0 ${isSearching ? 'opacity-90' : ''}`}
+                aria-busy={isSearching}
+                role="listbox"
+              >
+                <StaggeredLayoutContainer>
+                  {visibleResults.map((book, index) => {
+                    const isSelected = selectedBookId === book.id;
+                    const isActive = visibleResults[activeResultIndex]?.id === book.id;
+                    return (
+                      <StaggeredLayoutItem key={book.id} layoutId={`book-${book.id}`}>
+                        <motion.button
+                          type="button"
+                          layout
+                          onClick={() => {
+                            handleSelectBook(book);
+                          }}
+                          onMouseEnter={() => {
+                            setActiveResultIndex(
+                              visibleResults.findIndex(item => item.id === book.id)
+                            );
+                            prefetchBookData(book.id).catch(() => {
+                              // silent prefetch failure
+                            });
+                          }}
+                          aria-pressed={isSelected}
+                          id={`search-result-${book.id}`}
+                          data-result-index={visibleResults.findIndex(item => item.id === book.id)}
+                          role="option"
+                          aria-selected={isSelected || isActive}
+                          className={cn(
+                            'group min-h-touch w-full rounded-xl border p-2.5 sm:p-3 text-left transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-ring/40',
+                            isSelected
+                              ? 'border-primary/40 bg-accent shadow-panel-md ring-1 ring-primary/20'
+                              : isActive
+                                ? 'border-primary/30 bg-accent/50'
+                                : 'border-border hover:border-primary/40 hover:bg-accent hover:shadow-sm'
+                          )}
+                          whileHover={{ scale: 1.01 }}
+                          whileTap={{ scale: 0.99 }}
+                          transition={{
+                            type: 'spring',
+                            stiffness: 400,
+                            damping: 25,
+                          }}
+                        >
+                          <div className="flex min-w-0 items-start justify-between gap-2 sm:gap-3">
+                            <div className="flex min-w-0 gap-2 sm:gap-3">
+                              <motion.div layoutId={`cover-${book.id}`} className="shrink-0">
+                                <BookCover
+                                  src={book.cover_url}
+                                  alt={book.title}
+                                  size={coverSize}
+                                  aspectRatio="book"
+                                  showPlaceholderText
+                                  placeholderText={t('search.book.no_cover')}
+                                />
+                              </motion.div>
+                              <div className="min-w-0 flex-1">
+                                <motion.p
+                                  layoutId={`title-${book.id}`}
+                                  className="line-clamp-2 text-sm font-semibold leading-snug text-foreground whitespace-normal"
+                                >
+                                  {book.title}
+                                </motion.p>
 
-                              {book.authors && book.authors.length > 0 && (
-                                <div className="mt-1 flex min-w-0 items-center gap-1.5">
-                                  <User
-                                    className="h-3 w-3 shrink-0 text-muted-foreground"
-                                    weight="regular"
-                                    aria-hidden="true"
-                                  />
-                                  <p className="truncate text-xs text-muted-foreground">
-                                    {book.authors.join(', ')}
-                                  </p>
-                                </div>
-                              )}
+                                {book.authors && book.authors.length > 0 && (
+                                  <div className="mt-1 flex min-w-0 items-center gap-1.5">
+                                    <User
+                                      className="h-3 w-3 shrink-0 text-muted-foreground"
+                                      weight="regular"
+                                      aria-hidden="true"
+                                    />
+                                    <p className="truncate text-xs text-muted-foreground">
+                                      {book.authors.join(', ')}
+                                    </p>
+                                  </div>
+                                )}
 
-                              {book.publishers && book.publishers.length > 0 && (
-                                <div className="flex min-w-0 items-center gap-1.5">
-                                  <Buildings
-                                    className="h-3 w-3 shrink-0 text-muted-foreground"
-                                    weight="regular"
-                                    aria-hidden="true"
-                                  />
-                                  <p className="truncate text-xs text-muted-foreground/80">
-                                    {book.publishers.join(', ')}
-                                  </p>
-                                </div>
-                              )}
+                                {book.publishers && book.publishers.length > 0 && (
+                                  <div className="flex min-w-0 items-center gap-1.5">
+                                    <Buildings
+                                      className="h-3 w-3 shrink-0 text-muted-foreground"
+                                      weight="regular"
+                                      aria-hidden="true"
+                                    />
+                                    <p className="truncate text-xs text-muted-foreground/80">
+                                      {book.publishers.join(', ')}
+                                    </p>
+                                  </div>
+                                )}
+                              </div>
                             </div>
+                            <Badge
+                              variant={isSelected ? 'default' : 'secondary'}
+                              size="sm"
+                              className={cn(
+                                'shrink-0 transition-colors',
+                                !isSelected &&
+                                  'group-hover:border-primary/30 group-hover:bg-accent group-hover:text-accent-foreground'
+                              )}
+                            >
+                              {isSelected ? t('search.book.selected') : t('search.book.select')}
+                            </Badge>
                           </div>
-                          <Badge
-                            variant={isSelected ? 'default' : 'secondary'}
-                            size="sm"
-                            className={cn(
-                              'shrink-0 transition-colors',
-                              !isSelected &&
-                                'group-hover:border-primary/30 group-hover:bg-accent group-hover:text-accent-foreground'
-                            )}
-                          >
-                            {isSelected ? t('search.book.selected') : t('search.book.select')}
-                          </Badge>
-                        </div>
-                      </motion.button>
-                    </StaggeredLayoutItem>
-                  );
-                })}
-              </StaggeredLayoutContainer>
-            </ul>
+                        </motion.button>
+                      </StaggeredLayoutItem>
+                    );
+                  })}
+                </StaggeredLayoutContainer>
+              </ul>
+            </div>
           </AnimatedLayoutGroup>
 
           {!normalizedQuery ? (

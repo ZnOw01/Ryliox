@@ -126,3 +126,4 @@ bun/
 *.log
 !logs/.gitkeep
 !docs/**/*.log
+AUDITORIA_Y_PLAN.md

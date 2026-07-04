@@ -28,6 +28,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.responses import Response
 
 import config
+from core.logging_config import configure_logging
 from core.metrics import metrics
 from web.api_utils import ErrorCode, error_response
 from web.dependencies import (
@@ -386,6 +387,10 @@ app = create_app()
 
 def run_server(host: str | None = None, port: int | None = None) -> None:
     """Run the Uvicorn server (used by ``main.py`` and the launcher)."""
+    configure_logging(
+        level=config.SETTINGS.logging.level,
+        json_format=config.SETTINGS.logging.json_logs,
+    )
     uvicorn.run(
         "web.server:app",
         host=host or config.SETTINGS.server.host,

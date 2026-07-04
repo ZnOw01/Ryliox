@@ -34,27 +34,27 @@ function AppHeader() {
   return (
     <header className="safe-area-top sticky-header soft-rise relative rounded-2xl border border-border bg-card/80 px-4 py-3 shadow-panel backdrop-blur-header sm:px-6 sm:py-4 before:pointer-events-none before:absolute before:inset-x-0 before:bottom-0 before:h-px before:bg-gradient-to-r before:from-transparent before:via-primary/20 before:to-transparent">
       <div className="flex min-w-0 items-center justify-between gap-3 sm:gap-4">
-        <div className="flex min-w-0 items-center gap-3 sm:gap-4">
+        <div className="flex min-w-0 items-center gap-2.5 sm:gap-4">
           <div className="relative flex-none">
-            <div className="grid h-12 w-12 place-items-center rounded-xl bg-gradient-to-br from-primary to-primary-foreground text-2xl font-bold tracking-tight text-primary-foreground shadow-md select-none sm:h-14 sm:w-14 sm:rounded-2xl sm:text-3xl">
+            <div className="grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-br from-primary to-primary-foreground text-xl font-bold tracking-tight text-primary-foreground shadow-md select-none sm:h-12 sm:w-12 sm:rounded-2xl sm:text-2xl">
               R
             </div>
             <span
-              className="absolute -right-1 -top-1 h-3 w-3 rounded-full border-2 border-background bg-emerald-400 shadow-sm sse-pulse sm:h-3.5 sm:w-3.5"
+              className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full border-2 border-background bg-emerald-400 shadow-sm sse-pulse sm:h-3 sm:w-3"
               aria-hidden="true"
             ></span>
             <span className="sr-only">{t('app.status.active')}</span>
           </div>
           <div className="min-w-0">
-            <h1 className="truncate text-2xl font-bold leading-tight tracking-tight text-foreground sm:text-3xl md:text-4xl">
+            <h1 className="truncate text-lg font-bold leading-tight tracking-tight text-foreground sm:text-2xl md:text-3xl">
               {t('app.title')}
             </h1>
-            <p className="mt-1 truncate text-xs leading-tight text-muted-foreground sm:text-sm">
+            <p className="mt-0.5 truncate text-[10px] leading-tight text-muted-foreground sm:text-xs sm:mt-1">
               {t('app.subtitle')}
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2 sm:gap-3">
+        <div className="flex shrink-0 items-center gap-1.5 sm:gap-3">
           {isEnabled('enable_i18n') && <LanguageSwitcher />}
           {isEnabled('enable_dark_mode') && <ThemeToggle />}
         </div>

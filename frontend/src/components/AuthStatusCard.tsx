@@ -66,6 +66,7 @@ export function AuthStatusCard() {
   const queryClient = useQueryClient();
   const [cookiesText, setCookiesText] = useState('');
   const [showCookieEditor, setShowCookieEditor] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
   const cookiesTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const hasPrefilledRef = useRef(false);
 
@@ -195,10 +196,49 @@ export function AuthStatusCard() {
     el.style.height = `${targetHeight}px`;
   }, [cookiesText, shouldShowCookieEditor]);
 
+  if (sessionHealthy && !shouldShowCookieEditor && !isExpanded) {
+    return (
+      <section className="soft-rise min-w-0 flex-shrink-0 self-start overflow-hidden rounded-2xl border border-border bg-card p-4 shadow-panel backdrop-blur-sm w-full">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <span className="relative flex h-2.5 w-2.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+            </span>
+            <span className="text-sm font-semibold text-foreground truncate">
+              {t('auth.title')}:{' '}
+              <span className="text-emerald-600 dark:text-emerald-400 font-semibold">
+                {t('auth.status.valid')}
+              </span>
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setIsExpanded(true)}
+            className="flex items-center gap-1.5 rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs font-semibold text-foreground transition hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring shrink-0"
+          >
+            {t('auth.cookies.configure', { defaultValue: 'Administrar' })}
+          </button>
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section className="soft-rise min-w-0 flex-shrink-0 self-start overflow-hidden rounded-2xl border border-border bg-card p-5 shadow-panel backdrop-blur-sm">
       <div className="mb-4 flex min-w-0 flex-wrap items-center justify-between gap-3">
-        <h2 className="text-lg font-semibold leading-tight text-foreground">{t('auth.title')}</h2>
+        <div className="flex items-center gap-3">
+          <h2 className="text-lg font-semibold leading-tight text-foreground">{t('auth.title')}</h2>
+          {sessionHealthy && (
+            <button
+              type="button"
+              onClick={() => setIsExpanded(false)}
+              className="text-xs text-muted-foreground hover:text-foreground transition underline underline-offset-2"
+            >
+              {t('common.collapse', { defaultValue: 'Contraer' })}
+            </button>
+          )}
+        </div>
         <button
           type="button"
           onClick={() => {

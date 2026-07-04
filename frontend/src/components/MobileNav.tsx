@@ -20,9 +20,24 @@ export function MobileNav() {
   const sections = useMemo(
     () =>
       [
-        { id: 'search-section', label: t('search.title'), icon: SearchIcon },
-        { id: 'auth-section', label: t('auth.title'), icon: UserIcon },
-        { id: 'download-section', label: t('download.title'), icon: DownloadIcon },
+        {
+          id: 'search-section',
+          label: t('mobile_nav.labels.search', { defaultValue: 'Buscar' }),
+          fullLabel: t('search.title'),
+          icon: SearchIcon,
+        },
+        {
+          id: 'auth-section',
+          label: t('mobile_nav.labels.auth', { defaultValue: 'Sesión' }),
+          fullLabel: t('auth.title'),
+          icon: UserIcon,
+        },
+        {
+          id: 'download-section',
+          label: t('mobile_nav.labels.download', { defaultValue: 'Descarga' }),
+          fullLabel: t('download.title'),
+          icon: DownloadIcon,
+        },
       ] as const,
     [t]
   );
@@ -125,6 +140,7 @@ export function MobileNav() {
                 icon={<Icon />}
                 label={section.label}
                 controls={section.id}
+                ariaLabel={section.fullLabel}
               />
             );
           })}
@@ -159,9 +175,10 @@ type NavButtonProps = {
   icon: React.ReactNode;
   label: string;
   controls?: string;
+  ariaLabel?: string;
 };
 
-function NavButton({ active, onClick, icon, label, controls }: NavButtonProps) {
+function NavButton({ active, onClick, icon, label, controls, ariaLabel }: NavButtonProps) {
   return (
     <button
       onClick={onClick}
@@ -173,6 +190,7 @@ function NavButton({ active, onClick, icon, label, controls }: NavButtonProps) {
       )}
       aria-controls={controls}
       aria-current={active ? 'location' : undefined}
+      aria-label={ariaLabel || label}
     >
       <span className="h-5 w-5">{icon}</span>
       <span className="text-[10px] font-medium">{label}</span>

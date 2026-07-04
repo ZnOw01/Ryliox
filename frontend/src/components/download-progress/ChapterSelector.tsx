@@ -1,6 +1,14 @@
-import { CheckSquare, FileText, Info, Rows, Spinner, Square } from '@phosphor-icons/react';
+import {
+  CheckSquare,
+  FileText,
+  Info,
+  Rows,
+  Spinner,
+  Square,
+  MagnifyingGlass,
+} from '@phosphor-icons/react';
 import { motion } from 'framer-motion';
-import React, { memo } from 'react';
+import React, { memo, useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { cn } from '../../lib/cn';
 import type { ChapterSummary, SearchBook } from '../../lib/types';
@@ -145,6 +153,55 @@ export function ChapterSelector({
 }: ChapterSelectorProps) {
   const { t } = useTranslation();
 
+  const [showAllChapters, setShowAllChapters] = useState(false);
+  const [filterQuery, setFilterQuery] = useState('');
+  const [rangeStart, setRangeStart] = useState<number | ''>('');
+  const [rangeEnd, setRangeEnd] = useState<number | ''>('');
+
+  const filteredChapters = useMemo(() => {
+    if (!filterQuery) return chapters;
+    const q = filterQuery.toLowerCase();
+    return chapters.filter(c => c.title.toLowerCase().includes(q));
+  }, [chapters, filterQuery]);
+
+  const handleApplyRange = () => {
+    if (rangeStart === '' || rangeEnd === '') return;
+    const start = Math.min(Number(rangeStart), Number(rangeEnd));
+    const end = Math.max(Number(rangeStart), Number(rangeEnd));
+
+    chapters.forEach(c => {
+      const humanIndex = c.index + 1;
+      if (humanIndex >= start && humanIndex <= end) {
+        if (!selectedChapterSet.has(c.index)) {
+          onToggleChapter(c.index);
+        }
+      }
+    });
+  };
+
+  const handleSelectFirstN = (n: number) => {
+    chapters.slice(0, n).forEach(c => {
+      if (!selectedChapterSet.has(c.index)) {
+        onToggleChapter(c.index);
+      }
+    });
+  };
+
+  const handleSelectLastN = (n: number) => {
+    const total = chapters.length;
+    chapters.slice(Math.max(0, total - n)).forEach(c => {
+      if (!selectedChapterSet.has(c.index)) {
+        onToggleChapter(c.index);
+      }
+    });
+  };
+
+  const visibleChapters = useMemo(() => {
+    if (selectable) return filteredChapters;
+    if (showAllChapters) return chapters;
+    return chapters.slice(0, 3);
+  }, [selectable, filteredChapters, chapters, showAllChapters]);
+
   return (
     <OptimizedFadeIn direction="up" delay={100}>
       <div
@@ -231,37 +288,123 @@ export function ChapterSelector({
         {/* ── Lista de capítulos ── */}
         {selectedBook && hasData ? (
           <>
-            {/* Botones de acción — solo cuando es seleccionable */}
+            {/* Controles avanzados para PDF */}
             {selectable && (
-              <div
-                className="grid gap-3 p-3 sm:grid-cols-2"
-                role="group"
-                aria-label={t('download.chapters.title')}
-              >
-                <button
-                  type="button"
-                  onClick={onSelectAll}
-                  disabled={chapters.length === 0 || isLoading}
-                  className="mobile-full min-h-touch inline-flex w-full items-center justify-center gap-2 rounded-lg border border-border bg-background px-3 py-2.5 text-sm font-medium text-foreground transition hover:border-primary/30 hover:bg-primary/5 hover:text-primary disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                >
-                  <CheckSquare className="h-4 w-4" weight="regular" aria-hidden="true" />
-                  {t('download.chapters.select_all')}
-                </button>
-                <button
-                  type="button"
-                  onClick={onClear}
-                  disabled={selectedChapterIndexes.length === 0 || isLoading}
-                  className="mobile-full min-h-touch inline-flex w-full items-center justify-center gap-2 rounded-lg border border-border bg-background px-3 py-2.5 text-sm font-medium text-foreground transition hover:border-primary/30 hover:bg-primary/5 hover:text-primary disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                >
-                  <Square className="h-4 w-4" weight="regular" aria-hidden="true" />
-                  {t('download.chapters.clear_selection')}
-                </button>
+              <div className="border-b border-border bg-card/50 p-3 space-y-3">
+                {/* Botones de acción principales */}
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <button
+                    type="button"
+                    onClick={onSelectAll}
+                    disabled={chapters.length === 0 || isLoading}
+                    className="mobile-full min-h-touch inline-flex items-center justify-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-xs font-semibold text-foreground transition hover:border-primary/30 hover:bg-primary/5 hover:text-primary disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    <CheckSquare className="h-4 w-4" weight="regular" aria-hidden="true" />
+                    {t('download.chapters.select_all')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={onClear}
+                    disabled={selectedChapterIndexes.length === 0 || isLoading}
+                    className="mobile-full min-h-touch inline-flex items-center justify-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-xs font-semibold text-foreground transition hover:border-primary/30 hover:bg-primary/5 hover:text-primary disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    <Square className="h-4 w-4" weight="regular" aria-hidden="true" />
+                    {t('download.chapters.clear_selection')}
+                  </button>
+                </div>
+
+                {/* Búsqueda de capítulos y Selección por Rango */}
+                <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
+                  {/* Búsqueda */}
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={filterQuery}
+                      onChange={e => setFilterQuery(e.target.value)}
+                      placeholder={t('download.chapters.search_placeholder', {
+                        defaultValue: 'Buscar capítulo...',
+                      })}
+                      className="min-h-touch w-full rounded-lg border border-input bg-background pl-8 pr-8 py-2 text-xs text-foreground outline-none transition focus:border-primary/70 focus:ring-1 focus:ring-primary/20"
+                    />
+                    <div className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground">
+                      <MagnifyingGlass className="h-3.5 w-3.5" weight="bold" />
+                    </div>
+                    {filterQuery && (
+                      <button
+                        type="button"
+                        onClick={() => setFilterQuery('')}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground text-sm font-bold"
+                      >
+                        ×
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Rango */}
+                  <div className="flex items-center gap-2 justify-end sm:justify-start">
+                    <input
+                      type="number"
+                      value={rangeStart}
+                      onChange={e => setRangeStart(e.target.value ? parseInt(e.target.value) : '')}
+                      placeholder="De"
+                      min="1"
+                      max={chapters.length}
+                      className="w-14 rounded-lg border border-input bg-background px-2 py-2 text-xs text-center text-foreground outline-none transition focus:border-primary focus:ring-1 focus:ring-primary/20"
+                    />
+                    <span className="text-xs text-muted-foreground">-</span>
+                    <input
+                      type="number"
+                      value={rangeEnd}
+                      onChange={e => setRangeEnd(e.target.value ? parseInt(e.target.value) : '')}
+                      placeholder="A"
+                      min="1"
+                      max={chapters.length}
+                      className="w-14 rounded-lg border border-input bg-background px-2 py-2 text-xs text-center text-foreground outline-none transition focus:border-primary focus:ring-1 focus:ring-primary/20"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleApplyRange}
+                      disabled={rangeStart === '' || rangeEnd === ''}
+                      className="rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground hover:bg-primary/95 disabled:opacity-50 transition"
+                    >
+                      Rango
+                    </button>
+                  </div>
+                </div>
+
+                {/* Presets */}
+                <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-border/30">
+                  <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground mr-1">
+                    Presets:
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handleSelectFirstN(5)}
+                    className="rounded bg-muted px-2 py-1 text-[11px] font-medium text-muted-foreground hover:bg-muted/80 transition"
+                  >
+                    Primeros 5
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleSelectFirstN(10)}
+                    className="rounded bg-muted px-2 py-1 text-[11px] font-medium text-muted-foreground hover:bg-muted/80 transition"
+                  >
+                    Primeros 10
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleSelectLastN(5)}
+                    className="rounded bg-muted px-2 py-1 text-[11px] font-medium text-muted-foreground hover:bg-muted/80 transition"
+                  >
+                    Últimos 5
+                  </button>
+                </div>
               </div>
             )}
 
-            <div className="chapter-scroll overflow-x-hidden overflow-y-auto">
+            <div className="chapter-scroll overflow-x-hidden overflow-y-auto max-h-[300px]">
               <AnimatedLayoutGroup className="space-y-1 p-3">
-                {chapters.map((chapter, index) => (
+                {visibleChapters.map((chapter, index) => (
                   <ChapterRow
                     key={chapter.index}
                     index={index}
@@ -273,6 +416,24 @@ export function ChapterSelector({
                 ))}
               </AnimatedLayoutGroup>
             </div>
+
+            {/* Mostrar botón para expandir/colapsar en EPUB/HTML */}
+            {!selectable && chapters.length > 3 && (
+              <div className="flex justify-center p-2.5 border-t border-border bg-card">
+                <button
+                  type="button"
+                  onClick={() => setShowAllChapters(!showAllChapters)}
+                  className="text-xs font-semibold text-primary hover:text-primary-foreground hover:bg-primary px-3 py-1.5 rounded-lg border border-primary/20 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  {showAllChapters
+                    ? t('download.chapters.view_less', { defaultValue: 'Ver menos capítulos' })
+                    : t('download.chapters.view_all', {
+                        defaultValue: 'Ver todos los capítulos ({{count}})',
+                        count: chapters.length,
+                      })}
+                </button>
+              </div>
+            )}
           </>
         ) : null}
 

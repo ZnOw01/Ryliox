@@ -88,6 +88,7 @@ class DownloadQueueService:
         self._active_job_id: str | None = None
         self._active_cancel_event: threading.Event | None = None
         self._worker: threading.Thread | None = None
+        self._last_progress_log: dict[str, tuple[str, int, str]] = {}
 
         # Error deduplication
         self._last_worker_error_signature: str | None = None
@@ -296,6 +297,7 @@ class DownloadQueueService:
 
         def report_progress(progress: DownloadProgress) -> None:
             """Update progress in repository."""
+            self._log_progress_event(job.job_id, progress)
             progress_dto = DownloadProgressDTO(
                 status=progress.status,
                 percentage=progress.percentage,
@@ -366,10 +368,30 @@ class DownloadQueueService:
                     if self._active_job_id == job.job_id:
                         self._active_job_id = None
                         self._active_cancel_event = None
+                    self._last_progress_log.pop(job.job_id, None)
             except Exception as cleanup_exc:
                 logger.debug("Failed to clear active job state: %s", cleanup_exc)
             with contextlib.suppress(Exception):
                 self._wake_event.set()
+
+    def _log_progress_event(self, job_id: str, progress: DownloadProgress) -> None:
+        percent = max(0, min(100, int(progress.percentage or 0)))
+        message = " ".join(str(progress.message or "").split())
+        status = str(progress.status or "running")
+        previous = self._last_progress_log.get(job_id)
+        should_log = previous is None or previous[0] != status or percent >= previous[1] + 5
+        if not should_log and percent not in {0, 100}:
+            return
+        if previous is not None and previous == (status, percent, message):
+            return
+        self._last_progress_log[job_id] = (status, percent, message)
+        logger.info(
+            "download_progress job=%s status=%s percent=%d message=%s",
+            job_id[:8],
+            status,
+            percent,
+            message or "-",
+        )
 
     def _handle_job_exception(
         self,
