@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+import contextlib
 import os
 import re
 import shutil
 import subprocess
-import sys
+import time
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -268,22 +269,77 @@ def stop_port(steps: Steps, port: int) -> None:
 def launch_server(venv: Path, steps: Steps, label: str) -> None:
     """Launch the web server in the foreground (blocks until exit)."""
     steps.next(label)
+    creationflags = 0
+    if os.name == "nt":
+        creationflags = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+    process: subprocess.Popen[bytes] | None = None
     try:
-        subprocess.run(
+        process = subprocess.Popen(
             [str(venv), "-X", "utf8", "-m", "web.server"],
             cwd=REPO_ROOT,
             env=server_env(),
-            check=True,
+            creationflags=creationflags,
         )
-    except subprocess.CalledProcessError as exc:
-        raise RuntimeError(
-            f"Server process exited with code {exc.returncode}. Check the server logs."
-        ) from exc
+        returncode = _wait_for_server_process(process)
+        if returncode != 0:
+            raise RuntimeError(f"Server process exited with code {returncode}.")
     except KeyboardInterrupt:
+        _stop_foreground_server(process)
         print("\n  Server stopped by user.")
-        sys.exit(0)
     except Exception as exc:
         raise RuntimeError(f"Failed to launch server: {exc}") from exc
+
+
+def _wait_for_server_process(process: subprocess.Popen[bytes]) -> int:
+    while True:
+        returncode = process.poll()
+        if returncode is not None:
+            return int(returncode)
+        try:
+            time.sleep(0.25)
+        except KeyboardInterrupt:
+            _stop_foreground_server(process)
+            print("\n  Server stopped by user.")
+            return 0
+
+
+def _stop_foreground_server(process: subprocess.Popen[bytes] | None) -> None:
+    if process is None or process.poll() is not None:
+        return
+
+    print("\n  Stopping server...")
+    try:
+        if os.name == "nt":
+            process.send_signal(subprocess.CTRL_BREAK_EVENT)
+        else:
+            process.terminate()
+        _wait_for_exit_or_force(process, timeout=20.0)
+    except KeyboardInterrupt:
+        _force_stop_process(process)
+    except (OSError, ValueError):
+        _force_stop_process(process)
+
+
+def _wait_for_exit_or_force(process: subprocess.Popen[bytes], timeout: float) -> None:
+    deadline = time.monotonic() + timeout
+    while process.poll() is None and time.monotonic() < deadline:
+        time.sleep(0.1)
+    if process.poll() is None:
+        _force_stop_process(process)
+
+
+def _force_stop_process(process: subprocess.Popen[bytes]) -> None:
+    if process.poll() is not None:
+        return
+    print("  Force stopping server...")
+    try:
+        process.terminate()
+        process.wait(timeout=5)
+    except (OSError, subprocess.TimeoutExpired):
+        with contextlib.suppress(OSError):
+            process.kill()
+        with contextlib.suppress(OSError, subprocess.TimeoutExpired):
+            process.wait(timeout=5)
 
 
 def run_status(port: int) -> None:

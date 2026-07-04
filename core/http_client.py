@@ -19,6 +19,7 @@ import json
 import logging
 import re
 import time
+from http.cookiejar import Cookie
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
@@ -165,6 +166,68 @@ class HttpClient:
         for name, value in self._auth_cookies.items():
             jar.set(name, value)
 
+    def _should_persist_captured_cookies(self) -> bool:
+        return Path(self._cookies_file) == Path(config.COOKIES_FILE)
+
+    def _cookie_to_record(self, cookie: Cookie) -> dict[str, Any]:
+        rest = getattr(cookie, "_rest", {}) or {}
+        return {
+            "name": cookie.name,
+            "value": cookie.value or "",
+            "domain": cookie.domain or None,
+            "path": cookie.path or "/",
+            "secure": bool(cookie.secure),
+            "http_only": "HttpOnly" in rest or "httponly" in {str(k).lower() for k in rest},
+            "expires": cookie.expires,
+            "same_site": rest.get("SameSite") or rest.get("samesite"),
+        }
+
+    def _capture_response_cookies(self, response: httpx.Response) -> None:
+        """Persist cookies refreshed by the upstream service via Set-Cookie."""
+        captured = [
+            self._cookie_to_record(cookie)
+            for cookie in response.cookies.jar
+            if cookie.name and not self._is_akamai_cookie(cookie.name)
+        ]
+        if not captured:
+            return
+
+        now = time.time()
+        expired_names = {
+            str(record["name"])
+            for record in captured
+            if record.get("expires") is not None and int(record["expires"]) <= now
+        }
+        for name in expired_names:
+            self._auth_cookies.pop(name, None)
+
+        refreshed = [
+            record
+            for record in captured
+            if record["name"] not in expired_names and record.get("value") is not None
+        ]
+        if refreshed:
+            self._auth_cookies.update(
+                {str(record["name"]): str(record["value"]) for record in refreshed}
+            )
+        if not self._should_persist_captured_cookies():
+            return
+
+        try:
+            from core.session_store import SessionStore
+
+            store = SessionStore(
+                db_path=config.SESSION_DB_FILE,
+                legacy_cookies_file=config.COOKIES_FILE,
+            )
+            merged = store.get_cookies()
+            merged.update(self._auth_cookies)
+            for name in expired_names:
+                merged.pop(name, None)
+            store.save_cookies(merged)
+        except Exception as exc:
+            logger.warning("Failed to persist refreshed cookies: %s", exc)
+
     # ---- JWT helpers -----------------------------------------------------
 
     @staticmethod
@@ -239,7 +302,9 @@ class HttpClient:
         while True:
             try:
                 if not allow_redirects:
-                    return await self.client.get(url, **kwargs)
+                    response = await self.client.get(url, **kwargs)
+                    self._capture_response_cookies(response)
+                    return response
                 return await self._get_with_safe_redirects(url, kwargs)
             except httpx.RequestError:
                 if attempt >= max_retries:
@@ -260,6 +325,7 @@ class HttpClient:
                 raise ValueError(f"Blocked unsafe redirect URL: {current}")
             self._apply_auth_cookies()
             response = await self.client.get(current, follow_redirects=False, **kwargs)
+            self._capture_response_cookies(response)
             if response.status_code not in (301, 302, 303, 307, 308):
                 return response
             location = response.headers.get("location")

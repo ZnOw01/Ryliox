@@ -5,6 +5,7 @@ import pytest
 
 import config
 from core.http_client import HttpClient
+from core.session_store import SessionStore
 
 pytestmark = pytest.mark.unit
 
@@ -110,3 +111,36 @@ async def test_http_client_blocks_unsafe_redirect_target():
             await client.get(f"{config.BASE_URL}/redirect", allow_redirects=True)
 
         assert calls == [(f"{config.BASE_URL}/redirect", False)]
+
+
+@pytest.mark.asyncio
+async def test_http_client_persists_refreshed_set_cookie(monkeypatch, tmp_path):
+    db_path = tmp_path / "session.sqlite3"
+    cookies_file = tmp_path / "cookies.json"
+    monkeypatch.setattr(config, "SESSION_DB_FILE", db_path)
+    monkeypatch.setattr(config, "COOKIES_FILE", cookies_file)
+
+    store = SessionStore(db_path=db_path, legacy_cookies_file=cookies_file)
+    store.save_cookies({"orm-jwt": "old-token", "orm-rt": "refresh-token"})
+
+    async with HttpClient() as client:
+        request = httpx.Request("GET", f"{config.BASE_URL}/profile/")
+
+        async def fake_get(url: str, **_kwargs):
+            assert url == f"{config.BASE_URL}/profile/"
+            return httpx.Response(
+                status_code=200,
+                headers={"set-cookie": "orm-jwt=new-token; Path=/; HttpOnly; Secure"},
+                request=request,
+                json={"user_type": "Active"},
+            )
+
+        client.client.get = fake_get  # type: ignore[method-assign]
+
+        response = await client.get("/profile/")
+
+    assert response.status_code == 200
+    assert SessionStore(db_path=db_path, legacy_cookies_file=cookies_file).get_cookies() == {
+        "orm-jwt": "new-token",
+        "orm-rt": "refresh-token",
+    }
