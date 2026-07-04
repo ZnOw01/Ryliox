@@ -203,7 +203,7 @@ export function ProgressStatus({ currentLabel, progress, progressPercent }: Prog
                     className="break-all text-xs leading-relaxed text-muted-foreground"
                     id={`file-path-${path}`}
                   >
-                    {path}
+                    {path.split(/[/\\]/).pop() || path}
                   </p>
                   <div className="mt-3 flex flex-wrap gap-2">
                     <button
