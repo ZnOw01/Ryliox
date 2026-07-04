@@ -1,28 +1,43 @@
 # Ryliox
 
-> Export any O'Reilly Learning Platform book to EPUB or PDF, with a modern web
-> UI to search, preview, and queue downloads. Designed for personal and
-> educational use — see the [Disclaimer](#disclaimer) below.
+[![Python](https://img.shields.io/badge/Python-3.11%20%7C%203.12%20%7C%203.13-3776AB)](https://www.python.org/)
+[![FastAPI](https://img.shields.io/badge/API-FastAPI-009688)](https://fastapi.tiangolo.com/)
+[![Frontend](https://img.shields.io/badge/Frontend-Astro%207%20%2B%20React%2019-BC52EE)](https://astro.build/)
+[![License](https://img.shields.io/badge/License-MIT-blue)](LICENSE)
 
-Ryliox is a from-scratch refactor of [Mosaibah/oreilly-ingest](https://github.com/Mosaibah/oreilly-ingest).
-It unifies two previously parallel code bases (a stdlib `http.server` and a
-half-wired FastAPI implementation) into a single FastAPI backend, with a
-modern Astro/React frontend served from the same origin.
+Export books from the O'Reilly Learning Platform to EPUB or PDF through a
+single local web app. Ryliox combines a FastAPI backend, an Astro/React
+frontend, a persistent download queue, live progress streaming, and hardened
+local session storage.
 
-## Features
+Ryliox is designed for personal and educational use. Read the
+[Disclaimer](#disclaimer) before using it.
 
-- **EPUB 3 and PDF** — export complete books with images, styles and TOC.
-- **O'Reilly V2 API** — fast, reliable, supports the same auth flow as the
-  official web reader.
-- **Queue + progress streaming** — Server-Sent Events push live progress
-  per job; multiple downloads can run in series.
-- **Modern frontend** — Astro 7 + React 19 + Radix, with i18n (English /
-  Spanish), framer-motion transitions, and a fully accessible design.
-- **Hardened by default** — OWASP-aware security headers, CSRF tokens,
-  rate-limiting, immutable audit log, encrypted secret storage, Prometheus
-  metrics, structured logging, and a typed configuration layer.
+## Contents
 
-## Quick start
+- [What It Does](#what-it-does)
+- [Quick Start](#quick-start)
+- [Cookie Setup](#cookie-setup)
+- [Development](#development)
+- [Architecture](#architecture)
+- [API Surface](#api-surface)
+- [Configuration](#configuration)
+- [Troubleshooting](#troubleshooting)
+- [Project Layout](#project-layout)
+
+## What It Does
+
+- Exports books to **EPUB 3** and **PDF**.
+- Uses the O'Reilly V2 API and the same cookie-based auth flow as the web
+  reader.
+- Queues downloads and streams live status with Server-Sent Events.
+- Serves the Astro/React frontend from the same FastAPI origin.
+- Stores cookies in SQLite, with legacy JSON migration.
+- Includes OWASP-aware defaults: same-origin checks, security headers, request
+  limits, rate limiting, audit logging, encrypted secret storage, typed config,
+  and Prometheus metrics.
+
+## Quick Start
 
 ### Docker
 
@@ -30,10 +45,19 @@ modern Astro/React frontend served from the same origin.
 git clone https://github.com/ZnOw01/Ryliox.git
 cd Ryliox
 docker compose up -d
-# open http://localhost:8000
 ```
 
-### Local development (uv + bun)
+Open `http://localhost:8000`.
+
+### Local
+
+Requirements:
+
+- Python 3.11, 3.12, or 3.13
+- Bun 1.3+
+- Node 22.12+ or Node 24+
+- GTK3 runtime on Windows for WeasyPrint PDF export:
+  [GTK for Windows][gtk]
 
 ```bash
 git clone https://github.com/ZnOw01/Ryliox.git
@@ -42,164 +66,191 @@ uv sync --extra dev
 python -m launcher --no-browser
 ```
 
-The launcher (`python -m launcher`) drives the local workflow: it creates
-an isolated Python venv at `.run/venv` with `uv`, installs / builds the
-frontend with `bun`, and starts `web.server`. Pass `--no-browser` to skip
-the auto-open or `--docker` to use Compose instead of running the stack
-locally.
+Open `http://localhost:8000`.
 
-Requires **Python 3.11 → 3.13** and **Node ≥ 22.12 (even minor)**. PDF
-export uses WeasyPrint, which on Windows needs the [GTK3 runtime][gtk].
+The launcher creates an isolated Python environment in `.run/venv`, installs
+frontend dependencies with Bun, builds the frontend when needed, and starts the
+FastAPI app. Use `python -m launcher --docker` to run through Docker Compose.
 
 [gtk]: https://github.com/tschoonj/GTK-for-Windows-Runtime-Environment-Installer/releases
 
-## Setting up cookies
+## Cookie Setup
 
-1. Open the web UI and click **Set cookies**.
-2. Recommended: paste the full JSON export from the *EditThisCookie*
-   extension. It includes the HttpOnly `orm-rt` cookie that O'Reilly needs
-   to refresh the session after the JWT expires.
-3. Fallback: the in-page *browser console* helper only reads
-   `document.cookie`, so `orm-rt` will be missing and the session may
-   expire within minutes.
+Ryliox needs your O'Reilly session cookies to access purchased or subscribed
+content.
 
-Cookie storage is SQLite-first. The web UI writes cookies to
-`data/session.sqlite3` through `POST /api/cookies`, and `GET /api/cookies`
-reads them back from the same store. `data/cookies.json` is only a legacy
-import path: if the SQLite store is empty, Ryliox can migrate a JSON cookie
-file into `data/session.sqlite3`. After that, editing `data/cookies.json` will
-not override cookies already present in SQLite; use the web UI/API, or remove
-the SQLite session DB before importing a fresh legacy file.
+1. Open the web UI.
+2. Click **Set cookies**.
+3. Paste a full JSON cookie export from a browser extension such as
+   EditThisCookie.
 
-## Architecture
+The full browser export is recommended because it can include the HttpOnly
+`orm-rt` refresh cookie. Console snippets based on `document.cookie` cannot
+read HttpOnly cookies, so sessions created that way may expire quickly.
 
-```
-┌───────────────────────────────┐
-│  frontend/  (Astro 7 + React) │  served by FastAPI as static files
-└───────────────────────────────┘
-              ▲
-              │ JSON / SSE
-              │
-┌───────────────────────────────┐
-│  web/  FastAPI application    │  create_app()  ←  web/server.py
-│  ├── routes/   (auth, books,  │
-│  │             downloads, …)  │
-│  ├── api_utils, dependencies, │
-│  └── schemas (Pydantic)       │
-└───────────────────────────────┘
-              ▲
-              │  dependency-injected
-              │
-┌───────────────────────────────┐
-│  core/                        │
-│  ├── services + repository    │  download queue (DTOs, mappers, UoW)
-│  ├── kernel + http_client     │  plugin microkernel
-│  ├── audit, secrets, session, │
-│  │   cache, process_manager   │
-│  └── validators               │
-└───────────────────────────────┘
-              ▲
-              │
-┌───────────────────────────────┐
-│  plugins/  (auth, book, …)    │  registered into the kernel at startup
-└───────────────────────────────┘
-```
+Cookie storage is SQLite-first:
 
-### Public API
-
-| Method | Path | Purpose |
-| ------ | ---- | ------- |
-| `GET`  | `/api/status` | Auth + cookie status |
-| `GET`  | `/api/search?q=` | Find books |
-| `GET`  | `/api/book/{id}` | Book metadata |
-| `GET`  | `/api/book/{id}/chapters` | Chapter list |
-| `POST` | `/api/download` | Queue a download |
-| `GET`  | `/api/progress?job_id=` | Job progress (JSON) |
-| `GET`  | `/api/progress/stream` | Job progress (SSE) |
-| `POST` | `/api/cancel` | Cancel a job |
-| `POST` | `/api/cookies` | Save session cookies |
-| `GET`  | `/api/health` | Liveness probe |
-| `GET`  | `/api/health/detailed` | Disk, memory, SQLite, external APIs |
-| `GET`  | `/metrics` | Prometheus exposition |
-| `GET`  | `/api/docs` | Swagger UI (development only) |
-
-## Configuration
-
-All settings live in a single Pydantic `BaseSettings` model loaded from
-`.env`. See [`.env.example`](.env.example) for the full list of variables
-and the [OWASP production checklist](.env.example#production-checklist).
-
-| Group | Env prefix | Notes |
-| ----- | ---------- | ----- |
-| Server | `HOST`, `PORT`, `APP_VERSION` | Bind + bind interface |
-| HTTP | `REQUEST_*`, `USER_AGENT`, `ACCEPT_*` | Outbound client tuning |
-| Security | `ENVIRONMENT`, `ENABLE_*`, `CSP_POLICY`, `ALLOWED_HOSTS` | OWASP A02 / A05 |
-| Rate limit | `RATE_LIMIT_*`, `API_RATE_LIMIT_*` | OWASP A04 |
-| Secrets | `SECRET_MASTER_PASSWORD`, `SECRET_ROTATION_DAYS` | OWASP A02 / A07 |
-| Audit | `AUDIT_*` | OWASP A09 |
-| Cache | `CACHE_*` | LRU caches per resource type |
-
-To override a value at runtime, set the corresponding environment variable
-and restart, or call `config.reload()` from a test.
+- The UI writes cookies to `data/session.sqlite3` through `POST /api/cookies`.
+- `GET /api/cookies` reads from the same SQLite store.
+- `data/cookies.json` is only a legacy import path.
+- Once SQLite has cookies, editing `data/cookies.json` will not override them.
 
 ## Development
 
+Install Python dependencies:
+
 ```bash
 uv sync --extra dev
-uv run ruff check .            # lint
-uv run ruff format --check .   # format
-uv run mypy                    # static types
-uv run pytest tests/unit -q    # fast unit tests
-uv run pytest tests/integration -q  # API integration tests
+```
+
+Backend checks:
+
+```bash
+uv run ruff format --check .
+uv run ruff check .
+uv run mypy
+uv run pytest tests/unit -q
+uv run pytest tests/contract tests/integration -q
+```
+
+Frontend checks:
+
+```bash
 cd frontend
 bun run typecheck
 bun run test
 bun run build
 ```
 
-## Project layout
+Security checks:
 
-```
-config.py                – Pydantic Settings + legacy module-level constants
-main.py                  – thin entry point: parses args, calls web.server.run_server
-launcher/                – local CLI (replaces the old 850-line launcher.py)
-web/                     – FastAPI application
-  server.py              – create_app() factory + run_server()
-  routes/                – auth, books, downloads, metrics, system
-  api_utils.py           – error envelope, SSE helpers
-  dependencies.py        – FastAPI providers, OWASP guards
-  schemas.py             – Pydantic request / response models
-core/                    – domain layer
-  services.py            – DownloadQueueService
-  repository.py          – DownloadJobRepository (UoW)
-  dto.py / mappers.py    – DTO + mapper contracts
-  interfaces.py          – Protocols (IDownloadJobRepository, IUnitOfWork)
-  kernel.py              – microkernel + create_default_kernel
-  http_client.py         – Akamai-aware HTTP client
-  audit.py, secrets.py,  – OWASP-aligned infra
-  session_store.py,      – SQLite session/cookie storage
-  cache.py,              – LRU caches per resource type
-  process_manager.py     – PID/port management for the launcher
-  validators.py          – input/output validation
-plugins/                 – pluggable functionality (auth, book, …, epub, pdf, …)
-utils/files.py           – filename sanitisation, slugify, accent removal
-frontend/                – Astro 7 + React 19 frontend (Bun project)
-tests/                   – unit, integration, e2e, security, performance, contract, a11y
+```bash
+uv sync --extra security
+uv run pytest tests/security -q --run-security
 ```
 
-## License
+If `uv run` tries to reuse a broken `.venv` on Windows, point uv at a clean
+ignored environment:
 
-MIT.
+```powershell
+$env:UV_PROJECT_ENVIRONMENT=".run\dev-venv"
+uv sync --extra dev
+```
+
+## Architecture
+
+```mermaid
+flowchart TD
+    UI["frontend/ Astro + React"] --> API["web/ FastAPI routes"]
+    API --> Core["core/ services, repository, DTOs"]
+    Core --> Kernel["core.kernel microkernel"]
+    Kernel --> Plugins["plugins/ auth, book, chapters, assets, epub, pdf"]
+    Core --> SQLite["data/*.sqlite3"]
+    API --> SSE["SSE progress stream"]
+```
+
+Runtime flow:
+
+1. The user saves cookies through the UI or API.
+2. The frontend searches books and requests metadata through `/api/*`.
+3. `POST /api/download` validates the request and enqueues a job.
+4. `DownloadQueueService` persists the job in SQLite.
+5. A worker runs `DownloaderPlugin`, which fetches chapters, assets, and output
+   formats.
+6. Progress is persisted and streamed through `/api/progress/stream`.
+
+## API Surface
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `GET` | `/api/status` | Auth and cookie status |
+| `GET` | `/api/search?q=` | Search books |
+| `GET` | `/api/book/{id}` | Book metadata |
+| `GET` | `/api/book/{id}/chapters` | Chapter list |
+| `POST` | `/api/download` | Queue a download |
+| `GET` | `/api/progress?job_id=` | Job progress snapshot |
+| `GET` | `/api/progress/stream` | Live progress stream |
+| `POST` | `/api/cancel` | Cancel a job |
+| `POST` | `/api/cookies` | Save session cookies |
+| `GET` | `/api/health` | Liveness probe |
+| `GET` | `/api/health/detailed` | Disk, memory, SQLite, external APIs |
+| `GET` | `/metrics` | Prometheus metrics |
+| `GET` | `/api/docs` | Swagger UI in development |
+
+## Configuration
+
+Configuration is loaded from `.env` into a typed Pydantic settings model.
+Start from `.env.example`.
+
+| Area | Examples | Notes |
+| --- | --- | --- |
+| Server | `HOST`, `PORT`, `APP_VERSION` | Bind address and app metadata |
+| HTTP | `REQUEST_*`, `USER_AGENT`, `ACCEPT_*` | Outbound client behavior |
+| Security | `ENVIRONMENT`, `CSP_POLICY`, `ALLOWED_HOSTS` | Headers, host checks, CSP |
+| Rate limit | `RATE_LIMIT_*`, `API_RATE_LIMIT_*` | Endpoint throttling |
+| Secrets | `SECRET_MASTER_PASSWORD` | Encryption and rotation |
+| Audit | `AUDIT_*` | Audit log retention and integrity |
+| Cache | `CACHE_*` | Resource cache sizes and TTLs |
+
+Runtime paths default to local ignored directories:
+
+- `data/` for SQLite, cookies, audit logs, and secrets
+- `output/` for generated EPUB/PDF files
+- `.run/` for launcher-managed local runtime files
+
+## Troubleshooting
+
+**`bun test --run` fails with Vitest errors**
+
+Use `bun run test`. The test script runs `vitest run` with the configured JSDOM
+environment.
+
+**`uv run` fails on `.venv/lib64` with access denied**
+
+The local `.venv` is likely incomplete or has a Windows symlink permission
+problem. Use an ignored project environment:
+
+```powershell
+$env:UV_PROJECT_ENVIRONMENT=".run\dev-venv"
+uv sync --extra dev
+```
+
+**PDF export fails on Windows**
+
+Install the GTK3 runtime linked in [Quick Start](#quick-start). WeasyPrint needs
+native libraries to render PDFs.
+
+**Cookies save but auth expires quickly**
+
+Use a full browser cookie JSON export. Console-based cookie snippets cannot read
+the HttpOnly `orm-rt` refresh cookie.
+
+## Project Layout
+
+```text
+config.py          Typed settings and legacy module-level constants
+main.py            Thin server entry point
+launcher/          Local workflow launcher
+web/               FastAPI app, middleware, schemas, routes
+core/              Services, repository, DTOs, kernel, security, storage
+plugins/           Auth, book, chapter, asset, EPUB, PDF, downloader plugins
+utils/             File and filename helpers
+frontend/          Astro 7 + React 19 frontend
+tests/             Unit, integration, contract, security, e2e, a11y, performance
+```
 
 ## Credits
 
-Inspired by [lorenzodifuccia/safaribooks](https://github.com/lorenzodifuccia/safaribooks)
-and the original [Mosaibah/oreilly-ingest](https://github.com/Mosaibah/oreilly-ingest)
-project.
+Ryliox is a from-scratch refactor inspired by
+[Mosaibah/oreilly-ingest](https://github.com/Mosaibah/oreilly-ingest) and
+[lorenzodifuccia/safaribooks](https://github.com/lorenzodifuccia/safaribooks).
+
+## License
+
+MIT. See [LICENSE](LICENSE).
 
 ## Disclaimer
 
-Ryliox is for personal and educational use only. By using it you agree to
-the [O'Reilly Terms of Service](https://www.oreilly.com/terms/). The
-authors are not affiliated with O'Reilly Media and assume no liability for
-how the tool is used.
+Ryliox is for personal and educational use only. By using it, you agree to the
+[O'Reilly Terms of Service](https://www.oreilly.com/terms/). The authors are not
+affiliated with O'Reilly Media and assume no liability for how the tool is used.
