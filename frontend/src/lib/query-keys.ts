@@ -44,18 +44,7 @@ export const queryKeys = {
         : ([...queryKeys.progress.root, 'latest'] as const),
   },
 
-  // Legacy aliases para compatibilidad gradual (deprecated)
-  /** @deprecated Use queryKeys.search.byQuery() */
-  searchLegacy: (query: string) => ['search', query] as const,
-  /** @deprecated Use queryKeys.formats.all */
-  formatsLegacy: ['formats'] as const,
-  /** @deprecated Use queryKeys.chapters.byBook() */
-  bookChaptersLegacy: (bookId: string | null) => ['book-chapters', bookId] as const,
-  /** @deprecated Use queryKeys.progress.root */
-  downloadProgressRoot: ['download-progress'] as const,
-  /** @deprecated Use queryKeys.progress.byJob() */
-  downloadProgressLegacy: (jobId: string | null) =>
-    ['download-progress', jobId ?? 'latest'] as const,
+
 } as const;
 
 // Type-safe query key helpers

@@ -110,34 +110,3 @@ export function ThemeToggle() {
 }
 
 // Hook to use theme in other components
-export function useTheme() {
-  const [theme, setThemeState] = useState<Theme>(getInitialTheme);
-  const [isDark, setIsDark] = useState(() => getIsDark(getInitialTheme()));
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  useEffect(() => {
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-
-    const updateTheme = () => {
-      const isDarkMode = getIsDark(theme);
-      setIsDark(isDarkMode);
-      document.documentElement.classList.toggle('dark', isDarkMode);
-    };
-
-    updateTheme();
-
-    mediaQuery.addEventListener('change', updateTheme);
-    return () => mediaQuery.removeEventListener('change', updateTheme);
-  }, [theme]);
-
-  const setTheme = (newTheme: Theme) => {
-    setThemeState(newTheme);
-    localStorage.setItem(STORAGE_KEY, newTheme);
-  };
-
-  return { theme, setTheme, isDark, mounted };
-}
