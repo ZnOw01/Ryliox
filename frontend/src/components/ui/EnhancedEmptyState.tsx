@@ -374,9 +374,7 @@ export function EnhancedEmptyState({
       ? iconMap[IconProp] || content?.icon || FolderOpen
       : IconProp || content?.icon || null;
   const title =
-    titleProp ||
-    content?.title ||
-    t('search.no_results_title', { defaultValue: 'No content' });
+    titleProp || content?.title || t('search.no_results_title', { defaultValue: 'No content' });
   const description = descriptionProp || content?.description || '';
   const finalSteps = steps || content?.steps;
   const finalQuote = quote || content?.quote;

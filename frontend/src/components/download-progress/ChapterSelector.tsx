@@ -1,11 +1,4 @@
-import {
-  CheckSquare,
-  FileText,
-  Info,
-  Rows,
-  Spinner,
-  Square
-} from '@phosphor-icons/react';
+import { CheckSquare, FileText, Info, Rows, Spinner, Square } from '@phosphor-icons/react';
 import { motion } from 'framer-motion';
 import React, { memo } from 'react';
 import { useTranslation } from 'react-i18next';

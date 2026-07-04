@@ -43,8 +43,6 @@ export const queryKeys = {
         ? ([...queryKeys.progress.root, jobId] as const)
         : ([...queryKeys.progress.root, 'latest'] as const),
   },
-
-
 } as const;
 
 // Type-safe query key helpers
