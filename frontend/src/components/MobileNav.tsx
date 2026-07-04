@@ -26,18 +26,26 @@ export function MobileNav() {
       ] as const,
     [t]
   );
-  const [isVisible, setIsVisible] = useState(false);
+  const [isMobile, setIsMobile] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return window.matchMedia('(max-width: 1023px)').matches;
+  });
   const [activeSection, setActiveSection] = useState<MobileSectionId>('search-section');
   const [showScrollTop, setShowScrollTop] = useState(false);
 
   useEffect(() => {
-    const checkScreenSize = () => {
-      setIsVisible(window.innerWidth < 1024);
+    const mediaQuery = window.matchMedia('(max-width: 1023px)');
+    const handleChange = (e: MediaQueryListEvent) => {
+      setIsMobile(e.matches);
     };
 
-    checkScreenSize();
-    window.addEventListener('resize', checkScreenSize);
-    return () => window.removeEventListener('resize', checkScreenSize);
+    if (mediaQuery.addEventListener) {
+      mediaQuery.addEventListener('change', handleChange);
+      return () => mediaQuery.removeEventListener('change', handleChange);
+    } else {
+      mediaQuery.addListener(handleChange);
+      return () => mediaQuery.removeListener(handleChange);
+    }
   }, []);
 
   useEffect(() => {
@@ -51,7 +59,7 @@ export function MobileNav() {
   }, []);
 
   useEffect(() => {
-    if (!isVisible) {
+    if (!isMobile) {
       return;
     }
 
@@ -82,7 +90,7 @@ export function MobileNav() {
       window.removeEventListener('scroll', updateActiveSection);
       window.removeEventListener('resize', updateActiveSection);
     };
-  }, [isVisible, sections]);
+  }, [isMobile, sections]);
 
   const scrollToSection = (sectionId: MobileSectionId) => {
     const element = document.getElementById(sectionId);
@@ -98,8 +106,6 @@ export function MobileNav() {
   const scrollToTop = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
-
-  if (!isVisible) return null;
 
   return (
     <>
