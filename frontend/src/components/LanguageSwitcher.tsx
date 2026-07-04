@@ -24,6 +24,7 @@ export function LanguageSwitcher() {
           onClick={() => handleLanguageChange(lng)}
           aria-pressed={currentLanguage === lng}
           aria-label={`Switch to ${LANGUAGE_NAMES[lng]}`}
+          title={LANGUAGE_NAMES[lng]}
           className={`rounded-md px-2 py-1 text-xs font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/60 ${
             currentLanguage === lng
               ? 'bg-brand/10 text-brand-deep'

@@ -126,7 +126,8 @@ export function sseStatusClass(status: SseStatus): string {
     return 'border-success/30 bg-success/10 text-success-foreground';
   }
   if (status === 'error') {
-    return 'border-destructive/30 bg-destructive/10 text-destructive-foreground';
+    // Paused/disconnected SSE is not a critical error — use neutral amber instead of red
+    return 'border-warning/30 bg-warning/10 text-warning-foreground';
   }
   if (status === 'reconnecting') {
     return 'border-warning/30 bg-warning/10 text-warning-foreground';

@@ -1,5 +1,5 @@
 import { cn } from '../../lib/cn';
-import { Play, X, ArrowClockwise, Image, Spinner, Warning } from '@phosphor-icons/react';
+import { Play, X, ArrowClockwise, ImageSquare, Spinner, Warning } from '@phosphor-icons/react';
 import { useTranslation } from 'react-i18next';
 
 type DownloadActionsProps = {
@@ -46,7 +46,19 @@ export function DownloadActions({
               : 'border-input bg-background text-transparent group-hover:border-muted-foreground'
           )}
         >
-          <Image className="h-3 w-3" weight="regular" aria-hidden="true" />
+          {skipImages ? (
+            <svg className="h-3 w-3" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+              <path
+                d="M2.5 6L5 8.5L9.5 3.5"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          ) : (
+            <span className="h-3 w-3" />
+          )}
         </div>
         <input
           type="checkbox"
@@ -55,7 +67,10 @@ export function DownloadActions({
           className="sr-only"
           aria-describedby="skip-images-desc"
         />
-        <span id="skip-images-desc">{t('download.actions.skip_images')}</span>
+        <span id="skip-images-desc" className="inline-flex items-center gap-1.5">
+          <ImageSquare className="h-4 w-4 opacity-60" weight="regular" aria-hidden="true" />
+          {t('download.actions.skip_images')}
+        </span>
       </label>
 
       <div
