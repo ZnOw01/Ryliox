@@ -36,7 +36,7 @@ function AppHeader() {
       <div className="flex min-w-0 items-center justify-between gap-3 sm:gap-4">
         <div className="flex min-w-0 items-center gap-2.5 sm:gap-4">
           <div className="relative flex-none">
-            <div className="grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-br from-primary to-primary-foreground text-xl font-bold tracking-tight text-primary-foreground shadow-md select-none sm:h-12 sm:w-12 sm:rounded-2xl sm:text-2xl">
+            <div className="grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-br from-primary to-primary-foreground text-xl font-heading font-extrabold tracking-tight text-primary-foreground shadow-md select-none sm:h-12 sm:w-12 sm:rounded-2xl sm:text-2xl">
               R
             </div>
             <span
@@ -46,7 +46,7 @@ function AppHeader() {
             <span className="sr-only">{t('app.status.active')}</span>
           </div>
           <div className="min-w-0">
-            <h1 className="truncate text-lg font-bold leading-tight tracking-tight text-foreground sm:text-2xl md:text-3xl">
+            <h1 className="font-heading truncate text-lg font-bold leading-tight tracking-tight text-foreground sm:text-2xl md:text-3xl">
               {t('app.title')}
             </h1>
             <p className="mt-0.5 truncate text-[10px] leading-tight text-muted-foreground sm:text-xs sm:mt-1">

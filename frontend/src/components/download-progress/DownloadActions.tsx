@@ -5,11 +5,9 @@ import { useTranslation } from 'react-i18next';
 type DownloadActionsProps = {
   active: boolean;
   cancelPending: boolean;
-  canForceReconnect: boolean;
   formatsDisabled: boolean;
   invalidFormatWithChapterSelection: boolean;
   onCancel: () => void;
-  onForceReconnect: () => void;
   onSkipImagesChange: (value: boolean) => void;
   onStart: () => void;
   selectedBook: boolean;
@@ -22,11 +20,9 @@ type DownloadActionsProps = {
 export function DownloadActions({
   active,
   cancelPending,
-  canForceReconnect,
   formatsDisabled,
   invalidFormatWithChapterSelection,
   onCancel,
-  onForceReconnect,
   onSkipImagesChange,
   onStart,
   selectedBook,
@@ -117,17 +113,6 @@ export function DownloadActions({
             </>
           )}
         </button>
-
-        {canForceReconnect ? (
-          <button
-            type="button"
-            onClick={onForceReconnect}
-            className="mobile-full min-h-touch inline-flex w-full items-center justify-center gap-2 rounded-lg border border-warning bg-warning/10 px-4 py-3 text-sm font-semibold text-warning-foreground transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-warning/20 sm:col-span-2 sm:py-2"
-          >
-            <ArrowClockwise className="h-5 w-5 sm:h-4 sm:w-4" weight="regular" aria-hidden="true" />
-            <span>{t('download.actions.reconnect')}</span>
-          </button>
-        ) : null}
       </div>
 
       {startDisabledReason ? (

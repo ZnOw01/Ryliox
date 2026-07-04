@@ -93,7 +93,7 @@ export function ProgressStatus({ currentLabel, progress, progressPercent }: Prog
       </div>
 
       <div
-        className="h-3 overflow-hidden rounded-full bg-muted shadow-inner"
+        className="h-3 overflow-hidden rounded-full bg-neutral-200 dark:bg-neutral-800 shadow-inner"
         role="progressbar"
         aria-label={t('download.progress.aria_label')}
         aria-valuemin={0}

@@ -6,9 +6,11 @@ import { FormatSelector } from './download-progress/FormatSelector';
 import { ProgressStatus } from './download-progress/ProgressStatus';
 import { SseStatusBadge } from './download-progress/SseStatusBadge';
 import { cn } from '../lib/cn';
-import { DownloadSimple, BookOpen, Warning } from '@phosphor-icons/react';
+import { DownloadSimple, BookOpen, Warning, ArrowClockwise } from '@phosphor-icons/react';
 import { OptimizedFadeIn } from './motion/OptimizedAppear';
 import { useTranslation } from 'react-i18next';
+import { useMemo } from 'react';
+import { parseApiError } from '../lib/api-error';
 
 export function DownloadProgressCard() {
   const { t } = useTranslation();
@@ -18,6 +20,35 @@ export function DownloadProgressCard() {
   const chapters = manager.chaptersQuery.data?.chapters ?? [];
   // Formats that can only download the full book (e.g. epub) cannot use chapter selection
   const chapterSelectable = !manager.bookOnlyFormats.has(manager.format);
+
+  const errors = useMemo(() => {
+    return [
+      manager.formatsQuery.error,
+      manager.chaptersQuery.error,
+      manager.progressQuery.error,
+      manager.startMutation.error,
+      manager.cancelMutation.error,
+    ].filter(Boolean);
+  }, [
+    manager.formatsQuery.error,
+    manager.chaptersQuery.error,
+    manager.progressQuery.error,
+    manager.startMutation.error,
+    manager.cancelMutation.error,
+  ]);
+
+  const uniqueErrorMessages = useMemo(() => {
+    const messages = new Set<string>();
+    const unique: unknown[] = [];
+    errors.forEach(err => {
+      const parsed = parseApiError(err);
+      if (!messages.has(parsed.message)) {
+        messages.add(parsed.message);
+        unique.push(err);
+      }
+    });
+    return unique;
+  }, [errors]);
 
   return (
     <OptimizedFadeIn direction="up" delay={150}>
@@ -37,7 +68,20 @@ export function DownloadProgressCard() {
                 {t('download.title')}
               </h2>
             </div>
-            <SseStatusBadge status={manager.sseStatus} />
+            <div className="flex items-center gap-2">
+              <SseStatusBadge status={manager.sseStatus} />
+              {canForceReconnect ? (
+                <button
+                  type="button"
+                  onClick={manager.forceReconnect}
+                  className="rounded-full border border-warning/30 bg-warning/10 hover:bg-warning/20 px-2.5 py-0.5 text-xs font-semibold text-warning-foreground transition-all flex items-center gap-1 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-warning"
+                  title={t('download.sse.reconnect')}
+                >
+                  <ArrowClockwise className="h-3 w-3" weight="bold" />
+                  <span>Reintentar</span>
+                </button>
+              ) : null}
+            </div>
           </div>
 
           <div className="mb-4 grid gap-4 @md:grid-cols-2">
@@ -53,7 +97,7 @@ export function DownloadProgressCard() {
                   'mobile-full w-full min-w-0 truncate rounded-lg border px-3 py-2.5 text-sm leading-tight transition-colors',
                   manager.selectedBook
                     ? 'border-input bg-muted text-foreground'
-                    : 'border-border bg-muted/50 text-muted-foreground italic'
+                    : 'border-border bg-muted/50 text-neutral-500 dark:text-neutral-400 font-medium'
                 )}
               >
                 {manager.selectedBook ? manager.selectedBook.title : t('download.book.placeholder')}
@@ -80,7 +124,7 @@ export function DownloadProgressCard() {
 
           <ChapterSelector
             chapters={chapters}
-            error={manager.chaptersQuery.error}
+            error={null}
             hasData={Boolean(manager.chaptersQuery.data)}
             isLoading={manager.chaptersLoading}
             isFetching={manager.chaptersRefreshing}
@@ -117,16 +161,11 @@ export function DownloadProgressCard() {
             active={manager.active}
             invalidFormatWithChapterSelection={manager.invalidFormatWithChapterSelection}
             formatsDisabled={manager.formatsDisabled}
-            canForceReconnect={canForceReconnect}
-            onForceReconnect={manager.forceReconnect}
           />
 
-          {manager.formatsQuery.error ? <ErrorNotice error={manager.formatsQuery.error} /> : null}
-          {manager.progressQuery.error ? <ErrorNotice error={manager.progressQuery.error} /> : null}
-          {manager.startMutation.error ? <ErrorNotice error={manager.startMutation.error} /> : null}
-          {manager.cancelMutation.error ? (
-            <ErrorNotice error={manager.cancelMutation.error} />
-          ) : null}
+          {uniqueErrorMessages.map((err, idx) => (
+            <ErrorNotice key={idx} error={err} />
+          ))}
 
           <ProgressStatus
             currentLabel={manager.currentLabel}

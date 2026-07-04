@@ -51,8 +51,8 @@
   --radius-xl: calc(var(--radius) * 1.4);
 
   /* Font families */
-  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
-  --font-heading: 'Outfit', sans-serif;
+  --font-sans: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-heading: 'Lora', Georgia, serif;
   --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
 
   /* Animation timing */

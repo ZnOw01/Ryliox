@@ -407,7 +407,13 @@ export function EnhancedEmptyState({
           animate={{ scale: 1, opacity: 1 }}
           transition={{ delay: 0.1, type: 'spring', stiffness: 200 }}
         >
-          <IllustrationComponent className="h-24 w-24" />
+          <IllustrationComponent
+            className={cn(
+              'h-24 w-24',
+              variant === 'compact' && 'h-14 w-14',
+              variant === 'inline' && 'h-10 w-10'
+            )}
+          />
         </motion.div>
       )}
 
@@ -448,7 +454,7 @@ export function EnhancedEmptyState({
       {/* Título */}
       <motion.h3
         className={cn(
-          'font-semibold text-foreground leading-tight',
+          'font-heading font-semibold text-foreground leading-tight',
           variant === 'default' && 'text-lg',
           variant === 'compact' && 'text-base',
           variant === 'inline' && 'text-sm',
@@ -511,7 +517,7 @@ export function EnhancedEmptyState({
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: 0.3 + i * 0.1 }}
               >
-                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-medium text-primary">
+                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold text-muted-foreground">
                   {i + 1}
                 </span>
                 <span className="text-muted-foreground">{step}</span>

@@ -111,8 +111,31 @@ export function parseApiError(error: unknown): ParsedApiError {
   }
 
   if (error instanceof Error) {
+    let friendlyMessage = error.message;
+    if (error.message.includes('404')) {
+      friendlyMessage = t('errors.not_found_description', {
+        defaultValue:
+          'No se pudo encontrar el recurso solicitado. Verifica los datos e intenta de nuevo.',
+      });
+    } else if (error.message.includes('401') || error.message.includes('403')) {
+      friendlyMessage = t('errors.cookies_required_description');
+    } else if (
+      error.message.includes('503') ||
+      error.message.includes('502') ||
+      error.message.includes('504')
+    ) {
+      friendlyMessage = t('errors.service_unavailable_description', {
+        defaultValue:
+          'El servicio de descarga no está disponible temporalmente. Inténtalo más tarde.',
+      });
+    } else if (
+      error.message.includes('Failed to fetch') ||
+      error.message.includes('NetworkError')
+    ) {
+      friendlyMessage = t('errors.network_description');
+    }
     return {
-      message: error.message,
+      message: friendlyMessage,
       suggestion: t('errors.retry'),
     };
   }

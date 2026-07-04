@@ -257,7 +257,7 @@ export function ChapterSelector({
 
         {/* ── Estado vacío mejorado ── */}
         {!selectedBook ? (
-          <EnhancedEmptyState type="book" variant="compact" className="py-8" />
+          <EnhancedEmptyState type="book" variant="compact" className="py-3" />
         ) : null}
 
         {/* ── Esqueleto de carga ── */}

@@ -553,8 +553,8 @@ export function SearchBooksCard() {
                     className={cn(
                       'min-h-touch cursor-pointer rounded-full border px-3 py-2 text-xs font-medium leading-tight transition focus-within:outline-none focus-within:ring-2 focus-within:ring-ring/50 flex items-center justify-center gap-1.5',
                       checked
-                        ? 'border-primary/40 bg-primary text-primary-foreground shadow-sm'
-                        : 'border-border bg-background text-muted-foreground hover:border-primary/30 hover:bg-accent hover:text-accent-foreground'
+                        ? 'border-foreground/10 bg-foreground text-background shadow-sm'
+                        : 'border-border bg-background text-muted-foreground hover:border-foreground/10 hover:bg-accent hover:text-accent-foreground'
                     )}
                   >
                     <input

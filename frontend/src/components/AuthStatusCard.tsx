@@ -5,9 +5,10 @@ import { useTranslation } from 'react-i18next';
 import { getCookies, getHealth, getStatus, saveCookies } from '../lib/api';
 import { queryKeys } from '../lib/query-keys';
 import { EnhancedEmptyState } from './ui/EnhancedEmptyState';
-import { CopySimple, WarningCircle } from '@phosphor-icons/react';
+import { CopySimple, WarningCircle, Spinner } from '@phosphor-icons/react';
+import { parseApiError } from '../lib/api-error';
 
-type StatusTone = 'green' | 'amber' | 'red';
+type StatusTone = 'green' | 'amber' | 'red' | 'checking';
 
 function formatAuthReason(reason: string | null | undefined, t: (key: string) => string): string {
   if (!reason) {
@@ -34,6 +35,15 @@ function formatUptime(seconds: number): string {
 }
 
 function StatusIcon({ tone }: { tone: StatusTone }) {
+  if (tone === 'checking') {
+    return (
+      <Spinner
+        className="h-3.5 w-3.5 animate-spin text-muted-foreground shrink-0"
+        weight="bold"
+        aria-hidden="true"
+      />
+    );
+  }
   if (tone === 'green') {
     return (
       <svg className="h-3.5 w-3.5 shrink-0" viewBox="0 0 16 16" fill="none" aria-hidden="true">
@@ -143,7 +153,7 @@ export function AuthStatusCard() {
         ? t('auth.status.cookies_loaded')
         : `${t('auth.status.invalid')} (${formatAuthReason(authStatus.reason, t)})`;
   const statusTone: StatusTone = !authStatus
-    ? 'amber'
+    ? 'checking'
     : authStatus.valid
       ? 'green'
       : authStatus.reason === 'network_error' && authStatus.has_cookies
@@ -151,10 +161,12 @@ export function AuthStatusCard() {
         : 'red';
   const badgeClassName =
     statusTone === 'green'
-      ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
-      : statusTone === 'amber'
-        ? 'border-amber-200 bg-amber-50 text-amber-800'
-        : 'border-red-200 bg-red-50 text-red-700';
+      ? 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-800/30 dark:bg-emerald-950/20 dark:text-emerald-400'
+      : statusTone === 'checking'
+        ? 'border-neutral-200 bg-neutral-50 text-neutral-600 dark:border-neutral-800/30 dark:bg-neutral-950/20 dark:text-neutral-400'
+        : statusTone === 'amber'
+          ? 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-800/30 dark:bg-amber-950/20 dark:text-amber-400'
+          : 'border-red-200 bg-red-50 text-red-700 dark:border-red-800/30 dark:bg-red-950/20 dark:text-red-400';
 
   const persistedCookieCount = useMemo(
     () => Object.keys(cookiesQuery.data?.cookies ?? {}).length,
@@ -318,20 +330,28 @@ export function AuthStatusCard() {
           role="alert"
           aria-live="assertive"
         >
-          <WarningCircle className="mt-0.5 h-4 w-4 shrink-0" weight="regular" aria-hidden="true" />
+          <WarningCircle
+            className="mt-0.5 h-4 w-4 shrink-0 text-destructive-foreground"
+            weight="regular"
+            aria-hidden="true"
+          />
           <span>
-            {t('auth.service.unavailable')}: {(healthQuery.error as Error).message}
+            {t('auth.service.unavailable')}: {parseApiError(healthQuery.error).message}
           </span>
         </div>
       ) : null}
-      {statusQuery.error ? (
+      {statusQuery.error && !healthQuery.error ? (
         <div
           className="mb-4 flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive-foreground"
           role="alert"
           aria-live="assertive"
         >
-          <WarningCircle className="mt-0.5 h-4 w-4 shrink-0" weight="regular" aria-hidden="true" />
-          <span>{(statusQuery.error as Error).message}</span>
+          <WarningCircle
+            className="mt-0.5 h-4 w-4 shrink-0 text-destructive-foreground"
+            weight="regular"
+            aria-hidden="true"
+          />
+          <span>{parseApiError(statusQuery.error).message}</span>
         </div>
       ) : null}
       {sessionHealthy && persistedCookieCount > 0 && !shouldShowCookieEditor ? (
@@ -371,6 +391,14 @@ export function AuthStatusCard() {
             >
               {t('auth.cookies.label')}
             </label>
+            <a
+              href="https://github.com/ZnOw01/Ryliox#obtener-cookies"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-primary hover:underline"
+            >
+              ¿Cómo obtenerlas?
+            </a>
             {cookiesText.trim() ? (
               <div className="flex gap-1">
                 <button
