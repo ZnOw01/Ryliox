@@ -198,7 +198,7 @@ export function AuthStatusCard() {
 
   if (sessionHealthy && !shouldShowCookieEditor && !isExpanded) {
     return (
-      <section className="soft-rise min-w-0 flex-shrink-0 self-start overflow-hidden rounded-2xl border border-border bg-card p-4 shadow-panel backdrop-blur-sm w-full">
+      <section className="premium-card min-w-0 flex-shrink-0 self-start overflow-hidden p-4 w-full">
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-2.5 min-w-0">
             <span className="relative flex h-2.5 w-2.5">
@@ -225,7 +225,7 @@ export function AuthStatusCard() {
   }
 
   return (
-    <section className="soft-rise min-w-0 flex-shrink-0 self-start overflow-hidden rounded-2xl border border-border bg-card p-5 shadow-panel backdrop-blur-sm">
+    <section className="premium-card min-w-0 flex-shrink-0 self-start overflow-hidden p-5">
       <div className="mb-4 flex min-w-0 flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <h2 className="text-lg font-semibold leading-tight text-foreground">{t('auth.title')}</h2>

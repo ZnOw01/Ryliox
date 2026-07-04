@@ -32,7 +32,7 @@ function AppHeader() {
   const { t } = useTranslation();
 
   return (
-    <header className="safe-area-top sticky-header soft-rise relative rounded-2xl border border-border bg-card/80 px-4 py-3 shadow-panel backdrop-blur-header sm:px-6 sm:py-4 before:pointer-events-none before:absolute before:inset-x-0 before:bottom-0 before:h-px before:bg-gradient-to-r before:from-transparent before:via-primary/20 before:to-transparent">
+    <header className="safe-area-top relative py-4 sm:py-6">
       <div className="flex min-w-0 items-center justify-between gap-3 sm:gap-4">
         <div className="flex min-w-0 items-center gap-2.5 sm:gap-4">
           <div className="relative flex-none">

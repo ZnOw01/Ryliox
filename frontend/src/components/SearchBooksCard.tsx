@@ -385,7 +385,7 @@ export function SearchBooksCard() {
     <OptimizedFadeIn direction="up" delay={50}>
       <section
         id="search-section"
-        className="soft-rise flex min-w-0 scroll-mt-28 flex-col overflow-visible rounded-2xl border border-border bg-card shadow-panel backdrop-blur-sm"
+        className="premium-card flex min-w-0 scroll-mt-28 flex-col overflow-visible"
       >
         <div className="flex-shrink-0 p-4 sm:p-5">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">

@@ -23,7 +23,7 @@ export function DownloadProgressCard() {
     <OptimizedFadeIn direction="up" delay={150}>
       <section
         id="download-section"
-        className="soft-rise flex min-w-0 scroll-mt-28 flex-col overflow-visible rounded-2xl border border-border bg-card/90 shadow-panel backdrop-blur-sm"
+        className="premium-card flex min-w-0 scroll-mt-28 flex-col overflow-visible"
       >
         <div className="flex flex-col p-4 sm:p-5">
           <div className="mb-4 flex flex-shrink-0 flex-wrap items-center justify-between gap-3">

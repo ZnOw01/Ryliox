@@ -191,14 +191,17 @@ export function ProgressStatus({ currentLabel, progress, progressPercent }: Prog
         ) : null}
 
         {revealTargets.length > 0 ? (
-          <div className="mt-4 rounded-lg border border-border bg-muted px-4 py-4">
+          <div className="mt-4 rounded-2xl border border-border/30 bg-muted/30 px-4 py-4">
             <div className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               <FolderOpen className="h-4 w-4" weight="regular" aria-hidden="true" />
               {t('download.progress.files_generated')}
             </div>
             <div className="space-y-3">
               {revealTargets.map(path => (
-                <div key={path} className="rounded-lg border border-border bg-background px-3 py-3">
+                <div
+                  key={path}
+                  className="rounded-xl border border-border/25 bg-background/50 px-3 py-3"
+                >
                   <div className="flex flex-col gap-1">
                     <span className="text-[10px] font-semibold uppercase tracking-wider text-primary">
                       {getFriendlyTypeName(path, t)}
