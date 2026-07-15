@@ -72,6 +72,7 @@ class _RateLimiter:
         self.window_seconds = max(1, int(window_seconds))
         self._requests: defaultdict[tuple[str, str], list[float]] = defaultdict(list)
         self._lock = threading.Lock()
+        self._last_cleanup = time.monotonic()
 
     def is_allowed(self, client_ip: str, endpoint: str) -> bool:
         now = time.monotonic()
@@ -79,6 +80,9 @@ class _RateLimiter:
         key = (client_ip, endpoint)
 
         with self._lock:
+            if now - self._last_cleanup >= self.window_seconds:
+                self._clear_old_entries(cutoff)
+                self._last_cleanup = now
             timestamps = [ts for ts in self._requests[key] if ts > cutoff]
             if len(timestamps) >= self.max_requests:
                 self._requests[key] = timestamps
@@ -91,15 +95,19 @@ class _RateLimiter:
     def clear_old_entries(self) -> None:
         cutoff = time.monotonic() - self.window_seconds
         with self._lock:
-            stale_keys = []
-            for key, timestamps in self._requests.items():
-                fresh = [ts for ts in timestamps if ts > cutoff]
-                if fresh:
-                    self._requests[key] = fresh
-                else:
-                    stale_keys.append(key)
-            for key in stale_keys:
-                self._requests.pop(key, None)
+            self._clear_old_entries(cutoff)
+            self._last_cleanup = time.monotonic()
+
+    def _clear_old_entries(self, cutoff: float) -> None:
+        stale_keys = []
+        for key, timestamps in self._requests.items():
+            fresh = [ts for ts in timestamps if ts > cutoff]
+            if fresh:
+                self._requests[key] = fresh
+            else:
+                stale_keys.append(key)
+        for key in stale_keys:
+            self._requests.pop(key, None)
 
 
 def _client_ip(request: Request) -> str:

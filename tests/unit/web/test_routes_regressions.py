@@ -6,6 +6,7 @@ from types import SimpleNamespace
 import pytest
 from fastapi.testclient import TestClient
 
+from web.routes.downloads import _normalize_progress_snapshot
 from web.server import create_app
 
 pytestmark = pytest.mark.unit
@@ -197,3 +198,22 @@ def test_browse_output_dir_supports_synchronous_system_plugin(
 
     assert response.status_code == 200
     assert response.json() == {"path": str(selected_dir), "cancelled": False}
+
+
+def test_progress_error_does_not_expose_internal_trace_path():
+    payload = _normalize_progress_snapshot(
+        {
+            "job_id": "job-1",
+            "book_id": "book-1",
+            "status": "error",
+            "error": "failed",
+            "trace_log": "/app/data/logs/private.log",
+            "details": {
+                "trace_log": "/app/data/logs/private.log",
+                "reason": "render failed",
+            },
+        }
+    )
+
+    assert "trace_log" not in payload
+    assert payload["details"] == {"reason": "render failed"}

@@ -83,6 +83,13 @@ def _coerce_non_negative_int(value: Any) -> int | None:
     return parsed
 
 
+def _public_error_details(value: Any) -> dict[str, Any] | None:
+    if not isinstance(value, dict):
+        return None
+    public = {key: detail for key, detail in value.items() if key != "trace_log"}
+    return public or None
+
+
 def _normalize_progress_snapshot(snapshot: dict[str, Any] | None) -> dict[str, Any]:
     """Convierte un snapshot crudo del queue en un dict compatible con ProgressResponse."""
     if not isinstance(snapshot, dict):
@@ -119,10 +126,7 @@ def _normalize_progress_snapshot(snapshot: dict[str, Any] | None) -> dict[str, A
             "status": "cancelled",
             "error": _coerce_str(snapshot.get("error")) or "Download cancelled by user",
             "code": _coerce_str(snapshot.get("code")),
-            "details": (
-                snapshot.get("details") if isinstance(snapshot.get("details"), dict) else None
-            ),
-            "trace_log": _coerce_str(snapshot.get("trace_log")),
+            "details": _public_error_details(snapshot.get("details")),
         }
 
     if raw_status == "error":
@@ -132,10 +136,7 @@ def _normalize_progress_snapshot(snapshot: dict[str, Any] | None) -> dict[str, A
             "status": "error",
             "error": _coerce_str(snapshot.get("error")) or fallback,
             "code": _coerce_str(snapshot.get("code")),
-            "details": (
-                snapshot.get("details") if isinstance(snapshot.get("details"), dict) else None
-            ),
-            "trace_log": _coerce_str(snapshot.get("trace_log")),
+            "details": _public_error_details(snapshot.get("details")),
         }
 
     percentage = max(0, min(100, _coerce_int(snapshot.get("percentage")) or 0))
