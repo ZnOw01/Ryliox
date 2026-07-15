@@ -1,5 +1,5 @@
 import { cn } from '../../lib/cn';
-import { Play, X, ArrowClockwise, ImageSquare, Spinner, Warning } from '@phosphor-icons/react';
+import { Play, X, ImageOff, Loader2, Info } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 type DownloadActionsProps = {
@@ -68,7 +68,7 @@ export function DownloadActions({
           aria-describedby="skip-images-desc"
         />
         <span id="skip-images-desc" className="inline-flex items-center gap-1.5">
-          <ImageSquare className="h-4 w-4 opacity-60" weight="regular" aria-hidden="true" />
+          <ImageOff className="h-4 w-4 opacity-60" strokeWidth={1.75} aria-hidden="true" />
           {t('download.actions.skip_images')}
         </span>
       </label>
@@ -83,13 +83,13 @@ export function DownloadActions({
           onClick={onStart}
           aria-describedby={startDisabledReason ? 'start-disabled-reason' : undefined}
           disabled={startDisabled}
-          className="mobile-full min-h-touch inline-flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground shadow-sm transition hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 sm:py-2"
+          className="mobile-full min-h-touch inline-flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:border disabled:border-gray-200 disabled:bg-gray-200 disabled:text-gray-400 disabled:shadow-none disabled:cursor-not-allowed disabled:opacity-100 sm:py-2"
         >
           {startPending ? (
             <>
-              <Spinner
+              <Loader2
                 className="h-4 w-4 animate-spin sm:h-3.5 sm:w-3.5"
-                weight="bold"
+                strokeWidth={2.5}
                 aria-hidden="true"
               />
               <span>{t('download.actions.starting')}</span>
@@ -98,7 +98,7 @@ export function DownloadActions({
             <>
               <Play
                 className="h-5 w-5 fill-current sm:h-4 sm:w-4"
-                weight="fill"
+                strokeWidth={1.75}
                 aria-hidden="true"
               />
               <span>{t('download.actions.start')}</span>
@@ -110,20 +110,20 @@ export function DownloadActions({
           type="button"
           onClick={onCancel}
           disabled={!active || cancelPending}
-          className="mobile-full min-h-touch inline-flex w-full items-center justify-center gap-2 rounded-lg border border-border bg-background px-4 py-3 text-sm font-semibold text-foreground transition hover:border-destructive/30 hover:bg-destructive/5 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60 sm:py-2"
+          className="mobile-full min-h-touch inline-flex w-full items-center justify-center gap-2 rounded-lg border border-gray-200 bg-background px-4 py-3 text-sm font-semibold text-gray-900 transition hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:bg-gray-200 disabled:text-gray-400 disabled:shadow-none disabled:hover:border-gray-200 disabled:hover:bg-gray-200 disabled:hover:text-gray-400 disabled:cursor-not-allowed disabled:opacity-100 sm:py-2"
         >
           {cancelPending ? (
             <>
-              <Spinner
+              <Loader2
                 className="h-4 w-4 animate-spin sm:h-3.5 sm:w-3.5"
-                weight="bold"
+                strokeWidth={2.5}
                 aria-hidden="true"
               />
               <span>{t('download.actions.cancelling')}</span>
             </>
           ) : (
             <>
-              <X className="h-5 w-5 sm:h-4 sm:w-4" weight="regular" aria-hidden="true" />
+              <X className="h-5 w-5 sm:h-4 sm:w-4" strokeWidth={1.75} aria-hidden="true" />
               <span>{t('download.actions.cancel')}</span>
             </>
           )}
@@ -132,12 +132,12 @@ export function DownloadActions({
 
       {startDisabledReason ? (
         <div id="start-disabled-reason" className="mb-4 flex items-start gap-1.5" role="status">
-          <Warning
-            className="mt-0.5 h-4 w-4 shrink-0 text-warning"
-            weight="regular"
+          <Info
+            className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground"
+            strokeWidth={1.75}
             aria-hidden="true"
           />
-          <p className="text-xs text-warning-foreground">{startDisabledReason}</p>
+          <p className="text-xs text-muted-foreground">{startDisabledReason}</p>
         </div>
       ) : null}
     </>

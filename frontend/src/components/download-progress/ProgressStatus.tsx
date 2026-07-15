@@ -5,10 +5,10 @@ import {
   FileText,
   FolderOpen,
   Copy,
-  WarningCircle,
-  Spinner,
-  CaretRight,
-} from '@phosphor-icons/react';
+  AlertCircle as WarningCircle,
+  Loader2 as Spinner,
+  ChevronRight as CaretRight,
+} from 'lucide-react';
 
 import { revealFile } from '../../lib/api';
 import type { ProgressResponse } from '../../lib/types';
@@ -43,6 +43,14 @@ export function ProgressStatus({ currentLabel, progress, progressPercent }: Prog
       ? `${progress.current_chapter}/${progress.total_chapters}`
       : null;
   const isActive = progress?.status === 'running';
+  const progressToneClass =
+    progress?.status === 'completed'
+      ? 'bg-green-600'
+      : progress?.status === 'error'
+        ? 'bg-red-600'
+        : progress?.status === 'running'
+          ? 'bg-primary'
+          : 'bg-gray-300';
   const revealTargets = [
     ...(progress?.epub ? [progress.epub] : []),
     ...(progress?.pdf ? (Array.isArray(progress.pdf) ? progress.pdf : [progress.pdf]) : []),
@@ -93,7 +101,7 @@ export function ProgressStatus({ currentLabel, progress, progressPercent }: Prog
       </div>
 
       <div
-        className="h-3 overflow-hidden rounded-full bg-neutral-200 dark:bg-neutral-800 shadow-inner"
+        className="h-3 overflow-hidden rounded-full bg-gray-200 dark:bg-neutral-800"
         role="progressbar"
         aria-label={t('download.progress.aria_label')}
         aria-valuemin={0}
@@ -107,7 +115,8 @@ export function ProgressStatus({ currentLabel, progress, progressPercent }: Prog
       >
         <div
           className={cn(
-            'h-full bg-gradient-to-r from-primary to-primary/80 transition-all duration-500 ease-out',
+            'h-full transition-all duration-500 ease-out',
+            progressToneClass,
             isActive && 'progress-bar-active animate-pulse'
           )}
           style={{ width: `${progressPercent}%` }}
@@ -118,22 +127,22 @@ export function ProgressStatus({ currentLabel, progress, progressPercent }: Prog
       <div className="mt-3 space-y-2 text-sm text-foreground">
         {progress?.status === 'completed' ? (
           <div
-            className="flex items-center gap-2 rounded-lg border border-success/30 bg-success/10 px-3 py-2 text-sm font-medium text-success-foreground"
+            className="flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm font-medium text-green-800"
             role="status"
             aria-live="polite"
           >
-            <CheckCircle className="h-4 w-4 shrink-0" weight="regular" aria-hidden="true" />
+            <CheckCircle className="h-4 w-4 shrink-0" strokeWidth={1.75} aria-hidden="true" />
             <span>{t('download.progress.completed_message')}</span>
           </div>
         ) : null}
 
         {typeof progress?.queue_position === 'number' && progress.queue_position > 0 ? (
           <div
-            className="flex items-center gap-2 rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-xs leading-tight text-warning-foreground"
+            className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-tight text-amber-800"
             role="status"
             aria-live="polite"
           >
-            <Clock className="h-4 w-4 shrink-0" weight="regular" aria-hidden="true" />
+            <Clock className="h-4 w-4 shrink-0" strokeWidth={1.75} aria-hidden="true" />
             <span>
               {t('download.progress.queue_position', { position: progress.queue_position })}
             </span>
@@ -142,7 +151,7 @@ export function ProgressStatus({ currentLabel, progress, progressPercent }: Prog
 
         {chapterProgress ? (
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <FileText className="h-4 w-4" weight="regular" aria-hidden="true" />
+            <FileText className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />
             <span>
               {t('download.progress.chapter_label')} {chapterProgress}
               {progress?.chapter_title ? `: ${progress.chapter_title}` : ''}
@@ -191,16 +200,16 @@ export function ProgressStatus({ currentLabel, progress, progressPercent }: Prog
         ) : null}
 
         {revealTargets.length > 0 ? (
-          <div className="mt-4 rounded-2xl border border-border/30 bg-muted/30 px-4 py-4">
+          <div className="mt-4 rounded-lg border border-gray-200 bg-transparent px-4 py-4">
             <div className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              <FolderOpen className="h-4 w-4" weight="regular" aria-hidden="true" />
+              <FolderOpen className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />
               {t('download.progress.files_generated')}
             </div>
             <div className="space-y-3">
               {revealTargets.map(path => (
                 <div
                   key={path}
-                  className="rounded-xl border border-border/25 bg-background/50 px-3 py-3"
+                  className="rounded-lg border border-gray-200 bg-transparent px-3 py-3"
                 >
                   <div className="flex flex-col gap-1">
                     <span className="text-[10px] font-semibold uppercase tracking-wider text-primary">
@@ -225,14 +234,14 @@ export function ProgressStatus({ currentLabel, progress, progressPercent }: Prog
                         <>
                           <Spinner
                             className="h-4 w-4 animate-spin"
-                            weight="bold"
+                            strokeWidth={2.5}
                             aria-hidden="true"
                           />
                           {t('common.opening')}
                         </>
                       ) : (
                         <>
-                          <FolderOpen className="h-4 w-4" weight="regular" aria-hidden="true" />
+                          <FolderOpen className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />
                           {t('download.progress.open_location')}
                         </>
                       )}
@@ -243,7 +252,7 @@ export function ProgressStatus({ currentLabel, progress, progressPercent }: Prog
                       className="inline-flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-xs font-medium text-foreground transition hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       aria-describedby={`file-path-${path}`}
                     >
-                      <Copy className="h-4 w-4" weight="regular" aria-hidden="true" />
+                      <Copy className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />
                       {t('download.progress.copy_path')}
                     </button>
                   </div>
@@ -255,24 +264,24 @@ export function ProgressStatus({ currentLabel, progress, progressPercent }: Prog
 
         {actionMessage ? (
           <div
-            className="flex items-center gap-2 text-xs text-success-foreground"
+            className="flex items-center gap-2 text-xs text-green-700"
             role="status"
             aria-live="polite"
           >
-            <CheckCircle className="h-4 w-4" weight="regular" aria-hidden="true" />
+            <CheckCircle className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />
             {actionMessage}
           </div>
         ) : null}
 
         {actionError ? (
           <div
-            className="flex items-start gap-2 text-xs text-destructive-foreground"
+            className="flex items-start gap-2 text-xs text-red-700"
             role="alert"
             aria-live="assertive"
           >
             <WarningCircle
               className="mt-0.5 h-4 w-4 shrink-0"
-              weight="regular"
+              strokeWidth={1.75}
               aria-hidden="true"
             />
             {actionError}
@@ -282,7 +291,7 @@ export function ProgressStatus({ currentLabel, progress, progressPercent }: Prog
         {hasTechnicalDetails ? (
           <details className="mt-3 rounded-lg border border-border bg-muted px-4 py-3">
             <summary className="flex cursor-pointer items-center gap-2 text-xs font-semibold text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-              <CaretRight className="h-4 w-4" weight="regular" aria-hidden="true" />
+              <CaretRight className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />
               {t('download.progress.technical_details')}
             </summary>
             <div className="mt-3 space-y-2 text-xs text-foreground">
@@ -292,17 +301,17 @@ export function ProgressStatus({ currentLabel, progress, progressPercent }: Prog
                 </p>
               ) : null}
               {progress?.error ? (
-                <p className="text-destructive-foreground">
+                <p className="text-red-700">
                   <span className="font-medium">{t('common.error')}:</span> {progress.error}
                 </p>
               ) : null}
               {progress?.code ? (
-                <p className="text-destructive-foreground">
+                <p className="text-red-700">
                   <span className="font-medium">{t('common.code')}:</span> {progress.code}
                 </p>
               ) : null}
               {progress?.details ? (
-                <pre className="overflow-x-auto whitespace-pre-wrap rounded border border-border bg-background p-3 text-xs leading-relaxed text-destructive-foreground">
+                <pre className="overflow-x-auto whitespace-pre-wrap rounded border border-red-200 bg-red-50 p-3 text-xs leading-relaxed text-red-800">
                   {JSON.stringify(progress.details, null, 2)}
                 </pre>
               ) : null}

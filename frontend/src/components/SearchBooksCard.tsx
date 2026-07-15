@@ -3,17 +3,17 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { motion } from 'framer-motion';
 import {
-  MagnifyingGlass,
+  Search,
+  Search as MagnifyingGlass,
   X,
   BookOpen,
   User,
-  Buildings,
-  Spinner,
+  Building2,
+  Loader2,
   Clock,
-  TextAa,
-  PencilSimple,
-  Buildings as BuildingsIcon,
-} from '@phosphor-icons/react';
+  Type,
+  PenLine,
+} from 'lucide-react';
 
 import { parseApiError } from '../lib/api-error';
 import { getBookChapters, getBookInfo, getFormats, searchBooks } from '../lib/api';
@@ -178,22 +178,22 @@ export function SearchBooksCard() {
       {
         value: 'all' as const,
         label: t('search.scopes.all'),
-        icon: MagnifyingGlass,
+        icon: Search,
       },
       {
         value: 'title' as const,
         label: t('search.scopes.title'),
-        icon: TextAa,
+        icon: Type,
       },
       {
         value: 'author' as const,
         label: t('search.scopes.author'),
-        icon: PencilSimple,
+        icon: PenLine,
       },
       {
         value: 'publisher' as const,
         label: t('search.scopes.publisher'),
-        icon: BuildingsIcon,
+        icon: Building2,
       },
     ],
     [t]
@@ -387,10 +387,10 @@ export function SearchBooksCard() {
         id="search-section"
         className="premium-card flex min-w-0 scroll-mt-28 flex-col overflow-visible"
       >
-        <div className="flex-shrink-0 p-4 sm:p-5">
+        <div className="flex-shrink-0 p-6">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2">
-              <BookOpen className="h-5 w-5 text-primary" weight="regular" aria-hidden="true" />
+              <BookOpen className="h-5 w-5 text-primary" strokeWidth={1.75} aria-hidden="true" />
               <h2 className="text-base font-semibold leading-tight text-foreground sm:text-lg">
                 {t('search.title')}
               </h2>
@@ -407,9 +407,9 @@ export function SearchBooksCard() {
               {t('search.title')}
             </label>
             <div className="relative flex min-w-0 items-center">
-              <MagnifyingGlass
+              <Search
                 className="pointer-events-none absolute left-3 h-4 w-4 text-muted-foreground"
-                weight="regular"
+                strokeWidth={1.75}
                 aria-hidden="true"
               />
               <input
@@ -473,7 +473,7 @@ export function SearchBooksCard() {
                   className="absolute right-10 top-1/2 -translate-y-1/2 rounded p-1 text-muted-foreground transition hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   aria-label={t('search.clear')}
                 >
-                  <X className="h-3.5 w-3.5" weight="regular" aria-hidden="true" />
+                  <X className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden="true" />
                 </button>
               ) : null}
 
@@ -525,7 +525,7 @@ export function SearchBooksCard() {
                   >
                     <Clock
                       className="h-3.5 w-3.5 shrink-0 text-muted-foreground"
-                      weight="regular"
+                      strokeWidth={1.75}
                       aria-hidden="true"
                     />
                     <span className="truncate">{search}</span>
@@ -536,7 +536,7 @@ export function SearchBooksCard() {
           </div>
 
           <fieldset className="mb-0">
-            <legend className="mb-2 block text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            <legend className="mb-2 block text-xs font-medium uppercase tracking-wide text-gray-500">
               {t('search.filter_by')}
             </legend>
             <div
@@ -553,8 +553,8 @@ export function SearchBooksCard() {
                     className={cn(
                       'min-h-touch cursor-pointer rounded-full border px-3 py-2 text-xs font-medium leading-tight transition focus-within:outline-none focus-within:ring-2 focus-within:ring-ring/50 flex items-center justify-center gap-1.5',
                       checked
-                        ? 'border-foreground/10 bg-foreground text-background shadow-sm'
-                        : 'border-border bg-background text-muted-foreground hover:border-foreground/10 hover:bg-accent hover:text-accent-foreground'
+                        ? 'border-gray-900 bg-gray-900 text-white'
+                        : 'border-transparent bg-transparent text-gray-500 hover:border-gray-200 hover:bg-gray-50 hover:text-gray-700'
                     )}
                   >
                     <input
@@ -565,7 +565,7 @@ export function SearchBooksCard() {
                       onChange={() => setScope(item.value)}
                       className="sr-only"
                     />
-                    <Icon className="h-3.5 w-3.5" weight="regular" aria-hidden="true" />
+                    <Icon className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden="true" />
                     {item.label}
                   </label>
                 );
@@ -574,7 +574,7 @@ export function SearchBooksCard() {
           </fieldset>
         </div>
 
-        <div className="px-4 pb-4 sm:px-5 sm:pb-5">
+        <div className="px-6 pb-6">
           {isSearching ? (
             <div className="mb-3 space-y-3">
               <div
@@ -582,7 +582,7 @@ export function SearchBooksCard() {
                 role="status"
                 aria-live="polite"
               >
-                <Spinner className="h-4 w-4 animate-spin" weight="regular" aria-hidden="true" />
+                <Loader2 className="h-4 w-4 animate-spin" strokeWidth={2} aria-hidden="true" />
                 {hasStaleResults ? t('search.updating') : t('search.loading')}
               </div>
               <SearchResultsSkeleton count={3} />
@@ -590,19 +590,17 @@ export function SearchBooksCard() {
           ) : null}
           {parsedError ? (
             <div
-              className="rounded-lg border border-destructive/30 bg-destructive/10 p-3"
+              className="rounded-lg border border-red-200 bg-red-50 p-3"
               role="alert"
               aria-live="assertive"
               aria-atomic="true"
             >
-              <p className="text-sm font-medium text-destructive-foreground">
+              <p className="text-sm font-medium text-red-800">
                 {parsedError.message}
                 {parsedError.code ? ` (${parsedError.code})` : ''}
               </p>
               {parsedError.suggestion ? (
-                <p className="mt-1 text-xs text-destructive-foreground/80">
-                  {parsedError.suggestion}
-                </p>
+                <p className="mt-1 text-xs text-red-700">{parsedError.suggestion}</p>
               ) : null}
             </div>
           ) : null}
@@ -649,10 +647,10 @@ export function SearchBooksCard() {
                           className={cn(
                             'group min-h-touch w-full rounded-xl border p-2.5 sm:p-3 text-left transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-ring/40',
                             isSelected
-                              ? 'border-primary/40 bg-accent shadow-panel-md ring-1 ring-primary/20'
+                              ? 'border-primary/40 bg-accent ring-1 ring-primary/20'
                               : isActive
                                 ? 'border-primary/30 bg-accent/50'
-                                : 'border-border hover:border-primary/40 hover:bg-accent hover:shadow-sm'
+                                : 'border-border hover:border-primary/40 hover:bg-accent'
                           )}
                           whileHover={{ scale: 1.01 }}
                           whileTap={{ scale: 0.99 }}
@@ -686,7 +684,7 @@ export function SearchBooksCard() {
                                   <div className="mt-1 flex min-w-0 items-center gap-1.5">
                                     <User
                                       className="h-3 w-3 shrink-0 text-muted-foreground"
-                                      weight="regular"
+                                      strokeWidth={1.75}
                                       aria-hidden="true"
                                     />
                                     <p className="truncate text-xs text-muted-foreground">
@@ -697,9 +695,9 @@ export function SearchBooksCard() {
 
                                 {book.publishers && book.publishers.length > 0 && (
                                   <div className="flex min-w-0 items-center gap-1.5">
-                                    <Buildings
+                                    <Building2
                                       className="h-3 w-3 shrink-0 text-muted-foreground"
-                                      weight="regular"
+                                      strokeWidth={1.75}
                                       aria-hidden="true"
                                     />
                                     <p className="truncate text-xs text-muted-foreground/80">

@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { getCookies, getHealth, getStatus, saveCookies } from '../lib/api';
 import { queryKeys } from '../lib/query-keys';
 import { EnhancedEmptyState } from './ui/EnhancedEmptyState';
-import { CopySimple, WarningCircle, Spinner } from '@phosphor-icons/react';
+import { Copy, AlertCircle, Loader2 } from 'lucide-react';
 import { parseApiError } from '../lib/api-error';
 
 type StatusTone = 'green' | 'amber' | 'red' | 'checking';
@@ -37,9 +37,9 @@ function formatUptime(seconds: number): string {
 function StatusIcon({ tone }: { tone: StatusTone }) {
   if (tone === 'checking') {
     return (
-      <Spinner
+      <Loader2
         className="h-3.5 w-3.5 animate-spin text-muted-foreground shrink-0"
-        weight="bold"
+        strokeWidth={2.5}
         aria-hidden="true"
       />
     );
@@ -172,6 +172,19 @@ export function AuthStatusCard() {
     () => Object.keys(cookiesQuery.data?.cookies ?? {}).length,
     [cookiesQuery.data?.cookies]
   );
+  const visibleErrors = useMemo(() => {
+    const items = [healthQuery.error, statusQuery.error, cookiesMutation.error].filter(Boolean);
+    const seen = new Set<string>();
+
+    return items.filter(error => {
+      const parsed = parseApiError(error);
+      if (seen.has(parsed.message)) {
+        return false;
+      }
+      seen.add(parsed.message);
+      return true;
+    });
+  }, [healthQuery.error, statusQuery.error, cookiesMutation.error]);
 
   const copyCookiesToClipboard = useCallback(async () => {
     if (!cookiesText.trim()) return;
@@ -210,7 +223,7 @@ export function AuthStatusCard() {
 
   if (sessionHealthy && !shouldShowCookieEditor && !isExpanded) {
     return (
-      <section className="premium-card min-w-0 flex-shrink-0 self-start overflow-hidden p-4 w-full">
+      <section className="premium-card min-w-0 flex-shrink-0 self-start overflow-hidden p-6 w-full">
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-2.5 min-w-0">
             <span className="relative flex h-2.5 w-2.5">
@@ -237,7 +250,7 @@ export function AuthStatusCard() {
   }
 
   return (
-    <section className="premium-card min-w-0 flex-shrink-0 self-start overflow-hidden p-5">
+    <section className="premium-card min-w-0 flex-shrink-0 self-start overflow-hidden p-6">
       <div className="mb-4 flex min-w-0 flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <h2 className="text-lg font-semibold leading-tight text-foreground">{t('auth.title')}</h2>
@@ -324,34 +337,26 @@ export function AuthStatusCard() {
           {t('auth.service.checking')}
         </p>
       ) : null}
-      {healthQuery.error ? (
-        <div
-          className="mb-4 flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive-foreground"
-          role="alert"
-          aria-live="assertive"
-        >
-          <WarningCircle
-            className="mt-0.5 h-4 w-4 shrink-0 text-destructive-foreground"
-            weight="regular"
-            aria-hidden="true"
-          />
-          <span>
-            {t('auth.service.unavailable')}: {parseApiError(healthQuery.error).message}
-          </span>
-        </div>
-      ) : null}
-      {statusQuery.error && !healthQuery.error ? (
-        <div
-          className="mb-4 flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive-foreground"
-          role="alert"
-          aria-live="assertive"
-        >
-          <WarningCircle
-            className="mt-0.5 h-4 w-4 shrink-0 text-destructive-foreground"
-            weight="regular"
-            aria-hidden="true"
-          />
-          <span>{parseApiError(statusQuery.error).message}</span>
+      {visibleErrors.length > 0 ? (
+        <div className="mb-4 space-y-2">
+          {visibleErrors.map(error => {
+            const parsed = parseApiError(error);
+            return (
+              <div
+                key={parsed.message}
+                className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800"
+                role="alert"
+                aria-live="assertive"
+              >
+                <AlertCircle
+                  className="mt-0.5 h-4 w-4 shrink-0 text-red-600"
+                  strokeWidth={1.75}
+                  aria-hidden="true"
+                />
+                <span>{parsed.message}</span>
+              </div>
+            );
+          })}
         </div>
       ) : null}
       {sessionHealthy && persistedCookieCount > 0 && !shouldShowCookieEditor ? (
@@ -386,7 +391,7 @@ export function AuthStatusCard() {
         <div id="cookie-editor">
           <div className="mb-2 flex items-center justify-between gap-2">
             <label
-              className="block text-xs font-medium uppercase tracking-wide text-muted-foreground"
+              className="block text-xs font-medium uppercase tracking-wide text-gray-500"
               htmlFor="cookies-payload"
             >
               {t('auth.cookies.label')}
@@ -416,7 +421,7 @@ export function AuthStatusCard() {
                   title="Copiar al portapapeles"
                   aria-label="Copiar JSON al portapapeles"
                 >
-                  <CopySimple className="h-3.5 w-3.5" weight="regular" aria-hidden="true" />
+                  <Copy className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden="true" />
                 </button>
               </div>
             ) : null}
@@ -427,7 +432,7 @@ export function AuthStatusCard() {
             value={cookiesText}
             onChange={event => setCookiesText(event.target.value)}
             placeholder={t('auth.cookies.placeholder')}
-            className="w-full resize-none overflow-y-auto rounded-lg border border-border bg-background p-3 font-mono text-xs leading-relaxed text-foreground outline-none ring-ring placeholder:text-muted-foreground focus:border-primary focus:ring-2"
+            className="w-full resize-none overflow-y-auto rounded-lg border border-gray-200 bg-background p-3 font-mono text-xs leading-relaxed text-foreground outline-none placeholder:text-gray-500 focus:border-primary focus:ring-2 focus:ring-ring"
             spellCheck={false}
           />
 
@@ -438,7 +443,7 @@ export function AuthStatusCard() {
               type="button"
               onClick={() => cookiesMutation.mutate(cookiesText)}
               disabled={!cookiesText.trim() || cookiesMutation.isPending}
-              className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+              className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400 disabled:shadow-none sm:w-auto"
             >
               {cookiesMutation.isPending ? (
                 <>
@@ -483,17 +488,6 @@ export function AuthStatusCard() {
           </button>
         </div>
       )}
-
-      {cookiesMutation.error ? (
-        <div
-          className="mt-4 flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive-foreground"
-          role="alert"
-          aria-live="assertive"
-        >
-          <WarningCircle className="mt-0.5 h-4 w-4 shrink-0" weight="regular" aria-hidden="true" />
-          <span>{(cookiesMutation.error as Error).message}</span>
-        </div>
-      ) : null}
     </section>
   );
 }

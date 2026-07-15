@@ -6,7 +6,7 @@ import { FormatSelector } from './download-progress/FormatSelector';
 import { ProgressStatus } from './download-progress/ProgressStatus';
 import { SseStatusBadge } from './download-progress/SseStatusBadge';
 import { cn } from '../lib/cn';
-import { DownloadSimple, BookOpen, Warning, ArrowClockwise } from '@phosphor-icons/react';
+import { Download, BookOpen, AlertTriangle, RotateCw } from 'lucide-react';
 import { OptimizedFadeIn } from './motion/OptimizedAppear';
 import { useTranslation } from 'react-i18next';
 import { useMemo } from 'react';
@@ -56,14 +56,10 @@ export function DownloadProgressCard() {
         id="download-section"
         className="premium-card flex min-w-0 scroll-mt-28 flex-col overflow-visible"
       >
-        <div className="flex flex-col p-4 sm:p-5">
+        <div className="flex flex-col p-6">
           <div className="mb-4 flex flex-shrink-0 flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2">
-              <DownloadSimple
-                className="h-5 w-5 text-primary"
-                weight="regular"
-                aria-hidden="true"
-              />
+              <Download className="h-5 w-5 text-primary" strokeWidth={1.75} aria-hidden="true" />
               <h2 className="text-base font-semibold leading-tight text-foreground sm:text-lg">
                 {t('download.title')}
               </h2>
@@ -74,10 +70,10 @@ export function DownloadProgressCard() {
                 <button
                   type="button"
                   onClick={manager.forceReconnect}
-                  className="rounded-full border border-warning/30 bg-warning/10 hover:bg-warning/20 px-2.5 py-0.5 text-xs font-semibold text-warning-foreground transition-all flex items-center gap-1 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-warning"
+                  className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-800 transition hover:bg-amber-100 flex items-center gap-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300"
                   title={t('download.sse.reconnect')}
                 >
-                  <ArrowClockwise className="h-3 w-3" weight="bold" />
+                  <RotateCw className="h-3 w-3" strokeWidth={2.5} />
                   <span>Reintentar</span>
                 </button>
               ) : null}
@@ -87,7 +83,7 @@ export function DownloadProgressCard() {
           <div className="mb-4 grid gap-4 @md:grid-cols-2">
             <div className="min-w-0 text-sm leading-tight">
               <span className="mb-2 flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                <BookOpen className="h-4 w-4" weight="regular" aria-hidden="true" />
+                <BookOpen className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />
                 {t('download.book.label')}
               </span>
               <div
@@ -96,8 +92,8 @@ export function DownloadProgressCard() {
                 className={cn(
                   'mobile-full w-full min-w-0 truncate rounded-lg border px-3 py-2.5 text-sm leading-tight transition-colors',
                   manager.selectedBook
-                    ? 'border-input bg-muted text-foreground'
-                    : 'border-border bg-muted/50 text-neutral-500 dark:text-neutral-400 font-medium'
+                    ? 'border-gray-200 bg-gray-50 text-foreground'
+                    : 'border-gray-200 bg-gray-50 text-gray-500 font-medium'
                 )}
               >
                 {manager.selectedBook ? manager.selectedBook.title : t('download.book.placeholder')}
@@ -139,8 +135,12 @@ export function DownloadProgressCard() {
           />
 
           {manager.invalidFormatWithChapterSelection ? (
-            <div className="mb-4 flex items-start gap-3 rounded-lg border border-warning/30 bg-warning/10 p-4 text-sm leading-tight text-warning-foreground">
-              <Warning className="mt-0.5 h-4 w-4 shrink-0" weight="regular" aria-hidden="true" />
+            <div className="mb-4 flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm leading-tight text-amber-800">
+              <AlertTriangle
+                className="mt-0.5 h-4 w-4 shrink-0"
+                strokeWidth={1.75}
+                aria-hidden="true"
+              />
               <span>
                 {t('download.chapters.not_selectable', {
                   format: manager.format.toUpperCase(),

@@ -76,18 +76,18 @@
   --warning-900: oklch(30% 0.11 80);
   --warning-950: oklch(22% 0.08 80);
 
-  /* Error - Cold Crimson Red */
-  --error-50: oklch(96% 0.02 15);
-  --error-100: oklch(93% 0.04 15);
-  --error-200: oklch(86% 0.08 15);
-  --error-300: oklch(76% 0.13 15);
-  --error-400: oklch(64% 0.18 15);
-  --error-500: oklch(54% 0.22 15);
-  --error-600: oklch(45% 0.21 15);
-  --error-700: oklch(37% 0.18 15);
-  --error-800: oklch(30% 0.15 15);
-  --error-900: oklch(24% 0.12 15);
-  --error-950: oklch(16% 0.08 15);
+  /* Error - Cold Crimson Red, separated from the warm coral brand hue */
+  --error-50: oklch(96% 0.025 358);
+  --error-100: oklch(93% 0.05 358);
+  --error-200: oklch(86% 0.09 358);
+  --error-300: oklch(76% 0.15 358);
+  --error-400: oklch(64% 0.2 358);
+  --error-500: oklch(54% 0.24 358);
+  --error-600: oklch(45% 0.23 358);
+  --error-700: oklch(37% 0.2 358);
+  --error-800: oklch(30% 0.16 358);
+  --error-900: oklch(24% 0.13 358);
+  --error-950: oklch(16% 0.09 358);
 
   /* Info - Ocean Blue */
   --info-50: oklch(97% 0.02 250);

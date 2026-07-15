@@ -40,7 +40,7 @@ function AppHeader() {
               R
             </div>
             <span
-              className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full border-2 border-background bg-emerald-400 shadow-sm sse-pulse sm:h-3 sm:w-3"
+              className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-emerald-400 shadow-sm sse-pulse sm:h-3 sm:w-3"
               aria-hidden="true"
             ></span>
             <span className="sr-only">{t('app.status.active')}</span>
@@ -176,7 +176,7 @@ export default function App() {
             <main id="main-content" tabIndex={-1} className="mt-6 sm:mt-8 @container">
               <AppContent />
             </main>
-            <footer className="pb-2 pt-8 text-center text-xs text-muted-foreground">
+            <footer className="pb-2 pt-8 text-center text-xs text-gray-400">
               {t('app.footer')}
             </footer>
           </motion.div>

@@ -94,11 +94,11 @@
   --secondary: var(--neutral-100);
   --secondary-foreground: var(--text-primary);
   --muted: var(--neutral-100);
-  --muted-foreground: var(--text-tertiary);
+  --muted-foreground: #6b7280;
   --accent: var(--brand-100);
   --accent-foreground: var(--brand-800);
-  --destructive: var(--error-500);
-  --destructive-foreground: var(--text-inverse);
+  --destructive: #dc2626;
+  --destructive-foreground: #991b1b;
   --border: var(--border-default);
   --input: var(--border-default);
   --ring: var(--brand-500);
@@ -115,8 +115,8 @@
   --info-foreground: var(--text-inverse);
 
   /* Success colors */
-  --success: var(--success-500);
-  --success-foreground: var(--text-inverse);
+  --success: #16a34a;
+  --success-foreground: #15803d;
 
   /* Warning colors */
   --warning: var(--warning-500);
@@ -153,11 +153,11 @@
   --secondary: var(--neutral-800);
   --secondary-foreground: var(--text-primary);
   --muted: var(--neutral-800);
-  --muted-foreground: var(--text-secondary);
+  --muted-foreground: #9ca3af;
   --accent: var(--brand-950);
   --accent-foreground: var(--brand-300);
-  --destructive: var(--error-500);
-  --destructive-foreground: var(--text-inverse);
+  --destructive: #f87171;
+  --destructive-foreground: #fecaca;
   --border: var(--border-default);
   --input: var(--border-default);
   --ring: var(--brand-400);
@@ -205,6 +205,7 @@
 
   body {
     @apply bg-background text-foreground;
+    font-family: var(--font-sans);
   }
 
   h1, h2, h3, h4, h5, h6, .font-heading {
@@ -547,21 +548,24 @@ pre {
 
 /* Button & Interactable Enhancements */
 button.bg-primary {
-  background: linear-gradient(135deg, var(--brand-600) 0%, oklch(54% 0.18 20) 100%) !important;
-  box-shadow: 0 4px 12px -2px oklch(var(--brand-500) / 0.25);
+  background: var(--primary) !important;
+  box-shadow: none;
   transition: all 0.35s var(--ease-spring) !important;
 }
 
 button.bg-primary:not(:disabled):hover {
-  transform: translateY(-1.5px) scale(1.02);
-  background: linear-gradient(135deg, var(--brand-500) 0%, var(--brand-600) 100%) !important;
-  box-shadow: 
-    0 8px 20px -4px oklch(var(--brand-500) / 0.4),
-    0 0 12px oklch(var(--brand-500) / 0.2);
+  background: var(--brand-700) !important;
+  box-shadow: none;
 }
 
 button.bg-primary:not(:disabled):active {
   transform: translateY(0.5px) scale(0.98);
+}
+
+button.bg-primary:disabled {
+  background: #e5e7eb !important;
+  color: #9ca3af !important;
+  box-shadow: none !important;
 }
 
 /* Input Wrapper Focus Animations */
@@ -579,9 +583,7 @@ input:focus.border-input {
 .border-primary.bg-primary\/5 {
   background-color: color-mix(in oklch, var(--brand-500) 6%, var(--card)) !important;
   border-color: var(--brand-500) !important;
-  box-shadow: 
-    0 6px 14px -5px oklch(var(--brand-500) / 0.12),
-    inset 0 0 0 1px oklch(var(--brand-500) / 0.08) !important;
+  box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--brand-500) 14%, transparent) !important;
   position: relative;
   overflow: hidden;
 }
@@ -598,38 +600,6 @@ input:focus.border-input {
   box-shadow: 0 0 8px var(--brand-500);
 }
 
-/* Animated Multi-Hue Shimming Progress Bar */
-div[role="progressbar"] > .bg-primary {
-  background: linear-gradient(90deg, var(--brand-500) 0%, oklch(62% 0.22 300) 50%, var(--brand-600) 100%) !important;
-  background-size: 200% 100% !important;
-  animation: progress-shimmer 2.2s linear infinite !important;
-}
-
-@keyframes progress-shimmer {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
-}
-
-/* Glowing Breath Status Indicator */
-.bg-success {
-  position: relative;
-  box-shadow: 0 0 10px oklch(var(--success-500) / 0.6);
-}
-
-.bg-success::after {
-  content: '';
-  position: absolute;
-  inset: -3px;
-  border-radius: 999px;
-  border: 1.5px solid var(--success-500);
-  animation: pulse-ring 1.8s cubic-bezier(0.25, 0, 0.2, 1) infinite;
-}
-
-@keyframes pulse-ring {
-  0% { transform: scale(1); opacity: 1; }
-  100% { transform: scale(2.6); opacity: 0; }
-}
-
 /* Add custom animations to elements */
 .animate-enter {
   animation: enter 0.4s var(--ease-spring) forwards;
@@ -640,30 +610,28 @@ div[role="progressbar"] > .bg-primary {
   to { opacity: 1; transform: translateY(0); }
 }
 
-/* Premium Glassmorphic Cards (removes hard box boundaries) */
+/* Level-1 cards: only the main panels get elevation. */
 .premium-card {
-  border-radius: 1.5rem;
-  border: 1px solid var(--card-border, oklch(0.9 0.01 260 / 0.4));
-  background: var(--card-bg, oklch(1 0 0 / 0.65));
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  box-shadow: 0 8px 32px 0 oklch(0 0 0 / 0.02);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 1rem;
+  border: 1px solid #f3f4f6;
+  background: #fff;
+  box-shadow: 0 10px 30px -24px oklch(20% 0.03 260 / 0.35);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .dark .premium-card {
-  --card-border: oklch(0.3 0.03 260 / 0.25);
-  --card-bg: oklch(0.15 0.02 260 / 0.45);
-  box-shadow: 0 8px 32px 0 oklch(0 0 0 / 0.2);
+  border-color: oklch(28% 0.03 260);
+  background: var(--card);
+  box-shadow: 0 10px 30px -22px oklch(0% 0 0 / 0.55);
 }
 
 .premium-card:hover {
-  border-color: var(--card-border-hover, oklch(0.85 0.02 260 / 0.5));
-  box-shadow: 0 12px 40px 0 oklch(0 0 0 / 0.04);
+  border-color: #e5e7eb;
+  box-shadow: 0 14px 34px -26px oklch(20% 0.03 260 / 0.45);
 }
 
 .dark .premium-card:hover {
-  --card-border-hover: oklch(0.35 0.04 260 / 0.35);
-  box-shadow: 0 12px 40px 0 oklch(0 0 0 / 0.25);
+  border-color: oklch(35% 0.035 260);
+  box-shadow: 0 14px 34px -24px oklch(0% 0 0 / 0.65);
 }
 

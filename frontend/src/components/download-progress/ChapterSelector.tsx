@@ -2,11 +2,11 @@ import {
   CheckSquare,
   FileText,
   Info,
-  Rows,
-  Spinner,
+  Rows3 as Rows,
+  Loader2 as Spinner,
   Square,
-  MagnifyingGlass,
-} from '@phosphor-icons/react';
+  Search as MagnifyingGlass,
+} from 'lucide-react';
 import { motion } from 'framer-motion';
 import React, { memo, useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -56,7 +56,7 @@ const ChapterRow = memo(function ChapterRow({
       >
         <FileText
           className="h-4 w-4 shrink-0 text-muted-foreground"
-          weight="regular"
+          strokeWidth={1.75}
           aria-hidden="true"
         />
         <span className="block min-w-0 truncate text-sm leading-tight text-muted-foreground">
@@ -93,7 +93,7 @@ const ChapterRow = memo(function ChapterRow({
         animate={checked ? { scale: [1, 1.15, 1] } : { scale: 1 }}
         transition={{ type: 'spring', stiffness: 500, damping: 30 }}
       >
-        <CheckSquare className="h-3.5 w-3.5" weight="regular" aria-hidden="true" />
+        <CheckSquare className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden="true" />
       </motion.div>
       <input
         type="checkbox"
@@ -205,14 +205,14 @@ export function ChapterSelector({
   return (
     <OptimizedFadeIn direction="up" delay={100}>
       <div
-        className="mb-4 overflow-hidden rounded-2xl border border-border/30 bg-muted/30"
+        className="mb-4 overflow-hidden rounded-lg border border-gray-200 bg-transparent"
         role="region"
         aria-label={ariaLabel || t('download.chapters.aria_label')}
       >
         {/* ── Encabezado ── */}
-        <div className="flex min-w-0 flex-wrap items-center justify-between gap-3 border-b border-border/25 bg-background/25 px-4 py-3">
+        <div className="flex min-w-0 flex-wrap items-center justify-between gap-3 border-b border-gray-100 bg-transparent px-4 py-3">
           <div className="flex items-center gap-2">
-            <Rows className="h-4 w-4 text-muted-foreground" weight="regular" aria-hidden="true" />
+            <Rows className="h-4 w-4 text-muted-foreground" strokeWidth={1.75} aria-hidden="true" />
             <p
               className="text-sm font-semibold leading-tight text-foreground"
               id="chapter-selector-heading"
@@ -241,15 +241,15 @@ export function ChapterSelector({
         {/* ── Aviso de libro completo ── */}
         {!selectable && (
           <div
-            className="flex items-start gap-3 border-b border-border bg-info/10 px-4 py-3"
+            className="flex items-start gap-3 border-b border-gray-100 bg-blue-50 px-4 py-3"
             role="note"
           >
             <Info
-              className="mt-0.5 h-4 w-4 shrink-0 text-info"
-              weight="regular"
+              className="mt-0.5 h-4 w-4 shrink-0 text-blue-600"
+              strokeWidth={1.75}
               aria-hidden="true"
             />
-            <p className="text-xs leading-relaxed text-info-foreground">
+            <p className="text-xs leading-relaxed text-blue-800">
               {t('download.chapters.full_book_notice')}
             </p>
           </div>
@@ -257,14 +257,14 @@ export function ChapterSelector({
 
         {/* ── Estado vacío mejorado ── */}
         {!selectedBook ? (
-          <EnhancedEmptyState type="book" variant="compact" className="py-3" />
+          <EnhancedEmptyState type="book" variant="compact" steps={[]} className="py-3" />
         ) : null}
 
         {/* ── Esqueleto de carga ── */}
         {selectedBook && isLoading ? (
           <div className="space-y-3 p-4" role="status" aria-live="polite" aria-busy="true">
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <Spinner className="h-4 w-4 animate-spin" weight="bold" aria-hidden="true" />
+              <Spinner className="h-4 w-4 animate-spin" strokeWidth={2.5} aria-hidden="true" />
               {t('download.chapters.loading')}
             </div>
             <div className="space-y-2">
@@ -280,7 +280,7 @@ export function ChapterSelector({
             role="status"
             aria-live="polite"
           >
-            <Spinner className="h-4 w-4 animate-spin" weight="bold" aria-hidden="true" />
+            <Spinner className="h-4 w-4 animate-spin" strokeWidth={2.5} aria-hidden="true" />
             {t('download.chapters.updating')}
           </div>
         ) : null}
@@ -290,25 +290,25 @@ export function ChapterSelector({
           <>
             {/* Controles avanzados para PDF */}
             {selectable && (
-              <div className="border-b border-border bg-card/50 p-3 space-y-3">
+              <div className="border-b border-gray-100 bg-transparent p-3 space-y-3">
                 {/* Botones de acción principales */}
                 <div className="grid gap-2 sm:grid-cols-2">
                   <button
                     type="button"
                     onClick={onSelectAll}
                     disabled={chapters.length === 0 || isLoading}
-                    className="mobile-full min-h-touch inline-flex items-center justify-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-xs font-semibold text-foreground transition hover:border-primary/30 hover:bg-primary/5 hover:text-primary disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    className="mobile-full min-h-touch inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-background px-3 py-2 text-xs font-semibold text-gray-900 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   >
-                    <CheckSquare className="h-4 w-4" weight="regular" aria-hidden="true" />
+                    <CheckSquare className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />
                     {t('download.chapters.select_all')}
                   </button>
                   <button
                     type="button"
                     onClick={onClear}
                     disabled={selectedChapterIndexes.length === 0 || isLoading}
-                    className="mobile-full min-h-touch inline-flex items-center justify-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-xs font-semibold text-foreground transition hover:border-primary/30 hover:bg-primary/5 hover:text-primary disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    className="mobile-full min-h-touch inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-background px-3 py-2 text-xs font-semibold text-gray-900 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   >
-                    <Square className="h-4 w-4" weight="regular" aria-hidden="true" />
+                    <Square className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />
                     {t('download.chapters.clear_selection')}
                   </button>
                 </div>
@@ -324,10 +324,10 @@ export function ChapterSelector({
                       placeholder={t('download.chapters.search_placeholder', {
                         defaultValue: 'Buscar capítulo...',
                       })}
-                      className="min-h-touch w-full rounded-lg border border-input bg-background pl-8 pr-8 py-2 text-xs text-foreground outline-none transition focus:border-primary/70 focus:ring-1 focus:ring-primary/20"
+                      className="min-h-touch w-full rounded-lg border border-gray-200 bg-background pl-8 pr-8 py-2 text-xs text-foreground outline-none transition placeholder:text-gray-500 focus:border-primary focus:ring-2 focus:ring-ring"
                     />
                     <div className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground">
-                      <MagnifyingGlass className="h-3.5 w-3.5" weight="bold" />
+                      <MagnifyingGlass className="h-3.5 w-3.5" strokeWidth={2.5} />
                     </div>
                     {filterQuery && (
                       <button
@@ -349,7 +349,7 @@ export function ChapterSelector({
                       placeholder="De"
                       min="1"
                       max={chapters.length}
-                      className="w-14 rounded-lg border border-input bg-background px-2 py-2 text-xs text-center text-foreground outline-none transition focus:border-primary focus:ring-1 focus:ring-primary/20"
+                      className="w-14 rounded-lg border border-gray-200 bg-background px-2 py-2 text-xs text-center text-foreground outline-none transition placeholder:text-gray-500 focus:border-primary focus:ring-2 focus:ring-ring"
                     />
                     <span className="text-xs text-muted-foreground">-</span>
                     <input
@@ -359,13 +359,13 @@ export function ChapterSelector({
                       placeholder="A"
                       min="1"
                       max={chapters.length}
-                      className="w-14 rounded-lg border border-input bg-background px-2 py-2 text-xs text-center text-foreground outline-none transition focus:border-primary focus:ring-1 focus:ring-primary/20"
+                      className="w-14 rounded-lg border border-gray-200 bg-background px-2 py-2 text-xs text-center text-foreground outline-none transition placeholder:text-gray-500 focus:border-primary focus:ring-2 focus:ring-ring"
                     />
                     <button
                       type="button"
                       onClick={handleApplyRange}
                       disabled={rangeStart === '' || rangeEnd === ''}
-                      className="rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground hover:bg-primary/95 disabled:opacity-50 transition"
+                      className="rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground transition hover:bg-primary/90 disabled:bg-gray-200 disabled:text-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     >
                       Rango
                     </button>
@@ -373,7 +373,7 @@ export function ChapterSelector({
                 </div>
 
                 {/* Presets */}
-                <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-border/30">
+                <div className="flex flex-wrap items-center gap-2 border-t border-gray-100 pt-1">
                   <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground mr-1">
                     Presets:
                   </span>
@@ -419,7 +419,7 @@ export function ChapterSelector({
 
             {/* Mostrar botón para expandir/colapsar en EPUB/HTML */}
             {!selectable && chapters.length > 3 && (
-              <div className="flex justify-center p-2.5 border-t border-border bg-card">
+              <div className="flex justify-center border-t border-gray-100 bg-transparent p-2.5">
                 <button
                   type="button"
                   onClick={() => setShowAllChapters(!showAllChapters)}

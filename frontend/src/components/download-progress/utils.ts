@@ -123,14 +123,13 @@ export function renderOutputPath(value: string | string[] | null | undefined) {
 
 export function sseStatusClass(status: SseStatus): string {
   if (status === 'connected') {
-    return 'border-success/30 bg-success/10 text-success-foreground';
+    return 'border-green-200 bg-green-50 text-green-800';
   }
   if (status === 'error') {
-    // Paused/disconnected SSE is not a critical error — use neutral amber instead of red
-    return 'border-warning/30 bg-warning/10 text-warning-foreground';
+    return 'border-gray-200 bg-gray-50 text-gray-600';
   }
   if (status === 'reconnecting') {
-    return 'border-warning/30 bg-warning/10 text-warning-foreground';
+    return 'border-amber-200 bg-amber-50 text-amber-800';
   }
-  return 'border-border bg-muted text-muted-foreground';
+  return 'border-gray-200 bg-gray-50 text-gray-600';
 }

@@ -64,6 +64,12 @@ function getUserFriendlyMessage(error: ApiError | Record<string, unknown>): stri
     return error.message;
   }
 
+  if (typeof error.error === 'string' && /request failed with status\s+404/i.test(error.error)) {
+    return t('errors.not_found_description', {
+      defaultValue: 'No se pudo conectar con el servicio. Verifica tus cookies e intenta de nuevo.',
+    });
+  }
+
   return typeof error.error === 'string' ? error.error : t('errors.unknown_description');
 }
 
@@ -115,7 +121,7 @@ export function parseApiError(error: unknown): ParsedApiError {
     if (error.message.includes('404')) {
       friendlyMessage = t('errors.not_found_description', {
         defaultValue:
-          'No se pudo encontrar el recurso solicitado. Verifica los datos e intenta de nuevo.',
+          'No se pudo conectar con el servicio. Verifica tus cookies e intenta de nuevo.',
       });
     } else if (error.message.includes('401') || error.message.includes('403')) {
       friendlyMessage = t('errors.cookies_required_description');

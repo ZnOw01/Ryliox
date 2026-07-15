@@ -35,7 +35,7 @@ export function FormatSelector({
     <div className="min-w-0 text-sm leading-tight">
       <label
         htmlFor={selectId}
-        className="mb-2 block text-xs font-medium uppercase tracking-wide text-muted-foreground"
+        className="mb-2 block text-xs font-medium uppercase tracking-wide text-gray-500"
       >
         {t('download.format.label')}
       </label>
@@ -49,7 +49,7 @@ export function FormatSelector({
         aria-label={ariaLabel || t('download.format.aria_label')}
         aria-describedby={helperId}
         disabled={disabled}
-        className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm leading-tight text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-muted disabled:text-neutral-500 dark:disabled:text-neutral-400"
+        className="w-full rounded-lg border border-gray-200 bg-background px-3 py-2.5 text-sm leading-tight text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500"
       >
         {isLoading ? <option value="">{t('download.format.loading')}</option> : null}
         {!isLoading && formats.length === 0 ? (

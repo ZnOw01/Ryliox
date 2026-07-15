@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Moon, Sun, Desktop } from '@phosphor-icons/react';
+import { Moon, Sun, Monitor } from 'lucide-react';
 
 type Theme = 'light' | 'dark' | 'system';
 
@@ -80,7 +80,7 @@ export function ThemeToggle() {
         className="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-background text-muted-foreground"
         aria-label={t('theme.loading')}
       >
-        <Sun className="h-4 w-4 opacity-50" weight="regular" />
+        <Sun className="h-4 w-4 opacity-50" strokeWidth={1.75} />
       </button>
     );
   }
@@ -88,12 +88,12 @@ export function ThemeToggle() {
   const getThemeIcon = () => {
     switch (theme) {
       case 'dark':
-        return <Moon className="h-4 w-4" weight="regular" aria-hidden="true" />;
+        return <Moon className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />;
       case 'system':
-        return <Desktop className="h-4 w-4" weight="regular" aria-hidden="true" />;
+        return <Monitor className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />;
       case 'light':
       default:
-        return <Sun className="h-4 w-4" weight="regular" aria-hidden="true" />;
+        return <Sun className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />;
     }
   };
 
