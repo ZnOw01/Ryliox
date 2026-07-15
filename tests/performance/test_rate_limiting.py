@@ -279,6 +279,7 @@ class TestDatabasePerformance:
     def test_session_store_performance(self, base_url: str):
         """Test session store read/write performance."""
         times = []
+        statuses = []
 
         # Multiple save operations
         for i in range(30):
@@ -290,12 +291,13 @@ class TestDatabasePerformance:
             )
             elapsed = time.time() - start
             times.append(elapsed)
+            statuses.append(response.status_code)
 
             # Accept 200 or 429 (rate limited)
             assert response.status_code in [200, 429]
 
         # Calculate avg of successful requests only
-        successful_times = [t for t, r in zip(times, [200] * 30) if True]  # Simplified
+        successful_times = [elapsed for elapsed, code in zip(times, statuses) if code == 200]
         if successful_times:
             avg_time = statistics.mean(successful_times)
             assert avg_time < 0.3, f"Session save average {avg_time}s exceeds 300ms"

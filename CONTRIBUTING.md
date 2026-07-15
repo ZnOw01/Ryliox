@@ -63,13 +63,19 @@ Formato: `<type>(<scope>): <subject>`
 
 ```bash
 # Python
-pytest
-
-# Suite completa
-uv run python -m pytest tests -q --timeout=60
+uv sync --frozen --extra dev
+uv run ruff check .
+uv run ruff format --check .
+uv run mypy
+uv run pytest
 
 # Frontend
-cd frontend && bun install --frozen-lockfile && bun run typecheck && bunx vitest run && bun run build
+cd frontend
+bun install --frozen-lockfile
+bun run typecheck
+bun run test
+bun run format:check
+bun run build
 ```
 
 ---

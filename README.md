@@ -7,8 +7,8 @@
 
 Export books from the O'Reilly Learning Platform to EPUB or PDF through a
 single local web app. Ryliox combines a FastAPI backend, an Astro/React
-frontend, a persistent download queue, live progress streaming, and hardened
-local session storage.
+frontend, a persistent download queue, live progress streaming, and local
+session storage.
 
 Ryliox is designed for personal and educational use. Read the
 [Disclaimer](#disclaimer) before using it.
@@ -48,6 +48,11 @@ docker compose up -d
 ```
 
 Open `http://localhost:8000`.
+
+The Compose port is bound to `127.0.0.1` intentionally. Ryliox does not
+authenticate clients of its own API, and the cookie-management endpoint can
+return stored O'Reilly cookie values to the local UI. Do not expose port 8000
+to a LAN or the public internet without an authenticating reverse proxy.
 
 ### Local
 
@@ -95,6 +100,10 @@ Cookie storage is SQLite-first:
 - `data/cookies.json` is only a legacy import path.
 - Once SQLite has cookies, editing `data/cookies.json` will not override them.
 
+`data/session.sqlite3` is not encrypted. Protect the local account, filesystem,
+backups, and Docker volume that contain it. Deleting cookies from the UI or the
+database does not revoke an O'Reilly session already copied elsewhere.
+
 ## Development
 
 Install Python dependencies:
@@ -109,8 +118,7 @@ Backend checks:
 uv run ruff format --check .
 uv run ruff check .
 uv run mypy
-uv run pytest tests/unit -q
-uv run pytest tests/contract tests/integration -q
+uv run pytest
 ```
 
 Frontend checks:
@@ -119,6 +127,7 @@ Frontend checks:
 cd frontend
 bun run typecheck
 bun run test
+bun run format:check
 bun run build
 ```
 

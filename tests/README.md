@@ -43,9 +43,6 @@ uv run pytest
 # Faster, fail-fast loop
 uv run pytest -x --tb=short -q
 
-# Coverage
-uv run pytest --cov=core --cov=plugins --cov=utils --cov=web --cov-report=term-missing
-
 # Opt-in suites
 uv sync --extra e2e
 uv run pytest tests/e2e -m e2e
@@ -67,3 +64,6 @@ Security, performance, and e2e suites are opt-in because they may require extra
 dependencies, a live server, browser tooling, or slower runtime flags. Unit,
 contract, and focused integration tests should pass without external network
 access.
+
+Line coverage is not currently configured. Do not report a coverage percentage
+until `pytest-cov` (and frontend coverage) are declared and run in CI.

@@ -221,8 +221,7 @@ class TestBookSearchFlow:
 
                     # Should show no results message
                     no_results = page.locator("text=/no results|empty|not found/i").first
-                    # Or results area is empty
-                    assert no_results.is_visible() or True  # Pass if we got this far without error
+                    assert no_results.is_visible()
 
             finally:
                 context.close()
