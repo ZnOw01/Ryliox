@@ -22,6 +22,8 @@ RUN bun run build
 # -----------------------------------------------------------------------------
 FROM python:${PYTHON_VERSION}-slim AS builder
 
+COPY --from=ghcr.io/astral-sh/uv:0.11.28 /uv /uvx /bin/
+
 ENV VIRTUAL_ENV=/opt/venv \
     UV_PROJECT_ENVIRONMENT=/opt/venv \
     PATH="/opt/venv/bin:${PATH}" \
@@ -38,11 +40,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         libffi-dev \
         pkg-config \
         shared-mime-info \
-        curl \
-    && curl -LsSf https://astral.sh/uv/install.sh | sh \
     && rm -rf /var/lib/apt/lists/*
-
-ENV PATH="/root/.local/bin:${PATH}"
 
 WORKDIR /app
 
