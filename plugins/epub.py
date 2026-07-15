@@ -46,11 +46,10 @@ class EpubPlugin(Plugin):
         epub_name = sanitize_filename(book_info.get("title", book_info["id"]))
         epub_path = output_dir / f"{epub_name}.epub"
         self._create_epub_zip(output_dir, epub_path)
-        self._cleanup_build_artifacts(output_dir)
 
         return epub_path
 
-    def _cleanup_build_artifacts(self, output_dir: Path) -> None:
+    def cleanup_build_artifacts(self, output_dir: Path) -> None:
         """Remove intermediate EPUB build files after ZIP creation."""
         artifacts = [
             output_dir / "mimetype",
@@ -153,12 +152,18 @@ class EpubPlugin(Plugin):
                 f'    <item id="css{i:02d}" href="Styles/Style{i:02d}.css" media-type="text/css"/>'
             )
 
-        cover_image_id = None
-        if cover_image:
-            cover_image_id = f"img_{Path(cover_image).stem}"
-
         images_dir = oebps / "Images"
         used_img_ids: set[str] = set()
+        cover_image_id = None
+        if cover_image and (images_dir / cover_image).is_file():
+            cover_path = images_dir / cover_image
+            cover_image_id = f"img_{cover_path.stem}"
+            used_img_ids.add(cover_image_id)
+            manifest_items.append(
+                f'    <item id="{cover_image_id}" href="Images/{html.escape(cover_path.name, quote=True)}" '
+                f'media-type="{self._get_image_media_type(cover_path.suffix)}" properties="cover-image"/>'
+            )
+
         if images_dir.exists():
             for img_file in images_dir.iterdir():
                 img_id = f"img_{img_file.stem}"
@@ -168,11 +173,8 @@ class EpubPlugin(Plugin):
                     img_id = f"{img_id}_{img_file.suffix.lstrip('.')}"
                 used_img_ids.add(img_id)
                 media_type = self._get_image_media_type(img_file.suffix)
-                properties = ""
-                if cover_image_id and img_id == cover_image_id:
-                    properties = ' properties="cover-image"'
                 manifest_items.append(
-                    f'    <item id="{img_id}" href="Images/{html.escape(img_file.name, quote=True)}" media-type="{media_type}"{properties}/>'
+                    f'    <item id="{img_id}" href="Images/{html.escape(img_file.name, quote=True)}" media-type="{media_type}"/>'
                 )
 
         spine_items = []

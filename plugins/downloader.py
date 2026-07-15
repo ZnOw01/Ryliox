@@ -117,6 +117,8 @@ class EpubPluginProtocol(Protocol):
         cover_image: str | None = None,
     ) -> Path: ...
 
+    def cleanup_build_artifacts(self, output_dir: Path) -> None: ...
+
 
 class PdfPluginProtocol(Protocol):
     def generate(
@@ -329,10 +331,11 @@ class DownloaderPlugin(Plugin):
         report("fetching_chapters", 10)
         all_chapters = await chapters_plugin.fetch_list(book_id)
 
-        # Filter chapters if selection provided; verify the indexes match.
-        # Must come AFTER the fetch so we know the real chapter count, but we
-        # do it before creating the output directory so a bad selection aborts
-        # cleanly without leaving half-written files.
+        toc = await chapters_plugin.fetch_toc(book_id)
+        reorder = getattr(chapters_plugin, "reorder_by_toc", None)
+        if callable(reorder):
+            all_chapters = reorder(all_chapters, toc)
+
         if selected_chapters is not None:
             selected_set = set(selected_chapters)
             if not selected_set.issubset(range(len(all_chapters))):
@@ -340,16 +343,6 @@ class DownloaderPlugin(Plugin):
             chapters = [ch for i, ch in enumerate(all_chapters) if i in selected_set]
         else:
             chapters = all_chapters
-
-        toc = await chapters_plugin.fetch_toc(book_id)
-        reorder = getattr(chapters_plugin, "reorder_by_toc", None)
-        if callable(reorder):
-            all_chapters = reorder(all_chapters, toc)
-            if selected_chapters is not None:
-                selected_set = set(selected_chapters)
-                chapters = [ch for i, ch in enumerate(all_chapters) if i in selected_set]
-            else:
-                chapters = all_chapters
 
         # Create output directory
         book_dir = output_plugin.create_book_dir(
@@ -396,6 +389,11 @@ class DownloaderPlugin(Plugin):
             )
 
             filename = ch["filename"].replace(".html", ".xhtml")
+            file_path = (oebps / filename).resolve()
+            try:
+                file_path.relative_to(oebps.resolve())
+            except ValueError as exc:
+                raise ValueError(f"Chapter filename escapes output directory: {filename}") from exc
             depth = filename.count("/")
             path_prefix = "../" * depth if depth > 0 else ""
 
@@ -414,7 +412,6 @@ class DownloaderPlugin(Plugin):
             css_refs = [f"{path_prefix}Styles/Style{j:02d}.css" for j in range(len(all_css_urls))]
             xhtml = html_processor.wrap_xhtml(processed, css_refs, ch["title"])
 
-            file_path = oebps / filename
             file_path.parent.mkdir(parents=True, exist_ok=True)
             file_path.write_text(xhtml, encoding="utf-8")
 
@@ -533,10 +530,19 @@ class DownloaderPlugin(Plugin):
                 )
                 result.files["pdf"] = str(pdf_path)
 
+        if "epub" in formats:
+            cleanup = getattr(epub_plugin, "cleanup_build_artifacts", None)
+            if callable(cleanup):
+                cleanup(book_dir)
+
         report("completed", 100)
         return result
 
     def _cleanup_on_cancel(self, book_dir: Path) -> None:
-        """Clean up partially downloaded book on cancellation."""
-        if book_dir.exists():
-            shutil.rmtree(book_dir)
+        """Remove build-only artifacts without deleting completed outputs."""
+        for artifact_name in ("mimetype", "META-INF", "OEBPS"):
+            artifact = book_dir / artifact_name
+            if artifact.is_file():
+                artifact.unlink()
+            elif artifact.is_dir():
+                shutil.rmtree(artifact)

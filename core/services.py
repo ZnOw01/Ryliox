@@ -343,6 +343,9 @@ class DownloadQueueService:
                 # their own timeout (30s) and the user can cancel via the UI.
                 result = runner.run(run_download())
 
+            if self._check_and_signal_cancel(job.job_id, cancel_event):
+                raise RuntimeError("Download cancelled by user")
+
             if result.files.get("pdf"):
                 pdf_paths = result.files["pdf"]
             else:
@@ -356,7 +359,8 @@ class DownloadQueueService:
                 chapters_count=result.chapters_count,
             )
 
-            self._repository.mark_completed(job.job_id, result_dto)
+            if not self._repository.mark_completed(job.job_id, result_dto):
+                raise RuntimeError("Download job could not transition to completed")
             self._notify_progress_change()
             logger.info("Job %s completed successfully", job.job_id[:8])
 

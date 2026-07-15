@@ -698,6 +698,8 @@ class DownloadJobRepository:
                         finished_at = ?,
                         updated_at = ?
                     WHERE job_id = ?
+                      AND cancel_requested = 0
+                      AND status NOT IN ('completed', 'error', 'cancelled')
                     """,
                 (
                     db_data["status"],
