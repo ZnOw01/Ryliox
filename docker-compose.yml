@@ -17,14 +17,12 @@ services:
     restart: unless-stopped
 
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
 
     environment:
-      RYLIOX_ENV: development
-      HOST: 0.0.0.0
-      PORT: "8000"
-      DATA_DIR: /app/data
-      OUTPUT_DIR: /app/output
+      SECURITY: '{"environment":"development"}'
+      SERVER: '{"host":"0.0.0.0","port":8000}'
+      PATHS: '{"data_dir":"/app/data","output_dir":"/app/output"}'
       PYTHONDONTWRITEBYTECODE: "1"
       PYTHONUNBUFFERED: "1"
       PYTHONDEVMODE: "1"

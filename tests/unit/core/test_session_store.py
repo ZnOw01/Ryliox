@@ -116,3 +116,14 @@ def test_session_store_has_cookies_ignores_invalid_legacy_file(tmp_path):
     )
 
     assert store.has_cookies() is False
+
+
+def test_session_store_does_not_count_expired_cookies(tmp_path):
+    store = SessionStore(
+        db_path=tmp_path / "session.sqlite3",
+        legacy_cookies_file=tmp_path / "legacy-cookies.json",
+    )
+    store.save_cookies([{"name": "expired", "value": "old", "expires": 1}])
+
+    assert store.count_stored_cookies() == 0
+    assert store.has_cookies() is False

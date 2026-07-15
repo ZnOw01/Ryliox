@@ -54,6 +54,7 @@ class HttpClient:
         self._cookies_file = cookies_file or config.COOKIES_FILE
         self._allowed_hosts = allowed_hosts or self._resolve_default_hosts()
         self._auth_cookies: dict[str, str] = {}
+        self._auth_cookie_records: list[dict[str, Any]] = []
         self._client: httpx.AsyncClient | None = None
         self._owns_client: bool = False
         self.last_request_time: float = 0.0
@@ -88,6 +89,7 @@ class HttpClient:
             )
             self._owns_client = True
         self._load_cookies(self._cookies_file)
+        self._apply_auth_cookies()
         return self
 
     async def __aexit__(self, *_exc: object) -> None:
@@ -121,6 +123,11 @@ class HttpClient:
                     legacy_cookies_file=config.COOKIES_FILE,
                 ).load_cookie_records(migrate_legacy=True)
                 if records:
+                    self._auth_cookie_records = [
+                        dict(record)
+                        for record in records
+                        if not self._is_akamai_cookie(str(record["name"]))
+                    ]
                     self._auth_cookies = {
                         str(record["name"]): str(record["value"])
                         for record in records
@@ -139,8 +146,13 @@ class HttpClient:
             return
         if isinstance(cookies, dict):
             self._auth_cookies = {k: v for k, v in cookies.items() if not self._is_akamai_cookie(k)}
+            self._auth_cookie_records = [
+                {"name": name, "value": value, "domain": None, "path": "/"}
+                for name, value in self._auth_cookies.items()
+            ]
         elif isinstance(cookies, list):
             converted: dict[str, str] = {}
+            cookie_records: list[dict[str, Any]] = []
             for entry in cookies:
                 if not isinstance(entry, dict):
                     continue
@@ -148,7 +160,9 @@ class HttpClient:
                 value = entry.get("value")
                 if name and not self._is_akamai_cookie(str(name)):
                     converted[str(name)] = str(value or "")
+                    cookie_records.append(dict(entry))
             self._auth_cookies = converted
+            self._auth_cookie_records = cookie_records
 
     def _is_akamai_cookie(self, name: str) -> bool:
         return name.startswith(self._AKAMAI_COOKIE_PREFIXES)
@@ -156,6 +170,7 @@ class HttpClient:
     def reload_cookies(self) -> None:
         """Clear cookies and reload from disk. Sync for use from the route layer."""
         self._auth_cookies = {}
+        self._auth_cookie_records = []
         self._load_cookies(self._cookies_file)
 
     def _apply_auth_cookies(self) -> None:
@@ -163,6 +178,13 @@ class HttpClient:
             return
         jar = self._client.cookies
         jar.clear()
+        if self._auth_cookie_records:
+            for record in self._auth_cookie_records:
+                cookie_args = {"path": str(record.get("path") or "/")}
+                if record.get("domain"):
+                    cookie_args["domain"] = str(record["domain"])
+                jar.set(str(record["name"]), str(record["value"]), **cookie_args)
+            return
         for name, value in self._auth_cookies.items():
             jar.set(name, value)
 
@@ -220,11 +242,33 @@ class HttpClient:
                 db_path=config.SESSION_DB_FILE,
                 legacy_cookies_file=config.COOKIES_FILE,
             )
-            merged = store.get_cookies()
-            merged.update(self._auth_cookies)
-            for name in expired_names:
-                merged.pop(name, None)
-            store.save_cookies(merged)
+            merged = {
+                (
+                    str(record["name"]),
+                    str(record.get("domain") or ""),
+                    str(record.get("path") or "/"),
+                ): record
+                for record in store.get_cookie_records()
+            }
+            for record in captured:
+                key = (
+                    str(record["name"]),
+                    str(record.get("domain") or ""),
+                    str(record.get("path") or "/"),
+                )
+                if not record.get("domain"):
+                    merged = {
+                        existing_key: existing
+                        for existing_key, existing in merged.items()
+                        if existing_key[0] != str(record["name"])
+                    }
+                else:
+                    merged.pop((str(record["name"]), "", key[2]), None)
+                if record["name"] in expired_names:
+                    merged.pop(key, None)
+                else:
+                    merged[key] = record
+            store.save_cookies(list(merged.values()))
         except Exception as exc:
             logger.warning("Failed to persist refreshed cookies: %s", exc)
 

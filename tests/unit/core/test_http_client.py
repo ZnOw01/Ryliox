@@ -69,6 +69,10 @@ async def test_http_client_loads_domain_and_path_specific_cookies(tmp_path):
     async with client as c:
         assert c.client is not None
         assert c._owns_client is True
+        scoped = [cookie for cookie in c.client.cookies.jar if cookie.name == "test"]
+        assert len(scoped) == 1
+        assert scoped[0].domain == "example.com"
+        assert scoped[0].path == "/"
 
 
 @pytest.mark.asyncio
@@ -144,3 +148,42 @@ async def test_http_client_persists_refreshed_set_cookie(monkeypatch, tmp_path):
         "orm-jwt": "new-token",
         "orm-rt": "refresh-token",
     }
+
+
+@pytest.mark.asyncio
+async def test_http_client_preserves_unmodified_cookie_scope_on_refresh(monkeypatch, tmp_path):
+    db_path = tmp_path / "session.sqlite3"
+    cookies_file = tmp_path / "cookies.json"
+    monkeypatch.setattr(config, "SESSION_DB_FILE", db_path)
+    monkeypatch.setattr(config, "COOKIES_FILE", cookies_file)
+    store = SessionStore(db_path=db_path, legacy_cookies_file=cookies_file)
+    store.save_cookies(
+        [
+            {
+                "name": "orm-rt",
+                "value": "refresh-token",
+                "domain": "learning.oreilly.com",
+                "path": "/library",
+                "secure": True,
+            }
+        ]
+    )
+
+    async with HttpClient() as client:
+        request = httpx.Request("GET", f"{config.BASE_URL}/profile/")
+
+        async def fake_get(url: str, **_kwargs):
+            return httpx.Response(
+                200,
+                headers={"set-cookie": "orm-jwt=new-token; Path=/; HttpOnly; Secure"},
+                request=request,
+            )
+
+        client.client.get = fake_get  # type: ignore[method-assign]
+        await client.get("/profile/")
+
+    records = store.get_cookie_records()
+    refresh = next(record for record in records if record["name"] == "orm-rt")
+    assert refresh["domain"] == "learning.oreilly.com"
+    assert refresh["path"] == "/library"
+    assert refresh["secure"] is True

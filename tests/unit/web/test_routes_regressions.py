@@ -23,6 +23,19 @@ class DummyKernel:
         return self._plugins[name]
 
 
+class SyncSystemPlugin:
+    def __init__(self, *, selected_dir: Path | None = None) -> None:
+        self.selected_dir = selected_dir
+        self.revealed_path: Path | None = None
+
+    def reveal_in_file_manager(self, path: Path) -> bool:
+        self.revealed_path = path
+        return True
+
+    def show_folder_picker(self, _current: Path) -> Path | None:
+        return self.selected_dir
+
+
 def _build_client(
     monkeypatch: pytest.MonkeyPatch, *, kernel: DummyKernel | None = None, queue=None
 ):
@@ -118,7 +131,7 @@ def test_browse_output_dir_validates_before_persisting(
         get_default_dir=lambda: tmp_path,
     )
 
-    async def fake_show_folder_picker(_current):
+    def fake_show_folder_picker(_current):
         return str(tmp_path / "picked")
 
     system = SimpleNamespace(show_folder_picker=fake_show_folder_picker)
@@ -139,3 +152,48 @@ def test_browse_output_dir_validates_before_persisting(
 
     assert response.status_code == 400
     assert response.json()["code"] == "invalid_output_dir"
+
+
+def test_reveal_supports_synchronous_system_plugin(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    revealed_file = tmp_path / "book.epub"
+    revealed_file.touch()
+    system = SyncSystemPlugin()
+    kernel = DummyKernel(system=system)
+    monkeypatch.setattr("web.routes.system.config.OUTPUT_DIR", tmp_path)
+
+    with _build_client(monkeypatch, kernel=kernel) as client:
+        response = client.post(
+            "/api/reveal",
+            json={"path": str(revealed_file)},
+            headers={"origin": "http://testserver"},
+        )
+
+    assert response.status_code == 200
+    assert response.json()["success"] is True
+    assert system.revealed_path == revealed_file.resolve()
+
+
+def test_browse_output_dir_supports_synchronous_system_plugin(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+):
+    selected_dir = tmp_path / "picked"
+    selected_dir.mkdir()
+    system = SyncSystemPlugin(selected_dir=selected_dir)
+    kernel = DummyKernel(
+        system=system,
+        output=SimpleNamespace(
+            validate_dir=lambda path: (True, "ok", Path(path)),
+            get_default_dir=lambda: tmp_path,
+        ),
+    )
+    monkeypatch.setattr("web.routes.system.config.OUTPUT_DIR", tmp_path)
+
+    with _build_client(monkeypatch, kernel=kernel) as client:
+        response = client.post(
+            "/api/settings/output-dir",
+            json={"browse": True},
+            headers={"origin": "http://testserver"},
+        )
+
+    assert response.status_code == 200
+    assert response.json() == {"path": str(selected_dir), "cancelled": False}

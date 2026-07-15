@@ -62,7 +62,7 @@ ENV VIRTUAL_ENV=/opt/venv \
     PORT=8000 \
     DATA_DIR=/app/data \
     OUTPUT_DIR=/app/output \
-    RYLIOX_ENV=production
+    SECURITY={"environment":"production"}
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
         libpango-1.0-0 \

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import shutil
 import threading
@@ -443,7 +444,7 @@ async def reveal_file(
         )
 
     system_plugin = kernel["system"]
-    if not await system_plugin.reveal_in_file_manager(path):
+    if not await asyncio.to_thread(system_plugin.reveal_in_file_manager, path):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail={"error": "Failed to reveal file", "code": ErrorCode.REVEAL_FAILED},
@@ -465,7 +466,7 @@ async def set_output_dir(
     output_plugin = kernel["output"]
 
     if data.browse:
-        selected = await system_plugin.show_folder_picker(config.OUTPUT_DIR)
+        selected = await asyncio.to_thread(system_plugin.show_folder_picker, config.OUTPUT_DIR)
         if selected:
             # Validar igual que path manual
             success, message, path = output_plugin.validate_dir(selected)

@@ -94,7 +94,7 @@ async def save_cookies(
             },
         )
 
-    previous_cookies = session_store.get_cookies()
+    previous_cookies = session_store.get_cookie_records()
 
     try:
         session_store.save_cookies(payload)

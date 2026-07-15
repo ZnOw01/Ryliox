@@ -415,11 +415,14 @@ class SessionStore:
 
     def count_stored_cookies(self) -> int:
         row: sqlite3.Row | None = None
+        now = time.time()
         with self._lock:
             try:
                 with self._connection() as conn:
                     row = conn.execute(
-                        "SELECT COUNT(*) AS total FROM session_cookie_records"
+                        """SELECT COUNT(*) AS total FROM session_cookie_records
+                        WHERE expires IS NULL OR expires > ?""",
+                        (now,),
                     ).fetchone()
             except sqlite3.Error:
                 return 0
