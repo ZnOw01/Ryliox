@@ -101,10 +101,7 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["core", "plugins", "utils", "web", "launcher"]
-include = [
-    "config.py",
-    "main.py",
-]
+force-include = { "config.py" = "config.py", "main.py" = "main.py" }
 exclude = [
     "tests",
     "frontend",

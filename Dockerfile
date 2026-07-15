@@ -1,19 +1,29 @@
 # =============================================================================
 # Ryliox - Production Dockerfile
 # =============================================================================
-# Multi-stage build: builder (deps) + runtime (minimal).
-# The frontend is pre-built outside this Dockerfile (e.g. via `bun run build`
-# in `frontend/`) and the `frontend/dist` directory is COPY'd in.
+# Multi-stage build: frontend + Python dependencies + minimal runtime.
 # =============================================================================
 
 ARG PYTHON_VERSION=3.11
 
 # -----------------------------------------------------------------------------
-# Stage 1: Builder — install Python dependencies in an isolated venv
+# Stage 1: Frontend builder
+# -----------------------------------------------------------------------------
+FROM oven/bun:1.3.11 AS frontend-builder
+
+WORKDIR /app/frontend
+COPY frontend/package.json frontend/bun.lock ./
+RUN bun install --frozen-lockfile
+COPY frontend/ ./
+RUN bun run build
+
+# -----------------------------------------------------------------------------
+# Stage 2: Builder — install Python dependencies in an isolated venv
 # -----------------------------------------------------------------------------
 FROM python:${PYTHON_VERSION}-slim AS builder
 
 ENV VIRTUAL_ENV=/opt/venv \
+    UV_PROJECT_ENVIRONMENT=/opt/venv \
     PATH="/opt/venv/bin:${PATH}" \
     UV_LINK_MODE=copy \
     PYTHONDONTWRITEBYTECODE=1 \
@@ -43,7 +53,7 @@ COPY . .
 RUN uv sync --frozen --no-dev
 
 # -----------------------------------------------------------------------------
-# Stage 2: Runtime — minimal image with non-root user
+# Stage 3: Runtime — minimal image with non-root user
 # -----------------------------------------------------------------------------
 FROM python:${PYTHON_VERSION}-slim AS runtime
 
@@ -87,9 +97,7 @@ RUN mkdir -p ${DATA_DIR}/logs ${OUTPUT_DIR} \
 # Copy the venv and the application code from the builder
 COPY --from=builder --chown=${APP_USER}:${APP_USER} /opt/venv /opt/venv
 COPY --from=builder --chown=${APP_USER}:${APP_USER} /app /app
-
-# Pre-built frontend is expected to be copied in by docker-compose or a local build.
-# COPY --chown=${APP_USER}:${APP_USER} frontend/dist ./frontend/dist
+COPY --from=frontend-builder --chown=${APP_USER}:${APP_USER} /app/frontend/dist /app/frontend/dist
 
 USER ${APP_USER}
 
