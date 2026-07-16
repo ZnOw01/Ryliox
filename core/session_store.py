@@ -12,11 +12,72 @@ from contextlib import closing, contextmanager
 from pathlib import Path
 from typing import Any
 
+from cryptography.fernet import Fernet, InvalidToken, MultiFernet
+from platformdirs import user_config_path
+
 import config
 
 logger = logging.getLogger(__name__)
 
 CookieRecord = dict[str, Any]
+_ENCRYPTED_PREFIX = "fernet:v1:"
+
+
+class SessionEncryptionError(RuntimeError):
+    """Raised when persisted cookies cannot be encrypted or decrypted safely."""
+
+
+class _CookieCipher:
+    def __init__(self) -> None:
+        settings = config.SETTINGS.session
+        primary = settings.encryption_key
+        key_file = settings.encryption_key_file
+        if primary is None and key_file is not None:
+            path = Path(key_file).expanduser()
+            if not path.is_file():
+                raise SessionEncryptionError(f"Session encryption key file does not exist: {path}")
+            primary = path.read_text(encoding="ascii").strip()
+
+        if primary is None:
+            if config.SETTINGS.security.environment == "production":
+                raise SessionEncryptionError(
+                    "Production requires RYLIOX_SESSION__ENCRYPTION_KEY or "
+                    "RYLIOX_SESSION__ENCRYPTION_KEY_FILE"
+                )
+            path = user_config_path("ryliox") / "session.key"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            if path.exists():
+                primary = path.read_text(encoding="ascii").strip()
+            else:
+                primary = Fernet.generate_key().decode("ascii")
+                path.write_text(primary, encoding="ascii")
+            try:
+                path.parent.chmod(0o700)
+                path.chmod(0o600)
+            except OSError as exc:
+                raise SessionEncryptionError(f"Cannot secure session key file: {path}") from exc
+
+        try:
+            keys = [Fernet(primary.encode("ascii"))]
+            keys.extend(Fernet(value.encode("ascii")) for value in settings.old_encryption_keys)
+        except (UnicodeEncodeError, ValueError) as exc:
+            raise SessionEncryptionError("Invalid Fernet session encryption key") from exc
+        self._fernet = MultiFernet(keys)
+
+    def encrypt(self, value: str) -> str:
+        token = self._fernet.encrypt(value.encode("utf-8")).decode("ascii")
+        return _ENCRYPTED_PREFIX + token
+
+    def decrypt(self, value: str) -> str:
+        if not value.startswith(_ENCRYPTED_PREFIX):
+            return value
+        try:
+            token = value.removeprefix(_ENCRYPTED_PREFIX).encode("ascii")
+            return self._fernet.decrypt(token).decode("utf-8")
+        except (InvalidToken, UnicodeError) as exc:
+            raise SessionEncryptionError(
+                "Stored cookie cannot be decrypted with configured keys"
+            ) from exc
 
 
 def _parse_cookie_expires(value: Any) -> int | None:
@@ -202,6 +263,7 @@ class SessionStore:
         self.db_path = Path(db_path) if db_path is not None else config.SESSION_DB_FILE
         self._lock = threading.RLock()
         self._legacy_migration_attempted = False
+        self._cipher = _CookieCipher()
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self._initialize()
 
@@ -252,7 +314,20 @@ class SessionStore:
                     ON session_cookie_records(name)
                     """
             )
+            rows = conn.execute(
+                "SELECT id, value FROM session_cookie_records WHERE value NOT LIKE ?",
+                (f"{_ENCRYPTED_PREFIX}%",),
+            ).fetchall()
+            if rows:
+                conn.executemany(
+                    "UPDATE session_cookie_records SET value = ? WHERE id = ?",
+                    [(self._cipher.encrypt(str(row["value"])), int(row["id"])) for row in rows],
+                )
             conn.commit()
+        try:
+            self.db_path.chmod(0o600)
+        except OSError as exc:
+            raise SessionEncryptionError(f"Cannot secure session database: {self.db_path}") from exc
 
     def _read_legacy_json(self) -> list[CookieRecord]:
         path = self.legacy_cookies_file
@@ -343,7 +418,7 @@ class SessionStore:
                         rows = [
                             (
                                 str(cookie["name"]),
-                                str(cookie["value"]),
+                                self._cipher.encrypt(str(cookie["value"])),
                                 cookie.get("domain"),
                                 str(cookie.get("path") or "/"),
                                 1 if cookie.get("secure") else 0,
@@ -396,7 +471,7 @@ class SessionStore:
         return [
             {
                 "name": str(row["name"]),
-                "value": str(row["value"]),
+                "value": self._cipher.decrypt(str(row["value"])),
                 "domain": str(row["domain"]).lower() if row["domain"] else None,
                 "path": str(row["path"] or "/"),
                 "secure": bool(row["secure"]),
@@ -476,6 +551,18 @@ class SessionStore:
             )
             # Return legacy data even if we couldn't persist it.
             return legacy_records
+
+        with self._lock, self._connection() as conn:
+            conn.execute("DROP TABLE IF EXISTS session_cookies")
+            conn.commit()
+        if self.legacy_cookies_file.resolve() != self.db_path.resolve():
+            try:
+                self.legacy_cookies_file.unlink(missing_ok=True)
+            except OSError as exc:
+                logger.warning(
+                    "Encrypted cookie migration succeeded but plaintext source could not be removed: %s",
+                    exc,
+                )
 
         return self.get_cookie_records()
 

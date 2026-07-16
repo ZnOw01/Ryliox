@@ -81,6 +81,8 @@ def _build_download_queue(
         repository=repository,  # Inyección del repository
         error_log_dir=DOWNLOAD_ERROR_LOG_DIR,
         poll_interval_seconds=QUEUE_POLL_INTERVAL_SECONDS,
+        max_queued_jobs=config.SETTINGS.queue.max_queued_jobs,
+        download_timeout_seconds=config.SETTINGS.http.request_timeout_seconds,
     )
     queue.start()
     return queue
@@ -92,6 +94,17 @@ async def initialize_app_services(
     repository: IDownloadJobRepository | None = None,
 ) -> None:
     """Initialize all application-scoped services during startup."""
+    from core.cache import (
+        get_book_metadata_cache,
+        get_chapter_list_cache,
+        get_search_results_cache,
+        start_all_cleanup_tasks,
+    )
+
+    await get_book_metadata_cache().clear()
+    await get_chapter_list_cache().clear()
+    await get_search_results_cache().clear()
+    await start_all_cleanup_tasks()
     app.state.session_store = SessionStore()
     # Initialize kernel and enter its async context so plugins can use
     # ``self.kernel.http`` for the lifetime of the app.
@@ -105,10 +118,13 @@ async def initialize_app_services(
 
 async def shutdown_app_services(app: FastAPI) -> None:
     """Stop services in a safe order during shutdown."""
+    from core.cache import stop_all_cleanup_tasks
+
+    await stop_all_cleanup_tasks()
     download_queue: DownloadQueueService | None = getattr(app.state, "download_queue", None)
     if download_queue is not None:
         try:
-            download_queue.stop()
+            download_queue.stop(config.SETTINGS.queue.shutdown_timeout_seconds)
             logger.info("DownloadQueueService stopped.")
         except Exception:
             logger.exception("Error while stopping DownloadQueueService.")

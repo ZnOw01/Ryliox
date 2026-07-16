@@ -1,4 +1,4 @@
-import { useDownloadManager } from '../hooks/useDownloadManager';
+import { TERMINAL_DOWNLOAD_STATES, useDownloadManager } from '../hooks/useDownloadManager';
 import { ChapterSelector } from './download-progress/ChapterSelector';
 import { DownloadActions } from './download-progress/DownloadActions';
 import { ErrorNotice } from './download-progress/ErrorNotice';
@@ -9,8 +9,10 @@ import { cn } from '../lib/cn';
 import { Download, BookOpen, AlertTriangle, RotateCw } from 'lucide-react';
 import { OptimizedFadeIn } from './motion/OptimizedAppear';
 import { useTranslation } from 'react-i18next';
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { parseApiError } from '../lib/api-error';
+import { announce } from './AriaLiveRegion';
+import { toast } from './ui/BeautifulToast';
 
 export function DownloadProgressCard() {
   const { t } = useTranslation();
@@ -20,6 +22,35 @@ export function DownloadProgressCard() {
   const chapters = manager.chaptersQuery.data?.chapters ?? [];
   // Formats that can only download the full book (e.g. epub) cannot use chapter selection
   const chapterSelectable = !manager.bookOnlyFormats.has(manager.format);
+  const notifiedTerminalRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const progress = manager.progressQuery.data;
+    const status = progress?.status ?? '';
+    if (!TERMINAL_DOWNLOAD_STATES.has(status)) {
+      return;
+    }
+
+    const notificationKey = `${progress?.job_id ?? 'local'}:${status}`;
+    if (notifiedTerminalRef.current === notificationKey) {
+      return;
+    }
+    notifiedTerminalRef.current = notificationKey;
+
+    if (status === 'completed') {
+      const message = t('download.notifications.download_completed');
+      toast.success(message);
+      announce(message);
+    } else if (status === 'error') {
+      const message = progress?.error || t('download.notifications.download_error');
+      toast.error(message);
+      announce(message, 'assertive');
+    } else {
+      const message = t('download.notifications.download_cancelled');
+      toast.info(message);
+      announce(message);
+    }
+  }, [manager.progressQuery.data, t]);
 
   const errors = useMemo(() => {
     return [
@@ -74,7 +105,7 @@ export function DownloadProgressCard() {
                   title={t('download.sse.reconnect')}
                 >
                   <RotateCw className="h-3 w-3" strokeWidth={2.5} />
-                  <span>Reintentar</span>
+                  <span>{t('common.retry')}</span>
                 </button>
               ) : null}
             </div>

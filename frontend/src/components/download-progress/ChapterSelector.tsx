@@ -8,7 +8,7 @@ import {
   Search as MagnifyingGlass,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
-import React, { memo, useState, useMemo } from 'react';
+import React, { memo, useId, useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { cn } from '../../lib/cn';
 import type { ChapterSummary, SearchBook } from '../../lib/types';
@@ -20,7 +20,6 @@ import { Skeleton } from '../ui/Skeleton';
 import { ErrorNotice } from './ErrorNotice';
 
 type ChapterRowProps = {
-  index: number;
   style?: React.CSSProperties;
   chapter: ChapterSummary;
   selectable: boolean;
@@ -30,7 +29,6 @@ type ChapterRowProps = {
 
 // Componente memoizado para renderizar cada fila (compatible con react-window cuando se instale)
 const ChapterRow = memo(function ChapterRow({
-  index,
   style,
   chapter,
   selectable,
@@ -50,9 +48,6 @@ const ChapterRow = memo(function ChapterRow({
         layout
         style={style}
         className="flex min-h-touch min-w-0 items-center gap-3 rounded-lg px-3 py-2"
-        initial={{ opacity: 0, x: -10 }}
-        animate={{ opacity: 1, x: 0 }}
-        transition={{ delay: index * 0.03, duration: 0.2 }}
       >
         <FileText
           className="h-4 w-4 shrink-0 text-muted-foreground"
@@ -75,11 +70,6 @@ const ChapterRow = memo(function ChapterRow({
         'group flex min-h-touch min-w-0 cursor-pointer items-start gap-3 rounded-lg px-3 py-2 text-sm leading-tight transition-all duration-150 hover:bg-background focus-within:ring-2 focus-within:ring-ring',
         checked ? 'bg-primary/5' : 'hover:shadow-sm'
       )}
-      initial={{ opacity: 0, x: -10 }}
-      animate={{ opacity: 1, x: 0 }}
-      transition={{ delay: index * 0.03, duration: 0.2 }}
-      whileHover={{ scale: 1.01 }}
-      whileTap={{ scale: 0.99 }}
     >
       <motion.div
         layoutId={`checkbox-${chapter.index}`}
@@ -100,7 +90,9 @@ const ChapterRow = memo(function ChapterRow({
         checked={checked}
         onChange={() => onToggleChapter(chapter.index)}
         className="sr-only"
-        aria-label={t('download.chapters.select_chapter_aria', { title: chapter.title })}
+        aria-label={t('download.chapters.select_chapter_aria', {
+          title: chapter.title,
+        })}
       />
       <motion.span layoutId={`title-${chapter.index}`} className="min-w-0 overflow-hidden">
         <span
@@ -152,6 +144,11 @@ export function ChapterSelector({
   ariaLabel,
 }: ChapterSelectorProps) {
   const { t } = useTranslation();
+  const idPrefix = useId().replace(/:/g, '');
+  const headingId = `${idPrefix}-heading`;
+  const filterId = `${idPrefix}-filter`;
+  const rangeStartId = `${idPrefix}-range-start`;
+  const rangeEndId = `${idPrefix}-range-end`;
 
   const [showAllChapters, setShowAllChapters] = useState(false);
   const [filterQuery, setFilterQuery] = useState('');
@@ -207,16 +204,14 @@ export function ChapterSelector({
       <div
         className="mb-4 overflow-hidden rounded-lg border border-gray-200 bg-transparent"
         role="region"
-        aria-label={ariaLabel || t('download.chapters.aria_label')}
+        aria-labelledby={ariaLabel ? undefined : headingId}
+        aria-label={ariaLabel}
       >
         {/* ── Encabezado ── */}
         <div className="flex min-w-0 flex-wrap items-center justify-between gap-3 border-b border-gray-100 bg-transparent px-4 py-3">
           <div className="flex items-center gap-2">
             <Rows className="h-4 w-4 text-muted-foreground" strokeWidth={1.75} aria-hidden="true" />
-            <p
-              className="text-sm font-semibold leading-tight text-foreground"
-              id="chapter-selector-heading"
-            >
+            <p className="text-sm font-semibold leading-tight text-foreground" id={headingId}>
               {t('download.chapters.title')}
             </p>
           </div>
@@ -226,10 +221,12 @@ export function ChapterSelector({
               size="sm"
               aria-live="polite"
               aria-atomic="true"
-              aria-describedby="chapter-selector-heading"
+              aria-describedby={headingId}
             >
-              {t('download.chapters.selected_count', { count: selectedChapterIndexes.length })}/
-              {totalChapters}
+              {t('download.chapters.selected_count', {
+                count: selectedChapterIndexes.length,
+              })}
+              /{totalChapters}
             </Badge>
           ) : (
             <Badge variant="secondary" size="sm">
@@ -317,13 +314,15 @@ export function ChapterSelector({
                 <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
                   {/* Búsqueda */}
                   <div className="relative">
+                    <label htmlFor={filterId} className="sr-only">
+                      {t('download.chapters.search_label')}
+                    </label>
                     <input
+                      id={filterId}
                       type="text"
                       value={filterQuery}
                       onChange={e => setFilterQuery(e.target.value)}
-                      placeholder={t('download.chapters.search_placeholder', {
-                        defaultValue: 'Buscar capítulo...',
-                      })}
+                      placeholder={t('download.chapters.search_placeholder')}
                       className="min-h-touch w-full rounded-lg border border-gray-200 bg-background pl-8 pr-8 py-2 text-xs text-foreground outline-none transition placeholder:text-gray-500 focus:border-primary focus:ring-2 focus:ring-ring"
                     />
                     <div className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground">
@@ -334,6 +333,7 @@ export function ChapterSelector({
                         type="button"
                         onClick={() => setFilterQuery('')}
                         className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground text-sm font-bold"
+                        aria-label={t('download.chapters.clear_search')}
                       >
                         ×
                       </button>
@@ -342,21 +342,29 @@ export function ChapterSelector({
 
                   {/* Rango */}
                   <div className="flex items-center gap-2 justify-end sm:justify-start">
+                    <label htmlFor={rangeStartId} className="sr-only">
+                      {t('download.chapters.range_start')}
+                    </label>
                     <input
+                      id={rangeStartId}
                       type="number"
                       value={rangeStart}
                       onChange={e => setRangeStart(e.target.value ? parseInt(e.target.value) : '')}
-                      placeholder="De"
+                      placeholder={t('download.chapters.range_from')}
                       min="1"
                       max={chapters.length}
                       className="w-14 rounded-lg border border-gray-200 bg-background px-2 py-2 text-xs text-center text-foreground outline-none transition placeholder:text-gray-500 focus:border-primary focus:ring-2 focus:ring-ring"
                     />
                     <span className="text-xs text-muted-foreground">-</span>
+                    <label htmlFor={rangeEndId} className="sr-only">
+                      {t('download.chapters.range_end')}
+                    </label>
                     <input
+                      id={rangeEndId}
                       type="number"
                       value={rangeEnd}
                       onChange={e => setRangeEnd(e.target.value ? parseInt(e.target.value) : '')}
-                      placeholder="A"
+                      placeholder={t('download.chapters.range_to')}
                       min="1"
                       max={chapters.length}
                       className="w-14 rounded-lg border border-gray-200 bg-background px-2 py-2 text-xs text-center text-foreground outline-none transition placeholder:text-gray-500 focus:border-primary focus:ring-2 focus:ring-ring"
@@ -367,7 +375,7 @@ export function ChapterSelector({
                       disabled={rangeStart === '' || rangeEnd === ''}
                       className="rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground transition hover:bg-primary/90 disabled:bg-gray-200 disabled:text-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     >
-                      Rango
+                      {t('download.chapters.apply_range')}
                     </button>
                   </div>
                 </div>
@@ -375,28 +383,28 @@ export function ChapterSelector({
                 {/* Presets */}
                 <div className="flex flex-wrap items-center gap-2 border-t border-gray-100 pt-1">
                   <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground mr-1">
-                    Presets:
+                    {t('download.chapters.presets')}:
                   </span>
                   <button
                     type="button"
                     onClick={() => handleSelectFirstN(5)}
                     className="rounded bg-muted px-2 py-1 text-[11px] font-medium text-muted-foreground hover:bg-muted/80 transition"
                   >
-                    Primeros 5
+                    {t('download.chapters.first_n', { count: 5 })}
                   </button>
                   <button
                     type="button"
                     onClick={() => handleSelectFirstN(10)}
                     className="rounded bg-muted px-2 py-1 text-[11px] font-medium text-muted-foreground hover:bg-muted/80 transition"
                   >
-                    Primeros 10
+                    {t('download.chapters.first_n', { count: 10 })}
                   </button>
                   <button
                     type="button"
                     onClick={() => handleSelectLastN(5)}
                     className="rounded bg-muted px-2 py-1 text-[11px] font-medium text-muted-foreground hover:bg-muted/80 transition"
                   >
-                    Últimos 5
+                    {t('download.chapters.last_n', { count: 5 })}
                   </button>
                 </div>
               </div>
@@ -404,10 +412,9 @@ export function ChapterSelector({
 
             <div className="chapter-scroll overflow-x-hidden overflow-y-auto max-h-[300px]">
               <AnimatedLayoutGroup className="space-y-1 p-3">
-                {visibleChapters.map((chapter, index) => (
+                {visibleChapters.map(chapter => (
                   <ChapterRow
                     key={chapter.index}
-                    index={index}
                     chapter={chapter}
                     selectable={selectable}
                     selectedChapterSet={selectedChapterSet}
@@ -426,9 +433,8 @@ export function ChapterSelector({
                   className="text-xs font-semibold text-primary hover:text-primary-foreground hover:bg-primary px-3 py-1.5 rounded-lg border border-primary/20 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   {showAllChapters
-                    ? t('download.chapters.view_less', { defaultValue: 'Ver menos capítulos' })
+                    ? t('download.chapters.view_less')
                     : t('download.chapters.view_all', {
-                        defaultValue: 'Ver todos los capítulos ({{count}})',
                         count: chapters.length,
                       })}
                 </button>

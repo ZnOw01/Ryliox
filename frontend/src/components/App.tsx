@@ -8,14 +8,14 @@ import { DownloadProgressCard } from './DownloadProgressCard';
 import { SearchBooksCard } from './SearchBooksCard';
 import { LanguageSwitcher } from './LanguageSwitcher';
 import { ThemeToggle } from './ThemeToggle';
-import { BeautifulToastContainer, toast as beautifulToast } from './ui/BeautifulToast';
+import { BeautifulToastContainer } from './ui/BeautifulToast';
 import { KeyboardShortcutsModal, useKeyboardShortcuts } from './ui/KeyboardNavigation';
 import { SkipLink } from './SkipLink';
 import i18n from '../i18n/config';
 import { isEnabled } from '../lib/feature-flags';
+import { authenticateAdmin } from '../lib/api';
 import { useTranslation } from 'react-i18next';
 import { useBookStore } from '../store/book-store';
-import type { ProgressResponse } from '../lib/types';
 import {
   AnimatedLayoutGroup,
   StaggeredLayoutContainer,
@@ -73,32 +73,15 @@ function AppContent() {
       key: '?',
       action: () => setShortcutsModalOpen(true),
       scope: 'global',
-      description: 'Mostrar atajos de teclado',
+      description: t('keyboard_shortcuts.shortcuts.toggle_help'),
     },
     {
       key: 'Escape',
       action: () => setShortcutsModalOpen(false),
       scope: 'global',
-      description: 'Cerrar modales',
+      description: t('keyboard_shortcuts.shortcuts.close_modals'),
     },
   ]);
-
-  // Announce download progress changes
-  useEffect(() => {
-    const handleProgressUpdate = (event: Event) => {
-      const customEvent = event as CustomEvent<ProgressResponse>;
-      const data = customEvent.detail;
-
-      if (data.status === 'completed') {
-        beautifulToast.success(t('download.notifications.download_completed'));
-      } else if (data.status === 'error' && data.error) {
-        beautifulToast.error(data.error);
-      }
-    };
-
-    window.addEventListener('download-progress', handleProgressUpdate);
-    return () => window.removeEventListener('download-progress', handleProgressUpdate);
-  }, [t]);
 
   return (
     <>
@@ -106,7 +89,9 @@ function AppContent() {
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(320px,1fr)_minmax(0,1.25fr)] lg:items-start lg:gap-6">
           <StaggeredLayoutContainer className="flex min-w-0 flex-col gap-4">
             <StaggeredLayoutItem className="flex-shrink-0">
-              <AuthStatusCard />
+              <div id="auth-section" className="scroll-mt-28">
+                <AuthStatusCard />
+              </div>
             </StaggeredLayoutItem>
             <StaggeredLayoutItem>
               <SearchBooksCard />
@@ -149,6 +134,29 @@ export default function App() {
         },
       })
   );
+
+  useEffect(() => {
+    let authenticating = false;
+    const requestAuthentication = async () => {
+      if (authenticating) return;
+      authenticating = true;
+      const token = window.prompt(t('auth.admin_token_prompt'));
+      if (!token) {
+        authenticating = false;
+        return;
+      }
+      try {
+        await authenticateAdmin(token);
+        await queryClient.invalidateQueries();
+      } catch {
+        window.alert(t('auth.admin_token_invalid'));
+      } finally {
+        authenticating = false;
+      }
+    };
+    window.addEventListener('ryliox-admin-auth-required', requestAuthentication);
+    return () => window.removeEventListener('ryliox-admin-auth-required', requestAuthentication);
+  }, [queryClient, t]);
 
   // Smooth scroll to top when switching books
   useEffect(() => {

@@ -10,16 +10,24 @@ from utils import slugify
 class OutputPlugin(Plugin):
     """Manages output directories and file organization."""
 
+    def __init__(self, authorized_root: Path | None = None) -> None:
+        self._authorized_root = Path(authorized_root or config.OUTPUT_ROOT).expanduser().resolve()
+
     def get_default_dir(self) -> Path:
         """Return the default output directory from config."""
         return config.OUTPUT_DIR
 
     def validate_dir(self, path: str | Path | None) -> tuple[bool, str, Path | None]:
-        """Validate that a directory exists and is writable."""
+        """Validate that a directory is writable and confined to the output root."""
         if path is None:
             return True, "Using default directory", self.get_default_dir()
 
-        path = Path(path) if isinstance(path, str) else path
+        path = (Path(path) if isinstance(path, str) else path).expanduser().resolve()
+        root = self._authorized_root
+        try:
+            path.relative_to(root)
+        except ValueError:
+            return False, f"Directory must be inside authorized output root: {root}", None
 
         # Try to create if doesn't exist
         if not path.exists():
@@ -49,6 +57,13 @@ class OutputPlugin(Plugin):
         authors: list[str] | None = None,
     ) -> Path:
         """Create a book output directory with conflict resolution."""
+        output_dir = Path(output_dir).resolve()
+        root = self._authorized_root
+        try:
+            output_dir.relative_to(root)
+        except ValueError as exc:
+            raise ValueError(f"Output directory is outside authorized root: {root}") from exc
+
         # Build folder name with fallback chain
         folder_title = (title or "").strip()
         if not folder_title and authors:

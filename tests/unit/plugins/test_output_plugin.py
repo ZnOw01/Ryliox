@@ -13,7 +13,7 @@ pytestmark = pytest.mark.unit
 
 
 def test_validate_dir_creates_missing_directory(tmp_path: Path):
-    plugin = OutputPlugin()
+    plugin = OutputPlugin(authorized_root=tmp_path)
     target = tmp_path / "new-output"
 
     valid, message, resolved = plugin.validate_dir(target)
@@ -25,8 +25,20 @@ def test_validate_dir_creates_missing_directory(tmp_path: Path):
     assert target.is_dir()
 
 
+def test_validate_dir_rejects_path_outside_authorized_root(tmp_path: Path):
+    root = tmp_path / "allowed"
+    root.mkdir()
+    plugin = OutputPlugin(authorized_root=root)
+
+    valid, message, resolved = plugin.validate_dir(tmp_path / "outside")
+
+    assert valid is False
+    assert "authorized output root" in message
+    assert resolved is None
+
+
 def test_create_book_dir_creates_expected_structure(tmp_path: Path):
-    plugin = OutputPlugin()
+    plugin = OutputPlugin(authorized_root=tmp_path)
 
     book_dir = plugin.create_book_dir(
         output_dir=tmp_path,
@@ -41,7 +53,7 @@ def test_create_book_dir_creates_expected_structure(tmp_path: Path):
 
 
 def test_create_book_dir_uses_unique_suffix_for_collisions(tmp_path: Path):
-    plugin = OutputPlugin()
+    plugin = OutputPlugin(authorized_root=tmp_path)
 
     first = plugin.create_book_dir(
         output_dir=tmp_path,

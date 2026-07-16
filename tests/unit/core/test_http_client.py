@@ -118,6 +118,35 @@ async def test_http_client_blocks_unsafe_redirect_target():
 
 
 @pytest.mark.asyncio
+async def test_http_client_enforces_numeric_redirect_limit(monkeypatch):
+    monkeypatch.setattr(config.SETTINGS.http, "max_redirects", 2)
+    async with HttpClient(cookies_file=config.COOKIES_FILE) as client:
+
+        async def fake_get(url: str, **_kwargs):
+            request = httpx.Request("GET", url)
+            number = int(url.rsplit("/", 1)[-1])
+            return httpx.Response(302, headers={"location": f"/{number + 1}"}, request=request)
+
+        client.client.get = fake_get  # type: ignore[method-assign]
+        with pytest.raises(ValueError, match="Redirect limit exceeded"):
+            await client.get(f"{config.BASE_URL}/0", allow_redirects=True)
+
+
+@pytest.mark.asyncio
+async def test_http_client_rejects_oversized_upstream_response(monkeypatch):
+    monkeypatch.setattr(config.SETTINGS.http, "max_response_size_mb", 1)
+    async with HttpClient(cookies_file=config.COOKIES_FILE) as client:
+
+        async def fake_get(url: str, **_kwargs):
+            request = httpx.Request("GET", url)
+            return httpx.Response(200, request=request, content=b"x" * (1024 * 1024 + 1))
+
+        client.client.get = fake_get  # type: ignore[method-assign]
+        with pytest.raises(ValueError, match="size limit"):
+            await client.get(f"{config.BASE_URL}/large")
+
+
+@pytest.mark.asyncio
 async def test_http_client_persists_refreshed_set_cookie(monkeypatch, tmp_path):
     db_path = tmp_path / "session.sqlite3"
     cookies_file = tmp_path / "cookies.json"

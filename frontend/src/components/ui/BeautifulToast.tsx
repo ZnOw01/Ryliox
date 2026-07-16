@@ -23,7 +23,7 @@ export interface Toast {
 
 interface ToastState {
   toasts: Toast[];
-  addToast: (toast: Omit<Toast, 'id'>) => void;
+  addToast: (toast: Omit<Toast, 'id'>) => string;
   removeToast: (id: string) => void;
   updateToast: (id: string, updates: Partial<Omit<Toast, 'id'>>) => void;
   clearAll: () => void;
@@ -35,18 +35,21 @@ const generateId = () => `toast-${Date.now()}-${Math.random().toString(36).subst
 
 export const useToastStore = create<ToastState>((set, get) => ({
   toasts: [],
-  addToast: toast =>
+  addToast: toast => {
+    const id = generateId();
     set(state => ({
       toasts: [
         ...state.toasts,
         {
           ...toast,
-          id: generateId(),
+          id,
           duration: toast.duration ?? 4000,
           dismissible: toast.dismissible ?? true,
         },
       ],
-    })),
+    }));
+    return id;
+  },
   removeToast: id => {
     const toast = get().toasts.find(t => t.id === id);
     toast?.onDismiss?.();
@@ -101,9 +104,7 @@ export const toast = {
     });
   },
   loading: (message: string, options?: Omit<Partial<Toast>, 'type' | 'message'>) => {
-    const id = generateId();
-    useToastStore.getState().addToast({
-      id,
+    const id = useToastStore.getState().addToast({
       type: 'loading',
       message,
       duration: Infinity,

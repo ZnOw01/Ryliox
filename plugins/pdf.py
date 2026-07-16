@@ -5,10 +5,38 @@ import os
 import re
 import sys
 from pathlib import Path
+from typing import Any
+from urllib.parse import unquote, urlparse
 
 from utils.files import sanitize_filename
 
 from .base import Plugin
+
+
+def restricted_url_fetcher(book_dir: Path) -> Any:
+    """Build a WeasyPrint fetcher limited to data URLs and files in ``book_dir``."""
+    from weasyprint.urls import URLFetcher
+
+    root = Path(book_dir).resolve()
+
+    class RestrictedURLFetcher(URLFetcher):
+        def fetch(self, url: str, headers: Any = None) -> Any:
+            parsed = urlparse(url)
+            if parsed.scheme == "data":
+                return super().fetch(url, headers)
+            if parsed.scheme != "file" or parsed.netloc not in {"", "localhost"}:
+                raise ValueError(f"Blocked PDF resource scheme: {parsed.scheme or 'relative'}")
+
+            candidate = Path(unquote(parsed.path)).resolve()
+            try:
+                candidate.relative_to(root)
+            except ValueError as exc:
+                raise ValueError("Blocked PDF resource outside book directory") from exc
+            if not candidate.is_file():
+                raise ValueError("PDF resource is not a regular file")
+            return super().fetch(candidate.as_uri(), headers)
+
+    return RestrictedURLFetcher(allowed_protocols=("data", "file"), allow_redirects=False)
 
 
 class PdfPlugin(Plugin):
@@ -133,6 +161,7 @@ class PdfPlugin(Plugin):
         html_doc = self.weasyprint.HTML(
             string=html_content,
             base_url=str(oebps),
+            url_fetcher=restricted_url_fetcher(output_dir),
         )
         html_doc.write_pdf(str(pdf_path))
 
@@ -169,7 +198,7 @@ class PdfPlugin(Plugin):
         pdf_paths: list[Path] = []
 
         for i, chapter in enumerate(chapters):
-            xhtml_path = oebps / chapter["filename"].replace(".html", ".xhtml")
+            xhtml_path = self._safe_chapter_path(oebps, chapter["filename"])
             if not xhtml_path.exists():
                 continue
 
@@ -199,6 +228,7 @@ class PdfPlugin(Plugin):
             html_doc = self.weasyprint.HTML(
                 string=chapter_html,
                 base_url=str(oebps),
+                url_fetcher=restricted_url_fetcher(output_dir),
             )
             html_doc.write_pdf(str(pdf_path))
             pdf_paths.append(pdf_path)
@@ -224,7 +254,7 @@ class PdfPlugin(Plugin):
         chapters_html_parts: list[str] = []
 
         for chapter in chapters:
-            xhtml_path = oebps / chapter["filename"].replace(".html", ".xhtml")
+            xhtml_path = self._safe_chapter_path(oebps, chapter["filename"])
             if not xhtml_path.exists():
                 continue
 
@@ -333,6 +363,16 @@ class PdfPlugin(Plugin):
             return body_match.group(1)
 
         return content
+
+    @staticmethod
+    def _safe_chapter_path(oebps: Path, filename: str) -> Path:
+        root = oebps.resolve()
+        candidate = (root / str(filename).replace(".html", ".xhtml")).resolve()
+        try:
+            candidate.relative_to(root)
+        except ValueError as exc:
+            raise ValueError("Chapter path escapes the book directory") from exc
+        return candidate
 
     def _load_css_files(self, oebps: Path, css_files: list[str]) -> str:
         """Load and concatenate CSS files."""

@@ -21,6 +21,7 @@ from fastapi import (
 from fastapi.responses import StreamingResponse
 from pydantic import TypeAdapter
 
+from core.services import QueueCapacityError
 from plugins.downloader import DownloaderPlugin
 from web.api_utils import ErrorCode, error_response, sse_comment, sse_event
 from web.dependencies import (
@@ -320,8 +321,7 @@ async def progress_stream(
                 now = time.monotonic()
                 wait = max(0.1, SSE_HEARTBEAT_INTERVAL_SECONDS - (now - last_heartbeat_at))
 
-                next_version = await asyncio.to_thread(
-                    download_queue.wait_for_progress_change,
+                next_version = await download_queue.wait_for_progress_change_async(
                     progress_version,
                     wait,
                 )
@@ -422,13 +422,19 @@ def download(
                 },
             )
 
-    queued_job: dict[str, Any] = download_queue.enqueue(
-        book_id=data.book_id,
-        output_dir=output_dir,
-        formats=formats,
-        selected_chapters=selected_chapters,
-        skip_images=data.skip_images,
-    )
+    try:
+        queued_job: dict[str, Any] = download_queue.enqueue(
+            book_id=data.book_id,
+            output_dir=output_dir,
+            formats=formats,
+            selected_chapters=selected_chapters,
+            skip_images=data.skip_images,
+        )
+    except QueueCapacityError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={"error": str(exc), "code": "download_queue_full"},
+        ) from exc
 
     job_id = str(queued_job["job_id"])
 

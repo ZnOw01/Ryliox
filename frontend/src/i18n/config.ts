@@ -31,6 +31,12 @@ i18n
     },
   });
 
+i18n.on('languageChanged', language => {
+  if (typeof document !== 'undefined') {
+    document.documentElement.lang = language.split('-')[0] || 'es';
+  }
+});
+
 export default i18n;
 
 // Language names for the switcher

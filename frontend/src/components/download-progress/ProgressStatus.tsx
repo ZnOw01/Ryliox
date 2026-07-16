@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useId, useState } from 'react';
+import type { TFunction } from 'i18next';
 import {
   CheckCircle,
   Clock,
@@ -28,6 +29,7 @@ export function ProgressStatus({ currentLabel, progress, progressPercent }: Prog
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [revealingPath, setRevealingPath] = useState<string | null>(null);
+  const idPrefix = useId().replace(/:/g, '');
   const etaLabel = formatEta(progress?.eta_seconds);
   const statusLabel = formatStatusLabel(currentLabel, t);
   const epubName = outputFileNames(progress?.epub);
@@ -111,7 +113,6 @@ export function ProgressStatus({ currentLabel, progress, progressPercent }: Prog
           percent: progressPercent,
           status: statusLabel,
         })}
-        tabIndex={0}
       >
         <div
           className={cn(
@@ -144,7 +145,9 @@ export function ProgressStatus({ currentLabel, progress, progressPercent }: Prog
           >
             <Clock className="h-4 w-4 shrink-0" strokeWidth={1.75} aria-hidden="true" />
             <span>
-              {t('download.progress.queue_position', { position: progress.queue_position })}
+              {t('download.progress.queue_position', {
+                position: progress.queue_position,
+              })}
             </span>
           </div>
         ) : null}
@@ -206,58 +209,61 @@ export function ProgressStatus({ currentLabel, progress, progressPercent }: Prog
               {t('download.progress.files_generated')}
             </div>
             <div className="space-y-3">
-              {revealTargets.map(path => (
-                <div
-                  key={path}
-                  className="rounded-lg border border-gray-200 bg-transparent px-3 py-3"
-                >
-                  <div className="flex flex-col gap-1">
-                    <span className="text-[10px] font-semibold uppercase tracking-wider text-primary">
-                      {getFriendlyTypeName(path, t)}
-                    </span>
-                    <p
-                      className="break-all text-xs leading-relaxed text-muted-foreground"
-                      id={`file-path-${path}`}
-                    >
-                      {path.split(/[/\\]/).pop() || path}
-                    </p>
+              {revealTargets.map((path, index) => {
+                const pathId = `${idPrefix}-file-path-${index}`;
+                return (
+                  <div
+                    key={path}
+                    className="rounded-lg border border-gray-200 bg-transparent px-3 py-3"
+                  >
+                    <div className="flex flex-col gap-1">
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-primary">
+                        {getFriendlyTypeName(path, t)}
+                      </span>
+                      <p
+                        className="break-all text-xs leading-relaxed text-muted-foreground"
+                        id={pathId}
+                      >
+                        {path.split(/[/\\]/).pop() || path}
+                      </p>
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => void handleReveal(path)}
+                        disabled={revealingPath === path}
+                        className="inline-flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-xs font-medium text-foreground transition hover:bg-accent disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        aria-describedby={pathId}
+                      >
+                        {revealingPath === path ? (
+                          <>
+                            <Spinner
+                              className="h-4 w-4 animate-spin"
+                              strokeWidth={2.5}
+                              aria-hidden="true"
+                            />
+                            {t('common.opening')}
+                          </>
+                        ) : (
+                          <>
+                            <FolderOpen className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />
+                            {t('download.progress.open_location')}
+                          </>
+                        )}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void handleCopy(path)}
+                        className="inline-flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-xs font-medium text-foreground transition hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        aria-describedby={pathId}
+                      >
+                        <Copy className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />
+                        {t('download.progress.copy_path')}
+                      </button>
+                    </div>
                   </div>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={() => void handleReveal(path)}
-                      disabled={revealingPath === path}
-                      className="inline-flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-xs font-medium text-foreground transition hover:bg-accent disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                      aria-describedby={`file-path-${path}`}
-                    >
-                      {revealingPath === path ? (
-                        <>
-                          <Spinner
-                            className="h-4 w-4 animate-spin"
-                            strokeWidth={2.5}
-                            aria-hidden="true"
-                          />
-                          {t('common.opening')}
-                        </>
-                      ) : (
-                        <>
-                          <FolderOpen className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />
-                          {t('download.progress.open_location')}
-                        </>
-                      )}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void handleCopy(path)}
-                      className="inline-flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-xs font-medium text-foreground transition hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                      aria-describedby={`file-path-${path}`}
-                    >
-                      <Copy className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />
-                      {t('download.progress.copy_path')}
-                    </button>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         ) : null}
@@ -336,16 +342,16 @@ function outputFileNames(value: string | string[] | null | undefined): string | 
   return names.join(' | ');
 }
 
-function getFriendlyTypeName(filePath: string, t: any): string {
+function getFriendlyTypeName(filePath: string, t: TFunction): string {
   const lower = String(filePath).toLowerCase();
   if (lower.endsWith('.epub')) {
-    return t('download.progress.file_types.epub', { defaultValue: 'Libro EPUB' });
+    return t('download.progress.file_types.epub');
   }
   if (lower.endsWith('.pdf')) {
-    return t('download.progress.file_types.pdf', { defaultValue: 'Libro PDF' });
+    return t('download.progress.file_types.pdf');
   }
   if (lower.endsWith('.log') || lower.includes('trace')) {
-    return t('download.progress.file_types.log', { defaultValue: 'Log de depuración' });
+    return t('download.progress.file_types.log');
   }
-  return t('download.progress.file_types.file', { defaultValue: 'Archivo' });
+  return t('download.progress.file_types.file');
 }

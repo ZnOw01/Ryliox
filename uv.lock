@@ -1915,7 +1915,7 @@ requires-dist = [
     { name = "urllib3", specifier = ">=2.7.0" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.32.0" },
     { name = "watchfiles", specifier = ">=0.21.0" },
-    { name = "weasyprint", specifier = ">=60.0" },
+    { name = "weasyprint", specifier = ">=69.0,<70" },
 ]
 provides-extras = ["dev", "e2e", "security", "all"]
 

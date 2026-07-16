@@ -56,7 +56,7 @@ describe('ChapterSelector', () => {
     );
 
     expect(screen.getByPlaceholderText('Buscar capítulo...')).toBeInTheDocument();
-    expect(screen.getByText('Presets:')).toBeInTheDocument();
+    expect(screen.getByText('Selección rápida:')).toBeInTheDocument();
   });
 
   it('collapses chapters list when non-selectable for EPUB', () => {

@@ -130,7 +130,11 @@ async function request<T>(
       const payload = isRecord(data) ? data : {};
 
       if (!response.ok) {
-        throw new ApiError(parseApiErrorPayload(data, response.status), response.status);
+        const apiError = new ApiError(parseApiErrorPayload(data, response.status), response.status);
+        if (response.status === 401 && apiError.code === 'admin_auth_required') {
+          window.dispatchEvent(new CustomEvent('ryliox-admin-auth-required'));
+        }
+        throw apiError;
       }
 
       return payload as T;
@@ -159,6 +163,21 @@ async function request<T>(
   }
 
   throw new Error('Unreachable');
+}
+
+export async function authenticateAdmin(token: string): Promise<void> {
+  const response = await fetch(`${API_BASE}/api/admin/session`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ token }),
+  });
+  if (!response.ok) {
+    throw new ApiError(
+      parseApiErrorPayload(await parseResponseBody(response), response.status),
+      response.status
+    );
+  }
 }
 
 function combineSignals(...signals: AbortSignal[]): AbortSignal {

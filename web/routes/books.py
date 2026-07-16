@@ -8,6 +8,11 @@ from typing import TYPE_CHECKING
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import ValidationError
 
+from core.cache import (
+    get_book_metadata_cache,
+    get_chapter_list_cache,
+    get_search_results_cache,
+)
 from core.session_store import SessionStore
 from web.api_utils import ErrorCode
 from web.dependencies import get_kernel, get_session_store
@@ -93,9 +98,16 @@ async def search(
 
     _require_cookies(session_store, "Search")
 
+    cache = get_search_results_cache()
+    cache_key = f"search:{search_term.casefold()}"
+    cached_results = await cache.get(cache_key)
+    if cached_results is not None:
+        return SearchResponse(results=cached_results)
+
     book_plugin = kernel["book"]
     try:
         results = await book_plugin.search(search_term)
+        await cache.set(cache_key, results)
         return SearchResponse(results=results)
     except Exception as exc:
         logger.exception("Error searching for '%s'", search_term)
@@ -117,6 +129,12 @@ async def book_chapters(
 ) -> BookChaptersResponse:
     """Retorna la lista de capítulos de un libro."""
     _require_cookies(session_store, "Chapters fetch", book_id=book_id)
+
+    cache = get_chapter_list_cache()
+    cache_key = f"chapters:{book_id}"
+    cached_chapters = await cache.get(cache_key)
+    if cached_chapters is not None:
+        return BookChaptersResponse.model_validate({"chapters": cached_chapters})
 
     try:
         chapters_plugin = kernel["chapters"]
@@ -182,6 +200,7 @@ async def book_chapters(
             },
         ) from exc
 
+    await cache.set(cache_key, [chapter.model_dump() for chapter in chapters])
     return BookChaptersResponse(chapters=chapters)
 
 
@@ -193,6 +212,12 @@ async def book_info(
 ) -> BookInfoResponse:
     """Retorna los metadatos de un libro por su ID."""
     _require_cookies(session_store, "Book info fetch", book_id=book_id)
+
+    cache = get_book_metadata_cache()
+    cache_key = f"book:{book_id}"
+    cached_book = await cache.get(cache_key)
+    if cached_book is not None:
+        return BookInfoResponse.model_validate(cached_book)
 
     book_plugin = kernel["book"]
     try:
@@ -212,4 +237,6 @@ async def book_info(
             },
         ) from exc
 
-    return BookInfoResponse.model_validate(result)
+    response = BookInfoResponse.model_validate(result)
+    await cache.set(cache_key, response.model_dump())
+    return response

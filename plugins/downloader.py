@@ -445,6 +445,13 @@ class DownloaderPlugin(Plugin):
 
         css_list = list(all_css_urls)
         total_assets = len(css_list) + len(image_list)
+        import config
+
+        if total_assets > config.SETTINGS.http.max_assets_per_book:
+            raise ValueError(
+                f"Book references {total_assets} assets; configured limit is "
+                f"{config.SETTINGS.http.max_assets_per_book}"
+            )
 
         css_width = len(str(len(css_list)))
 

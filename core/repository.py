@@ -372,6 +372,14 @@ class DownloadJobRepository:
 
             return str(row["job_id"])
 
+    def count_queued(self) -> int:
+        """Return the number of jobs waiting to be claimed."""
+        with self._lock, self._connect() as conn:
+            row = conn.execute(
+                "SELECT COUNT(*) AS total FROM download_jobs WHERE status = 'queued'"
+            ).fetchone()
+            return int(row["total"]) if row else 0
+
     def list_all(
         self, limit: int | None = None, status_filter: str | None = None
     ) -> list[dict[str, Any]]:

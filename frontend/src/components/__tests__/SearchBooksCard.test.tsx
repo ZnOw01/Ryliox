@@ -46,18 +46,18 @@ describe('SearchBooksCard', () => {
   it('renders an accessible search box and listbox options', async () => {
     render(<SearchBooksCard />);
 
-    const input = screen.getByRole('textbox', { name: /buscar libros/i });
+    const input = screen.getByRole('combobox', { name: /buscar libros/i });
     fireEvent.change(input, { target: { value: 'python' } });
 
-    expect(input).toHaveAttribute('aria-controls', 'search-results');
-    expect(screen.getByRole('listbox')).toBeInTheDocument();
+    const listbox = screen.getByRole('listbox');
+    expect(input).toHaveAttribute('aria-controls', listbox.id);
     expect(screen.getByRole('option', { name: /python limpio/i })).toBeInTheDocument();
   });
 
   it('marks the selected option with aria-selected', () => {
     render(<SearchBooksCard />);
 
-    const input = screen.getByRole('textbox', { name: /buscar libros/i });
+    const input = screen.getByRole('combobox', { name: /buscar libros/i });
     fireEvent.change(input, { target: { value: 'python' } });
 
     const option = screen.getByRole('option', { name: /python limpio/i });

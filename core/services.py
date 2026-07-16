@@ -12,12 +12,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from core.audit import AuditEventType, audit_download
 from core.dto import (
     DownloadErrorDTO,
     DownloadJobDTO,
     DownloadProgressDTO,
     DownloadResultDTO,
 )
+from core.metrics import metrics
 from core.repository import DownloadJobRepository
 
 if TYPE_CHECKING:
@@ -35,6 +37,10 @@ MIN_QUEUE_POLL_INTERVAL_SECONDS = 0.1
 WORKER_ERROR_LOG_COOLDOWN_SECONDS = 60.0
 
 TERMINAL_STATES = frozenset(["completed", "error", "cancelled"])
+
+
+class QueueCapacityError(RuntimeError):
+    """Raised when the configured pending-job bound has been reached."""
 
 
 @dataclass(frozen=True)
@@ -58,6 +64,8 @@ class DownloadQueueService:
         error_log_dir: Path,
         poll_interval_seconds: float = DEFAULT_QUEUE_POLL_INTERVAL_SECONDS,
         terminal_job_retention: int = DEFAULT_TERMINAL_JOB_RETENTION,
+        max_queued_jobs: int = 50,
+        download_timeout_seconds: float = 600.0,
     ):
         """Initialize the service."""
         self._kernel_factory = kernel_factory
@@ -65,6 +73,8 @@ class DownloadQueueService:
         self._poll_interval_seconds = max(
             MIN_QUEUE_POLL_INTERVAL_SECONDS, float(poll_interval_seconds)
         )
+        self._max_queued_jobs = max(1, int(max_queued_jobs))
+        self._download_timeout_seconds = max(1.0, float(download_timeout_seconds))
 
         # Repository
         if repository is not None:
@@ -81,6 +91,7 @@ class DownloadQueueService:
         self._state_lock = threading.Lock()
         self._wake_event = threading.Event()
         self._progress_condition = threading.Condition()
+        self._async_waiters: set[tuple[asyncio.AbstractEventLoop, asyncio.Event]] = set()
         self._progress_version = 0
         self._stop_event = threading.Event()
 
@@ -119,7 +130,7 @@ class DownloadQueueService:
             self._worker.start()
             logger.info("Download queue worker started")
 
-    def stop(self, timeout_seconds: float = 5.0) -> None:
+    def stop(self, timeout_seconds: float = 5.0) -> bool:
         """Stop the queue worker."""
         self._stop_event.set()
         self._wake_event.set()
@@ -136,13 +147,19 @@ class DownloadQueueService:
         if active_cancel_event is not None:
             active_cancel_event.set()
 
-        try:
-            if worker and worker.is_alive():
-                worker.join(timeout=max(MIN_QUEUE_POLL_INTERVAL_SECONDS, timeout_seconds))
-        finally:
-            with contextlib.suppress(Exception):
-                self._repository.close()
-            logger.info("Download queue worker stopped")
+        if worker and worker.is_alive():
+            worker.join(timeout=max(MIN_QUEUE_POLL_INTERVAL_SECONDS, timeout_seconds))
+        if worker and worker.is_alive():
+            logger.critical(
+                "Download queue worker did not stop before timeout; repository left open"
+            )
+            return False
+        with contextlib.suppress(Exception):
+            self._repository.close()
+        with self._state_lock:
+            self._worker = None
+        logger.info("Download queue worker stopped")
+        return True
 
     def enqueue(
         self,
@@ -154,6 +171,9 @@ class DownloadQueueService:
         skip_images: bool,
     ) -> dict[str, Any]:
         """Enqueue a new download job."""
+        queued_count = getattr(self._repository, "count_queued", lambda: 0)()
+        if queued_count >= self._max_queued_jobs:
+            raise QueueCapacityError("Download queue is full")
         job_dto = DownloadJobDTO.create(
             book_id=book_id,
             output_dir=output_dir,
@@ -167,6 +187,8 @@ class DownloadQueueService:
         self._notify_progress_change()
 
         logger.info("Enqueued job %s for book %s", job_dto.job_id[:8], book_id)
+        metrics.set_queue_size(queued_count + 1)
+        audit_download(AuditEventType.DOWNLOAD_STARTED, book_id, job_dto.job_id)
         return snapshot
 
     def get_progress(self, job_id: str | None = None) -> dict[str, Any]:
@@ -220,11 +242,34 @@ class DownloadQueueService:
             self._progress_condition.wait(timeout=timeout)
             return self._progress_version
 
+    async def wait_for_progress_change_async(
+        self, previous_version: int, timeout_seconds: float
+    ) -> int:
+        """Await a progress notification without occupying a worker thread."""
+        loop = asyncio.get_running_loop()
+        event = asyncio.Event()
+        waiter = (loop, event)
+        with self._progress_condition:
+            if self._progress_version != previous_version:
+                return self._progress_version
+            self._async_waiters.add(waiter)
+        try:
+            with contextlib.suppress(TimeoutError):
+                await asyncio.wait_for(event.wait(), timeout=max(0.0, timeout_seconds))
+        finally:
+            with self._progress_condition:
+                self._async_waiters.discard(waiter)
+        return self.get_progress_version()
+
     def _notify_progress_change(self) -> None:
         """Notify all waiters of progress change."""
         with self._progress_condition:
             self._progress_version += 1
             self._progress_condition.notify_all()
+            waiters = tuple(self._async_waiters)
+        for loop, event in waiters:
+            with contextlib.suppress(RuntimeError):
+                loop.call_soon_threadsafe(event.set)
 
     def _worker_loop(self) -> None:
         """Main worker daemon loop."""
@@ -341,7 +386,9 @@ class DownloadQueueService:
             with runner:
                 # ponytail: no overall timeout — individual HTTP requests have
                 # their own timeout (30s) and the user can cancel via the UI.
-                result = runner.run(run_download())
+                result = runner.run(
+                    asyncio.wait_for(run_download(), timeout=self._download_timeout_seconds)
+                )
 
             if self._check_and_signal_cancel(job.job_id, cancel_event):
                 raise RuntimeError("Download cancelled by user")
@@ -363,6 +410,8 @@ class DownloadQueueService:
                 raise RuntimeError("Download job could not transition to completed")
             self._notify_progress_change()
             logger.info("Job %s completed successfully", job.job_id[:8])
+            metrics.set_active_downloads(0)
+            audit_download(AuditEventType.DOWNLOAD_COMPLETED, job.book_id, job.job_id)
 
         except Exception as exc:
             self._handle_job_exception(job, exc, cancel_event)
@@ -437,6 +486,14 @@ class DownloadQueueService:
                 status="error",
             )
             logger.error("Job %s failed: %s", job.job_id[:8], message)
+
+        metrics.set_active_downloads(0)
+        event_type = (
+            AuditEventType.DOWNLOAD_CANCELLED
+            if cancel_event.is_set() or "cancelled" in message.lower()
+            else AuditEventType.DOWNLOAD_FAILED
+        )
+        audit_download(event_type, job.book_id, job.job_id, success=False)
 
         self._notify_progress_change()
 

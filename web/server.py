@@ -9,6 +9,10 @@ attaches the application-scoped kernel, session store and download queue to
 
 from __future__ import annotations
 
+import asyncio
+import hashlib
+import hmac
+import ipaddress
 import logging
 import threading
 import time
@@ -16,6 +20,7 @@ import uuid
 from collections import defaultdict
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from contextlib import asynccontextmanager, suppress
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import uvicorn
@@ -46,7 +51,8 @@ from web.routes import (
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
-    from pathlib import Path
+
+    from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 logger = logging.getLogger(__name__)
 
@@ -116,6 +122,46 @@ def _client_ip(request: Request) -> str:
     return "unknown"
 
 
+def _is_loopback_bind(host: str) -> bool:
+    if host.lower() == "localhost":
+        return True
+    try:
+        return ipaddress.ip_address(host.strip("[]")).is_loopback
+    except ValueError:
+        return False
+
+
+def _validate_deployment_security() -> None:
+    settings = config.SETTINGS
+    remote = not _is_loopback_bind(settings.server.host)
+    token = settings.security.admin_token
+    remote_requires_auth = remote and not settings.security.allow_unauthenticated_local_proxy
+    if (remote_requires_auth or settings.security.environment == "production") and (
+        token is None or len(token) < 32
+    ):
+        raise RuntimeError(
+            "Remote/production API requires RYLIOX_SECURITY__ADMIN_TOKEN (at least 32 characters)"
+        )
+    if settings.security.environment == "production" and not settings.session.encryption_key:
+        key_file = settings.session.encryption_key_file
+        if key_file is None or not Path(key_file).expanduser().is_file():
+            raise RuntimeError(
+                "Production requires RYLIOX_SESSION__ENCRYPTION_KEY or an existing "
+                "RYLIOX_SESSION__ENCRYPTION_KEY_FILE"
+            )
+    if settings.security.environment == "production" and not settings.audit.hmac_key:
+        audit_key_file = settings.audit.hmac_key_file
+        if audit_key_file is None or not Path(audit_key_file).expanduser().is_file():
+            raise RuntimeError(
+                "Production requires RYLIOX_AUDIT__HMAC_KEY or an existing "
+                "RYLIOX_AUDIT__HMAC_KEY_FILE"
+            )
+
+
+def _admin_session_value(token: str) -> str:
+    return hmac.new(token.encode("utf-8"), b"ryliox-admin-session", hashlib.sha256).hexdigest()
+
+
 NextHandler = Callable[[Request], Awaitable[Response]]
 MiddlewareHandler = Callable[[Request, NextHandler], Awaitable[Response]]
 
@@ -144,6 +190,39 @@ def _rate_limit_middleware_factory(limiter: _RateLimiter) -> MiddlewareHandler:
                 status.HTTP_429_TOO_MANY_REQUESTS,
                 code=ErrorCode.RATE_LIMITED,
                 details={"retry_after_seconds": limiter.window_seconds},
+            )
+        return await call_next(request)
+
+    return _middleware
+
+
+def _admin_auth_middleware_factory() -> MiddlewareHandler:
+    async def _middleware(request: Request, call_next: NextHandler) -> Response:
+        if not request.url.path.startswith(("/api", "/metrics")):
+            return await call_next(request)
+        if request.url.path in {"/api/health", "/api/admin/session"}:
+            return await call_next(request)
+        if (
+            _is_loopback_bind(config.SETTINGS.server.host)
+            or config.SETTINGS.security.allow_unauthenticated_local_proxy
+        ):
+            return await call_next(request)
+        configured = config.SETTINGS.security.admin_token or ""
+        authorization = request.headers.get("authorization", "")
+        scheme, _, provided = authorization.partition(" ")
+        bearer_valid = scheme.lower() == "bearer" and hmac.compare_digest(provided, configured)
+        session_valid = hmac.compare_digest(
+            request.cookies.get("ryliox_admin_session", ""),
+            _admin_session_value(configured),
+        )
+        if not bearer_valid and not session_valid:
+            return JSONResponse(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                content={
+                    "error": "Administrative authentication required",
+                    "code": "admin_auth_required",
+                },
+                headers={"WWW-Authenticate": "Bearer"},
             )
         return await call_next(request)
 
@@ -200,18 +279,74 @@ def _sanitize_errors(errors: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]
 # ─── Request size / timeout middleware ───────────────────────────────────────
 
 
-def _request_size_middleware_factory(max_bytes: int) -> MiddlewareHandler:
+class RequestBodyLimitMiddleware:
+    """Bound request bodies even when clients use chunked transfer encoding."""
+
+    def __init__(self, app: ASGIApp, max_bytes: int) -> None:
+        self.app = app
+        self.max_bytes = max_bytes
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+        headers = {key.lower(): value for key, value in scope.get("headers", [])}
+        content_length = headers.get(b"content-length", b"")
+        if content_length.isdigit() and int(content_length) > self.max_bytes:
+            await self._reject(scope, receive, send)
+            return
+
+        messages: list[Message] = []
+        total = 0
+        while True:
+            message = await receive()
+            messages.append(message)
+            if message["type"] == "http.disconnect":
+                return
+            if message["type"] == "http.request":
+                total += len(message.get("body", b""))
+                if total > self.max_bytes:
+                    await self._reject(scope, receive, send)
+                    return
+                if not message.get("more_body", False):
+                    break
+
+        async def replay() -> Message:
+            if messages:
+                return messages.pop(0)
+            return {"type": "http.request", "body": b"", "more_body": False}
+
+        await self.app(scope, replay, send)
+
+    @staticmethod
+    async def _reject(scope: Scope, receive: Receive, send: Send) -> None:
+        response = JSONResponse(
+            status_code=413,
+            content={"error": "Request body too large", "code": ErrorCode.REQUEST_TOO_LARGE},
+        )
+        await response(scope, receive, send)
+
+
+def _timeout_and_metrics_middleware_factory(timeout_seconds: float) -> MiddlewareHandler:
     async def _middleware(request: Request, call_next: NextHandler) -> Response:
-        cl = request.headers.get("content-length")
-        if cl and cl.isdigit() and int(cl) > max_bytes:
-            return JSONResponse(
-                status_code=413,
-                content={
-                    "error": "Request body too large",
-                    "code": ErrorCode.REQUEST_TOO_LARGE,
-                },
+        started = time.monotonic()
+        try:
+            async with asyncio.timeout(timeout_seconds):
+                response = await call_next(request)
+        except TimeoutError:
+            response = JSONResponse(
+                status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+                content={"error": "Request timed out", "code": "request_timeout"},
             )
-        return await call_next(request)
+        with suppress(Exception):
+            route = request.scope.get("route")
+            metrics.record_http_request(
+                request.method,
+                route.path if route is not None else request.url.path,
+                response.status_code,
+                time.monotonic() - started,
+            )
+        return response
 
     return _middleware
 
@@ -240,6 +375,7 @@ def create_app() -> FastAPI:
     Returns:
         A fully configured :class:`fastapi.FastAPI` instance.
     """
+    _validate_deployment_security()
     settings = config.SETTINGS
     is_prod = settings.security.environment == "production"
 
@@ -274,11 +410,45 @@ def create_app() -> FastAPI:
         )
 
     app.middleware("http")(_security_headers_middleware_factory())
-    app.middleware("http")(
-        _request_size_middleware_factory(settings.security.max_request_size_mb * 1024 * 1024)
+    app.add_middleware(
+        RequestBodyLimitMiddleware,
+        max_bytes=settings.security.max_request_size_mb * 1024 * 1024,
     )
+    app.middleware("http")(
+        _timeout_and_metrics_middleware_factory(settings.http.request_timeout_seconds)
+    )
+    app.middleware("http")(_admin_auth_middleware_factory())
     app.middleware("http")(_rate_limit_middleware_factory(app.state.rate_limiter))
     app.middleware("http")(_request_id_middleware_factory())
+
+    @app.post("/api/admin/session", include_in_schema=False)
+    async def _create_admin_session(request: Request) -> Response:
+        configured = settings.security.admin_token or ""
+        if not configured:
+            return JSONResponse(
+                status_code=status.HTTP_404_NOT_FOUND,
+                content={"error": "Administrative authentication is not configured"},
+            )
+        try:
+            payload = await request.json()
+        except ValueError:
+            payload = {}
+        provided = payload.get("token", "") if isinstance(payload, dict) else ""
+        if not isinstance(provided, str) or not hmac.compare_digest(provided, configured):
+            return JSONResponse(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                content={"error": "Invalid administrative token", "code": "admin_auth_invalid"},
+            )
+        response = JSONResponse({"success": True})
+        response.set_cookie(
+            "ryliox_admin_session",
+            _admin_session_value(configured),
+            httponly=True,
+            secure=settings.security.environment == "production",
+            samesite="strict",
+            path="/",
+        )
+        return response
 
     # ── Routers ──
     app.include_router(auth_router)

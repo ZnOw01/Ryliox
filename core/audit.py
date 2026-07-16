@@ -16,8 +16,9 @@ from enum import Enum, auto
 from pathlib import Path
 from typing import Any
 
+from platformdirs import user_config_path
+
 import config
-from core.secrets import get_secret
 from core.validators import sanitize_for_logs
 
 logger = logging.getLogger(__name__)
@@ -43,16 +44,37 @@ AUDIT_FSYNC_ENABLED: bool = os.getenv("AUDIT_FSYNC_ENABLED", "true").lower() in 
 _MIN_PRINTABLE_ASCII: int = 32
 
 
-def _get_audit_hmac_key() -> bytes:
-    """Get or create the HMAC key for audit log integrity."""
-    key = get_secret("audit_hmac_key")
-    if key is None:
-        # Generate and store new key
-        key = secrets.token_hex(32)
-        from core.secrets import set_secret
+_audit_hmac_key: bytes | None = None
 
-        set_secret("audit_hmac_key", key)
-    return key.encode() if isinstance(key, str) else key
+
+def _get_audit_hmac_key() -> bytes:
+    """Load the audit key externally, generating a durable local key only in development."""
+    global _audit_hmac_key
+    if _audit_hmac_key is not None:
+        return _audit_hmac_key
+    settings = config.SETTINGS.audit
+    key = settings.hmac_key
+    path = Path(settings.hmac_key_file).expanduser() if settings.hmac_key_file else None
+    if key is None and path is not None:
+        if not path.is_file():
+            raise RuntimeError(f"Audit HMAC key file does not exist: {path}")
+        key = path.read_text(encoding="ascii").strip()
+    if key is None:
+        if config.SETTINGS.security.environment == "production":
+            raise RuntimeError("Production requires an external audit HMAC key")
+        path = user_config_path("ryliox") / "audit-hmac.key"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if path.exists():
+            key = path.read_text(encoding="ascii").strip()
+        else:
+            key = secrets.token_hex(32)
+            path.write_text(key, encoding="ascii")
+        path.parent.chmod(0o700)
+        path.chmod(0o600)
+    if len(key) < 64:
+        raise RuntimeError("Audit HMAC key must contain at least 64 characters")
+    _audit_hmac_key = key.encode("ascii")
+    return _audit_hmac_key
 
 
 class AuditEventType(Enum):
@@ -247,7 +269,22 @@ class AuditLogger:
         self._prune_old_logs()
 
         if self._enabled:
+            self._restore_chain_state()
+            valid, _ = self.verify_integrity()
+            if not valid:
+                raise RuntimeError("Existing audit log failed integrity verification")
             self._log_startup()
+
+    def _restore_chain_state(self) -> None:
+        """Restore chain position from the active log before appending."""
+        if not self._log_file.exists():
+            return
+        with self._log_file.open("r", encoding="utf-8") as handle:
+            entries = [line.strip() for line in handle if line.strip()]
+        self._entry_count = len(entries)
+        if entries:
+            data = json.loads(entries[-1])
+            self._last_hash = str(data["integrity_hash"])
 
     def _prune_old_logs(self) -> None:
         """Delete rotated audit log files older than ``retention_days``.
@@ -312,21 +349,23 @@ class AuditLogger:
     def _write_entry(self, entry: AuditEntry) -> None:
         """Write entry to log file with thread safety and chaining."""
         with self._file_lock:
-            try:
-                with self._log_file.open("a", encoding="utf-8") as f:
-                    f.write(entry.to_json() + "\n")
-                    f.flush()
-                    if self._fsync_enabled:
-                        try:
-                            os.fsync(f.fileno())
-                        except OSError as exc:
-                            logger.warning("Audit log fsync failed: %s", exc)
+            self._write_entry_unlocked(entry)
 
-                self._entry_count += 1
-                self._last_hash = entry.integrity_hash
-            except OSError:
-                logger.exception("Failed to write audit entry")
-                raise
+    def _write_entry_unlocked(self, entry: AuditEntry) -> None:
+        try:
+            with self._log_file.open("a", encoding="utf-8") as f:
+                f.write(entry.to_json() + "\n")
+                f.flush()
+                if self._fsync_enabled:
+                    try:
+                        os.fsync(f.fileno())
+                    except OSError as exc:
+                        logger.warning("Audit log fsync failed: %s", exc)
+            self._entry_count += 1
+            self._last_hash = entry.integrity_hash
+        except OSError:
+            logger.exception("Failed to write audit entry")
+            raise
 
     def log(
         self,
@@ -348,21 +387,21 @@ class AuditLogger:
         safe_user_agent = sanitize_for_logs(user_agent, max_length=200) if user_agent else None
         safe_source_ip = self._validate_ip(source_ip)
 
-        entry = AuditEntry(
-            timestamp=datetime.now(UTC),
-            event_type=event_type.name,
-            severity=severity.value,
-            request_id=request_id,
-            user_id=sanitize_for_logs(user_id, max_length=100) if user_id else None,
-            source_ip=safe_source_ip,
-            user_agent=safe_user_agent,
-            action=action,
-            resource=sanitize_for_logs(resource, max_length=500) if resource else None,
-            details=safe_details,
-            prev_hash=self._last_hash,
-        )
-
-        self._write_entry(entry)
+        with self._file_lock:
+            entry = AuditEntry(
+                timestamp=datetime.now(UTC),
+                event_type=event_type.name,
+                severity=severity.value,
+                request_id=request_id,
+                user_id=sanitize_for_logs(user_id, max_length=100) if user_id else None,
+                source_ip=safe_source_ip,
+                user_agent=safe_user_agent,
+                action=action,
+                resource=sanitize_for_logs(resource, max_length=500) if resource else None,
+                details=safe_details,
+                prev_hash=self._last_hash,
+            )
+            self._write_entry_unlocked(entry)
         self._mirror_to_logger(entry)
 
         return entry
@@ -440,6 +479,7 @@ class AuditLogger:
 
         suspicious = []
 
+        expected_prev_hash = ""
         with self._file_lock, self._log_file.open("r", encoding="utf-8") as f:
             for line_num, line in enumerate(f, 1):
                 line = line.strip()
@@ -480,8 +520,12 @@ class AuditLogger:
                         prev_hash=entry.prev_hash,
                     )
 
-                    if actual_entry.integrity_hash != expected_hash:
+                    if (
+                        actual_entry.integrity_hash != expected_hash
+                        or entry.prev_hash != expected_prev_hash
+                    ):
                         suspicious.append(entry)
+                    expected_prev_hash = expected_hash
 
                 except (json.JSONDecodeError, KeyError, ValueError) as exc:
                     logger.error(
@@ -545,6 +589,7 @@ class AuditLogger:
                         details=data.get("details", {}),
                         integrity_hash=data.get("integrity_hash", ""),
                         entry_id=data.get("entry_id", ""),
+                        prev_hash=data.get("prev_hash", ""),
                     )
 
                     results.append(entry)

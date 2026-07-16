@@ -347,6 +347,7 @@ class HttpClient:
             try:
                 if not allow_redirects:
                     response = await self.client.get(url, **kwargs)
+                    self._enforce_response_limit(response)
                     self._capture_response_cookies(response)
                     return response
                 return await self._get_with_safe_redirects(url, kwargs)
@@ -359,6 +360,8 @@ class HttpClient:
     async def _get_with_safe_redirects(self, url: str, kwargs: dict[str, Any]) -> httpx.Response:
         current = url
         seen: set[str] = set()
+        redirect_count = 0
+        max_redirects = max(0, int(config.SETTINGS.http.max_redirects))
         while True:
             if current in seen:
                 raise ValueError(f"Redirect loop detected for URL: {current}")
@@ -369,17 +372,30 @@ class HttpClient:
                 raise ValueError(f"Blocked unsafe redirect URL: {current}")
             self._apply_auth_cookies()
             response = await self.client.get(current, follow_redirects=False, **kwargs)
+            self._enforce_response_limit(response)
             self._capture_response_cookies(response)
             if response.status_code not in (301, 302, 303, 307, 308):
                 return response
             location = response.headers.get("location")
             if not location:
                 return response
+            redirect_count += 1
+            if redirect_count > max_redirects:
+                raise ValueError(f"Redirect limit exceeded ({max_redirects})")
             if not location.startswith("http"):
                 from urllib.parse import urljoin
 
                 location = urljoin(current, location)
             current = location
+
+    @staticmethod
+    def _enforce_response_limit(response: httpx.Response) -> None:
+        max_bytes = max(1, int(config.SETTINGS.http.max_response_size_mb)) * 1024 * 1024
+        declared = response.headers.get("content-length", "")
+        if declared.isdigit() and int(declared) > max_bytes:
+            raise ValueError("Upstream response exceeds configured size limit")
+        if len(response.content) > max_bytes:
+            raise ValueError("Upstream response exceeds configured size limit")
 
     async def get_json(self, url: str, **kwargs: Any) -> dict:
         response = await self.get(url, **kwargs)

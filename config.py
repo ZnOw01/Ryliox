@@ -13,7 +13,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any, Literal
 
-from pydantic import Field
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # ─── Project root ────────────────────────────────────────────────────────────
@@ -33,6 +33,7 @@ class ServerSettings(BaseSettings):
 
 class PathSettings(BaseSettings):
     output_dir: Path = Field(default=Path("./output"))
+    output_root: Path = Field(default=Path("./output"))
     data_dir: Path = Field(default=Path("./data"))
     cookies_file: Path | None = None
     session_db_file: Path | None = None
@@ -51,6 +52,9 @@ class HttpSettings(BaseSettings):
     retries: int = 2
     retry_backoff: float = 0.5
     request_timeout_seconds: int = 600
+    max_redirects: int = 5
+    max_response_size_mb: int = 50
+    max_assets_per_book: int = 2_000
     user_agent: str | None = None
     enable_fake_useragent: bool = False
     accept: str = "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8"
@@ -72,6 +76,8 @@ class SecuritySettings(BaseSettings):
         "connect-src 'self'; frame-ancestors 'none';"
     )
     max_request_size_mb: int = 10
+    admin_token: str | None = None
+    allow_unauthenticated_local_proxy: bool = False
     cors_origins: list[str] = Field(
         default_factory=lambda: ["http://localhost:8000", "http://127.0.0.1:8000"]
     )
@@ -95,6 +101,8 @@ class AuditSettings(BaseSettings):
     log_dir: Path = Field(default=Path("./data/audit"))
     log_file: Path = Field(default=Path("./data/audit.log"))
     retention_days: int = 365
+    hmac_key: str | None = None
+    hmac_key_file: Path | None = None
 
 
 class SessionSettings(BaseSettings):
@@ -102,6 +110,9 @@ class SessionSettings(BaseSettings):
     cookie_httponly: bool = True
     cookie_samesite: Literal["Strict", "Lax", "None"] = "Lax"
     max_age: int = 86_400
+    encryption_key: str | None = None
+    old_encryption_keys: list[str] = Field(default_factory=list)
+    encryption_key_file: Path | None = None
 
 
 class LoggingSettings(BaseSettings):
@@ -129,6 +140,8 @@ class QueueSettings(BaseSettings):
     log_dir: str = "logs"
     poll_interval_seconds: float = 0.5
     terminal_job_retention: int = 500
+    max_queued_jobs: int = 50
+    shutdown_timeout_seconds: float = 10.0
 
 
 class Settings(BaseSettings):
@@ -142,19 +155,31 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=(".env",),
         env_file_encoding="utf-8",
-        env_nested_delimiter="_",
+        env_nested_delimiter="__",
         case_sensitive=False,
         extra="ignore",
     )
 
     server: ServerSettings = Field(default_factory=ServerSettings)
-    paths: PathSettings = Field(default_factory=PathSettings)
+    paths: PathSettings = Field(
+        default_factory=PathSettings,
+        validation_alias=AliasChoices("PATHS", "RYLIOX_PATHS"),
+    )
     http: HttpSettings = Field(default_factory=HttpSettings)
-    security: SecuritySettings = Field(default_factory=SecuritySettings)
+    security: SecuritySettings = Field(
+        default_factory=SecuritySettings,
+        validation_alias=AliasChoices("SECURITY", "RYLIOX_SECURITY"),
+    )
     rate_limit: RateLimitSettings = Field(default_factory=RateLimitSettings)
     secrets: SecretsSettings = Field(default_factory=SecretsSettings)
-    audit: AuditSettings = Field(default_factory=AuditSettings)
-    session: SessionSettings = Field(default_factory=SessionSettings)
+    audit: AuditSettings = Field(
+        default_factory=AuditSettings,
+        validation_alias=AliasChoices("AUDIT", "RYLIOX_AUDIT"),
+    )
+    session: SessionSettings = Field(
+        default_factory=SessionSettings,
+        validation_alias=AliasChoices("SESSION", "RYLIOX_SESSION"),
+    )
     logging: LoggingSettings = Field(default_factory=LoggingSettings)
     metrics: MetricsSettings = Field(default_factory=MetricsSettings)
     cache: CacheSettings = Field(default_factory=CacheSettings)
@@ -199,6 +224,7 @@ def _resolve(value: Path | str | None, default: str) -> Path:
 
 
 OUTPUT_DIR: Path = _resolve(SETTINGS.paths.output_dir, "output")
+OUTPUT_ROOT: Path = _resolve(SETTINGS.paths.output_root, "output")
 DATA_DIR: Path = _resolve(SETTINGS.paths.data_dir, "data")
 COOKIES_FILE: Path = SETTINGS.paths.cookies_file or (DATA_DIR / "cookies.json")
 SESSION_DB_FILE: Path = SETTINGS.paths.session_db_file or (DATA_DIR / "session.sqlite3")
@@ -228,13 +254,14 @@ HEADERS: dict[str, str] = {
 
 def reload() -> Settings:
     """Force-reload SETTINGS from the environment (used by tests)."""
-    global SETTINGS, OUTPUT_DIR, DATA_DIR, COOKIES_FILE, SESSION_DB_FILE
+    global SETTINGS, OUTPUT_DIR, OUTPUT_ROOT, DATA_DIR, COOKIES_FILE, SESSION_DB_FILE
     global DOWNLOAD_QUEUE_DB, DOWNLOAD_ERROR_LOG_DIR, BASE_URL
     global REQUEST_DELAY, REQUEST_TIMEOUT, REQUEST_RETRIES, REQUEST_RETRY_BACKOFF
     global DOWNLOAD_TIMEOUT_SECONDS, HEADERS
     _load_settings.cache_clear()
     SETTINGS = _load_settings()
     OUTPUT_DIR = _resolve(SETTINGS.paths.output_dir, "output")
+    OUTPUT_ROOT = _resolve(SETTINGS.paths.output_root, "output")
     DATA_DIR = _resolve(SETTINGS.paths.data_dir, "data")
     COOKIES_FILE = SETTINGS.paths.cookies_file or (DATA_DIR / "cookies.json")
     SESSION_DB_FILE = SETTINGS.paths.session_db_file or (DATA_DIR / "session.sqlite3")
@@ -260,6 +287,7 @@ __all__ = [
     "SETTINGS",
     "REPO_ROOT",
     "OUTPUT_DIR",
+    "OUTPUT_ROOT",
     "DATA_DIR",
     "COOKIES_FILE",
     "SESSION_DB_FILE",

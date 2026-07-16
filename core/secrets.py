@@ -127,10 +127,8 @@ class SecretManager:
         self._master_key_file.parent.mkdir(parents=True, exist_ok=True)
         password = os.getenv("SECRET_MASTER_PASSWORD")
         if not password:
-            password = secrets.token_urlsafe(32)
-            logger.warning(
-                "Generated random master password. Set SECRET_MASTER_PASSWORD "
-                "in environment for persistence across restarts."
+            raise SecretManagerError(
+                "SECRET_MASTER_PASSWORD is required before creating encrypted secrets"
             )
 
         key, salt = self._derive_key(password)

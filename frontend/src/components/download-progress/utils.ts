@@ -66,6 +66,7 @@ export function formatStatusLabel(status: string, t?: TFunction): string {
 export function formatSseStatusLabel(status: SseStatus, t?: TFunction): string {
   if (!t) {
     const fallbackLabels: Record<SseStatus, string> = {
+      disconnected: 'paused',
       connected: 'active',
       connecting: 'starting',
       error: 'paused',
@@ -75,6 +76,7 @@ export function formatSseStatusLabel(status: SseStatus, t?: TFunction): string {
   }
 
   const labels: Record<SseStatus, string> = {
+    disconnected: t('download.sse.status_disconnected'),
     connected: t('download.sse.status_connected'),
     connecting: t('download.sse.status_connecting'),
     error: t('download.sse.status_error'),

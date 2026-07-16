@@ -7,8 +7,10 @@ import inspect
 import logging
 from typing import Any
 
-from fastapi import APIRouter, Body, Depends, HTTPException, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Request, status
 
+from core.audit import AuditEventType, audit_data
+from core.cache import get_book_metadata_cache, get_chapter_list_cache, get_search_results_cache
 from core.kernel import Kernel
 from core.session_store import SessionStore, normalize_cookies_payload
 from web.api_utils import ErrorCode
@@ -131,6 +133,15 @@ async def save_cookies(
             },
         )
 
+    await get_book_metadata_cache().clear()
+    await get_chapter_list_cache().clear()
+    await get_search_results_cache().clear()
+    audit_data(
+        AuditEventType.DATA_WRITE,
+        "session_cookies_replaced",
+        "session:cookies",
+        details={"cookie_count": len(payload)},
+    )
     return SaveCookiesResponse(success=True)
 
 
@@ -140,6 +151,7 @@ async def save_cookies(
     dependencies=[Depends(require_same_origin("get_cookies"))],
 )
 def get_cookies(
+    request: Request,
     session_store: SessionStore = Depends(get_session_store),
 ) -> CookiesResponse:
     """Return the currently stored session cookies.
@@ -150,4 +162,12 @@ def get_cookies(
     Returns:
         CookiesResponse containing the stored cookies.
     """
-    return CookiesResponse(cookies=session_store.get_cookies())
+    cookies = session_store.get_cookies()
+    audit_data(
+        AuditEventType.DATA_READ,
+        "session_cookies_read",
+        "session:cookies",
+        request_id=getattr(request.state, "request_id", None),
+        details={"cookie_count": len(cookies)},
+    )
+    return CookiesResponse(cookies=cookies)

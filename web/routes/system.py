@@ -14,6 +14,7 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Request, status
 from pydantic import BaseModel
 
 import config
+from core.audit import AuditEventType, audit_data
 from core.feature_flags import feature_flags
 from core.metrics import metrics
 from plugins.downloader import DownloaderPlugin
@@ -416,6 +417,7 @@ def get_formats() -> FormatsResponse:
     dependencies=[Depends(require_same_origin("reveal_file"))],
 )
 async def reveal_file(
+    request: Request,
     data: RevealRequest = Body(default_factory=RevealRequest),
     kernel: Kernel = Depends(get_kernel),
 ) -> RevealResponse:
@@ -450,6 +452,14 @@ async def reveal_file(
             detail={"error": "Failed to reveal file", "code": ErrorCode.REVEAL_FAILED},
         )
 
+    audit_data(
+        AuditEventType.DATA_READ,
+        "output_revealed_in_file_manager",
+        "output:file",
+        request_id=getattr(request.state, "request_id", None),
+        details={"path": str(path.relative_to(allowed_base))},
+    )
+
     return RevealResponse(success=True)
 
 
@@ -459,6 +469,7 @@ async def reveal_file(
     dependencies=[Depends(require_same_origin("set_output_dir"))],
 )
 async def set_output_dir(
+    request: Request,
     data: OutputDirRequest = Body(default_factory=OutputDirRequest),
     kernel: Kernel = Depends(get_kernel),
 ) -> SetOutputDirResponse | JSONResponse:
@@ -466,6 +477,12 @@ async def set_output_dir(
     output_plugin = kernel["output"]
 
     if data.browse:
+        if config.SETTINGS.server.host not in {"127.0.0.1", "localhost", "::1"}:
+            return error_response(
+                "Native folder picker is only available in local mode",
+                status.HTTP_403_FORBIDDEN,
+                code=ErrorCode.INVALID_OUTPUT_DIR,
+            )
         selected = await asyncio.to_thread(system_plugin.show_folder_picker, config.OUTPUT_DIR)
         if selected:
             # Validar igual que path manual
@@ -478,6 +495,13 @@ async def set_output_dir(
                 )
             with _config_lock:
                 config.OUTPUT_DIR = path
+            audit_data(
+                AuditEventType.CONFIG_CHANGED,
+                "output_directory_changed_by_local_picker",
+                "config:output_dir",
+                request_id=getattr(request.state, "request_id", None),
+                details={"path": str(path)},
+            )
             return SetOutputDirResponse(path=str(path))
         return SetOutputDirResponse(cancelled=True)
 
@@ -498,6 +522,13 @@ async def set_output_dir(
 
     with _config_lock:
         config.OUTPUT_DIR = path
+    audit_data(
+        AuditEventType.CONFIG_CHANGED,
+        "output_directory_changed",
+        "config:output_dir",
+        request_id=getattr(request.state, "request_id", None),
+        details={"path": str(path)},
+    )
     return SetOutputDirResponse(path=str(path))
 
 

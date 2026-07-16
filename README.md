@@ -234,6 +234,25 @@ native libraries to render PDFs.
 Use a full browser cookie JSON export. Console-based cookie snippets cannot read
 the HttpOnly `orm-rt` refresh cookie.
 
+## Secure deployment and migrations
+
+Localhost keeps the zero-configuration workflow. A non-loopback bind, and every
+production deployment, must set `RYLIOX_SECURITY__ADMIN_TOKEN` to at least 32
+characters. Remote API clients send it as `Authorization: Bearer <token>`; it is
+never compiled into the frontend bundle. Production also requires
+`RYLIOX_SESSION__ENCRYPTION_KEY` (a Fernet key) or
+`RYLIOX_SESSION__ENCRYPTION_KEY_FILE`, plus `RYLIOX_AUDIT__HMAC_KEY` or its file
+variant. Old cookie keys can be supplied as JSON in
+`RYLIOX_SESSION__OLD_ENCRYPTION_KEYS` while rotating.
+
+On first startup, plaintext cookie rows and legacy cookie files are imported,
+encrypted transactionally, and the plaintext source is removed. Back up before
+upgrading. Development keys are stored with mode `0600` in the platform user
+configuration directory, separate from SQLite and audit ciphertext. Output
+paths, including values selected by the local native picker, must remain below
+`RYLIOX_PATHS__OUTPUT_ROOT` (default `./output`). The native picker is disabled
+for remote binds.
+
 ## Project Layout
 
 ```text

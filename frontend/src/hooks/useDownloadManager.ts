@@ -14,7 +14,19 @@ import { queryKeys } from '../lib/query-keys';
 import type { DownloadStartResponse, ProgressResponse } from '../lib/types';
 import { useBookStore } from '../store/book-store';
 
-const ACTIVE_STATES = new Set(['queued', 'running']);
+const ACTIVE_STATES = new Set(['queued', 'running', 'cancelling']);
+export const TERMINAL_DOWNLOAD_STATES = new Set(['completed', 'error', 'cancelled', 'canceled']);
+
+const STATUS_ORDER: Record<string, number> = {
+  idle: 0,
+  queued: 1,
+  running: 2,
+  cancelling: 3,
+  completed: 4,
+  error: 4,
+  cancelled: 4,
+  canceled: 4,
+};
 
 const RECONNECT_BASE_DELAY_MS = 1000;
 const RECONNECT_MAX_DELAY_MS = 30000;
@@ -32,11 +44,46 @@ const STALE_TIMES = {
   chapters: 2 * 60 * 1000,
 } as const;
 
-export type SseStatus = 'connecting' | 'connected' | 'reconnecting' | 'error';
+export type SseStatus = 'disconnected' | 'connecting' | 'connected' | 'reconnecting' | 'error';
 
 function isDownloadActive(progress?: ProgressResponse) {
   const status = progress?.status;
   return Boolean(status && ACTIVE_STATES.has(status));
+}
+
+export function mergeProgressUpdate(
+  current: ProgressResponse | undefined,
+  next: ProgressResponse,
+  expectedJobId: string | null
+): ProgressResponse | undefined {
+  const nextJobId = next.job_id ?? null;
+  if (expectedJobId && nextJobId !== expectedJobId) {
+    return current;
+  }
+  if (current?.job_id && nextJobId !== current.job_id) {
+    return current;
+  }
+  if (!current) {
+    return next;
+  }
+
+  const currentStatus = current.status ?? 'idle';
+  const nextStatus = next.status ?? 'idle';
+  if (TERMINAL_DOWNLOAD_STATES.has(currentStatus)) {
+    return current;
+  }
+  if ((STATUS_ORDER[nextStatus] ?? 0) < (STATUS_ORDER[currentStatus] ?? 0)) {
+    return current;
+  }
+  if (
+    nextStatus === currentStatus &&
+    typeof current.percentage === 'number' &&
+    typeof next.percentage === 'number' &&
+    next.percentage < current.percentage
+  ) {
+    return current;
+  }
+  return next;
 }
 
 export function useDownloadManager() {
@@ -49,11 +96,10 @@ export function useDownloadManager() {
   const setSkipImages = useBookStore(state => state.setSkipImages);
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
   const [selectedChapters, setSelectedChapters] = useState<number[]>([]);
-  const [sseStatus, setSseStatus] = useState<SseStatus>('connecting');
+  const [sseStatus, setSseStatus] = useState<SseStatus>('disconnected');
   const [reconnectToken, setReconnectToken] = useState(0);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reconnectAttemptRef = useRef(0);
-  const disposedRef = useRef(false);
 
   // Query para formatos - datos estáticos con staleTime extendido
   const formatsQuery = useQuery({
@@ -67,24 +113,23 @@ export function useDownloadManager() {
   // Query key para progreso usando factory pattern
   const progressQueryKey = useMemo(() => queryKeys.progress.byJob(activeJobId), [activeJobId]);
 
-  const activeJobIdRef = useRef(activeJobId);
-  const progressQueryKeyRef = useRef(progressQueryKey);
-
-  activeJobIdRef.current = activeJobId;
-  progressQueryKeyRef.current = progressQueryKey;
-
   // Query para progreso con staleTime dinámico basado en estado
   const progressQuery = useQuery({
     queryKey: progressQueryKey,
-    queryFn: () => getProgress(activeJobId),
+    queryFn: async () => {
+      const requestedJobId = activeJobId;
+      const next = await getProgress(requestedJobId);
+      const current = queryClient.getQueryData<ProgressResponse>(progressQueryKey);
+      return (
+        mergeProgressUpdate(current, next, requestedJobId) ?? {
+          job_id: requestedJobId,
+          status: 'idle',
+        }
+      );
+    },
     refetchInterval: query => {
       const data = query.state.data as ProgressResponse | undefined;
-      // Refetch más frecuente durante descargas activas
-      if (isDownloadActive(data)) {
-        return 8000;
-      }
-      // Menos frecuente cuando está idle o completado
-      return 30000;
+      return activeJobId && isDownloadActive(data) && sseStatus !== 'connected' ? 8000 : false;
     },
     staleTime: query => {
       const data = query.state.data as ProgressResponse | undefined;
@@ -97,14 +142,11 @@ export function useDownloadManager() {
 
   useEffect(() => {
     const progressJobId = progressQuery.data?.job_id ?? null;
-    if (!progressJobId) {
-      return;
-    }
-    if (activeJobId === progressJobId) {
+    if (!progressJobId || activeJobId || !isDownloadActive(progressQuery.data)) {
       return;
     }
     setActiveJobId(progressJobId);
-  }, [activeJobId, progressQuery.data?.job_id]);
+  }, [activeJobId, progressQuery.data]);
 
   // Query para capítulos con staleTime apropiado
   const chaptersQuery = useQuery({
@@ -123,8 +165,16 @@ export function useDownloadManager() {
   }, []);
 
   useEffect(() => {
-    // Reset disposed flag so reconnection works correctly after remounts (e.g. HMR)
-    disposedRef.current = false;
+    const progress = progressQuery.data;
+    if (!activeJobId || !isDownloadActive(progress)) {
+      clearReconnectTimer();
+      reconnectAttemptRef.current = 0;
+      setSseStatus('disconnected');
+      return;
+    }
+
+    const subscribedJobId = activeJobId;
+    const subscribedQueryKey = queryKeys.progress.byJob(subscribedJobId);
     let closed = false;
     let unsubscribe = () => {};
 
@@ -137,7 +187,7 @@ export function useDownloadManager() {
     };
 
     const scheduleReconnect = () => {
-      if (disposedRef.current || reconnectTimerRef.current) {
+      if (closed || reconnectTimerRef.current) {
         return;
       }
       reconnectAttemptRef.current += 1;
@@ -149,7 +199,7 @@ export function useDownloadManager() {
       const delay = Math.round(clampedDelay + jitter);
       reconnectTimerRef.current = setTimeout(() => {
         reconnectTimerRef.current = null;
-        if (disposedRef.current) {
+        if (closed) {
           return;
         }
         setReconnectToken(current => current + 1);
@@ -161,34 +211,42 @@ export function useDownloadManager() {
     unsubscribe = subscribeProgress(
       {
         onProgress: next => {
-          if (!activeJobIdRef.current && next.job_id) {
-            setActiveJobId(next.job_id);
+          if (closed || next.job_id !== subscribedJobId) {
+            return;
           }
-          queryClient.setQueryData(progressQueryKeyRef.current, next);
+          queryClient.setQueryData<ProgressResponse>(subscribedQueryKey, current =>
+            mergeProgressUpdate(current, next, subscribedJobId)
+          );
         },
         onOpen: () => {
+          if (closed) {
+            return;
+          }
           reconnectAttemptRef.current = 0;
           setSseStatus('connected');
           clearReconnectTimer();
+          void queryClient.cancelQueries({
+            queryKey: subscribedQueryKey,
+            exact: true,
+          });
         },
         onError: () => {
-          if (disposedRef.current) {
+          if (closed) {
             return;
           }
           setSseStatus('error');
-          closeConnection();
+          unsubscribe();
           scheduleReconnect();
         },
       },
-      activeJobIdRef.current
+      subscribedJobId
     );
 
     return () => {
-      disposedRef.current = true;
       clearReconnectTimer();
       closeConnection();
     };
-  }, [activeJobId, clearReconnectTimer, queryClient, reconnectToken]);
+  }, [activeJobId, clearReconnectTimer, progressQuery.data?.status, queryClient, reconnectToken]);
 
   const forceReconnect = useCallback(() => {
     clearReconnectTimer();

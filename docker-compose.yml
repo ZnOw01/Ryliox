@@ -20,7 +20,7 @@ services:
       - "127.0.0.1:8000:8000"
 
     environment:
-      SECURITY: '{"environment":"development"}'
+      SECURITY: '{"environment":"development","allow_unauthenticated_local_proxy":true}'
       SERVER: '{"host":"0.0.0.0","port":8000}'
       PATHS: '{"data_dir":"/app/data","output_dir":"/app/output"}'
       PYTHONDONTWRITEBYTECODE: "1"
@@ -46,6 +46,7 @@ services:
       # Persistent runtime state
       - data-dev:/app/data
       - output-dev:/app/output
+      - config-dev:/app/.config/ryliox
 
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8000/api/health"]
@@ -57,3 +58,4 @@ services:
 volumes:
   data-dev:
   output-dev:
+  config-dev:

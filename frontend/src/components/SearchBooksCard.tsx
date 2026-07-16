@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { motion } from 'framer-motion';
@@ -44,7 +44,7 @@ function SearchResultsSkeleton({ count = 3 }: { count?: number }) {
           className="rounded-xl border border-border bg-card p-3"
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: i * 0.1, duration: 0.3 }}
+          transition={{ duration: 0.15 }}
         >
           <div className="flex gap-3">
             <BookCoverSkeleton size="md" />
@@ -108,36 +108,57 @@ function parseDirectBookRef(query: string): SearchBook | null {
 
 const RECENT_SEARCHES_KEY = 'ryliox-recent-searches';
 const MAX_RECENT_SEARCHES = 5;
+const SEARCH_SCOPES = new Set<SearchScope>(['all', 'title', 'author', 'publisher']);
 
 function getRecentSearches(): string[] {
   try {
-    return JSON.parse(localStorage.getItem(RECENT_SEARCHES_KEY) || '[]');
+    const value: unknown = JSON.parse(localStorage.getItem(RECENT_SEARCHES_KEY) || '[]');
+    return Array.isArray(value) ? value.filter(item => typeof item === 'string') : [];
   } catch {
     return [];
   }
 }
 
-function saveRecentSearch(query: string) {
+function saveRecentSearch(query: string): string[] {
   const trimmed = query.trim();
-  if (!trimmed) return;
+  if (!trimmed) return getRecentSearches();
   const recent = getRecentSearches().filter(s => s !== trimmed);
   recent.unshift(trimmed);
-  localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(recent.slice(0, MAX_RECENT_SEARCHES)));
+  const next = recent.slice(0, MAX_RECENT_SEARCHES);
+  localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(next));
+  return next;
+}
+
+function getInitialSearchState(): { query: string; scope: SearchScope } {
+  if (typeof window === 'undefined') {
+    return { query: '', scope: 'all' };
+  }
+  const params = new URLSearchParams(window.location.search);
+  const rawScope = (params.get('scope') || 'all').toLowerCase() as SearchScope;
+  return {
+    query: (params.get('q') || '').trim(),
+    scope: SEARCH_SCOPES.has(rawScope) ? rawScope : 'all',
+  };
 }
 
 export function SearchBooksCard() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
+  const [initialSearch] = useState(getInitialSearchState);
+  const idPrefix = useId().replace(/:/g, '');
+  const resultsListId = `${idPrefix}-search-results`;
+  const recentListId = `${idPrefix}-recent-searches`;
   const selectedBookId = useBookStore(state => state.selectedBook?.id ?? null);
   const setSelectedBook = useBookStore(state => state.setSelectedBook);
-  const [queryInput, setQueryInput] = useState('');
-  const [scope, setScope] = useState<SearchScope>('all');
+  const [queryInput, setQueryInput] = useState(initialSearch.query);
+  const [scope, setScope] = useState<SearchScope>(initialSearch.scope);
   const [activeResultIndex, setActiveResultIndex] = useState(0);
+  const [activeRecentIndex, setActiveRecentIndex] = useState(0);
   const [showRecent, setShowRecent] = useState(false);
   const [recentSearches, setRecentSearches] = useState<string[]>(getRecentSearches);
   const resultsListRef = useRef<HTMLUListElement | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
-  const recentRef = useRef<HTMLDivElement | null>(null);
+  const searchContainerRef = useRef<HTMLDivElement | null>(null);
   const [coverSize, setCoverSize] = useState<'sm' | 'md'>('md');
 
   useEffect(() => {
@@ -165,7 +186,7 @@ export function SearchBooksCard() {
   useEffect(() => {
     if (!showRecent) return;
     const handler = (e: MouseEvent) => {
-      if (recentRef.current && !recentRef.current.contains(e.target as Node)) {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(e.target as Node)) {
         setShowRecent(false);
       }
     };
@@ -210,17 +231,18 @@ export function SearchBooksCard() {
   const prefetchBookData = async (bookId: string) => {
     if (!bookId) return;
 
-    await queryClient.prefetchQuery({
-      queryKey: queryKeys.chapters.byBook(bookId),
-      queryFn: () => getBookChapters(bookId),
-      staleTime: PREFETCH_STALE_TIME_MS,
-    });
-
-    await queryClient.prefetchQuery({
-      queryKey: queryKeys.formats.all,
-      queryFn: getFormats,
-      staleTime: PREFETCH_STALE_TIME_MS,
-    });
+    await Promise.all([
+      queryClient.prefetchQuery({
+        queryKey: queryKeys.chapters.byBook(bookId),
+        queryFn: () => getBookChapters(bookId),
+        staleTime: PREFETCH_STALE_TIME_MS,
+      }),
+      queryClient.prefetchQuery({
+        queryKey: queryKeys.formats.all,
+        queryFn: getFormats,
+        staleTime: PREFETCH_STALE_TIME_MS,
+      }),
+    ]);
   };
 
   useEffect(() => {
@@ -264,7 +286,7 @@ export function SearchBooksCard() {
       const params = new URLSearchParams(window.location.search);
       const query = (params.get('q') || '').trim();
       const rawScope = (params.get('scope') || 'all').toLowerCase();
-      const newScope = searchScopes.some(item => item.value === rawScope)
+      const newScope = SEARCH_SCOPES.has(rawScope as SearchScope)
         ? (rawScope as SearchScope)
         : 'all';
       setQueryInput(query);
@@ -273,7 +295,7 @@ export function SearchBooksCard() {
 
     window.addEventListener('popstate', onPopState);
     return () => window.removeEventListener('popstate', onPopState);
-  }, [searchScopes]);
+  }, []);
 
   // Detect direct ISBN / O'Reilly URL in the query
   const directRef = useMemo(() => parseDirectBookRef(normalizedQuery), [normalizedQuery]);
@@ -346,7 +368,7 @@ export function SearchBooksCard() {
 
   const handleSelectBook = (book: SearchBook) => {
     setSelectedBook(book);
-    saveRecentSearch(normalizedQuery);
+    setRecentSearches(saveRecentSearch(normalizedQuery));
     if (typeof window !== 'undefined' && window.innerWidth < 1024) {
       setTimeout(() => {
         const el = document.getElementById('download-section');
@@ -377,9 +399,11 @@ export function SearchBooksCard() {
   }, [activeResultIndex, visibleResults.length]);
 
   const activeDescendant =
-    visibleResults.length > 0
-      ? `search-result-${visibleResults[activeResultIndex]?.id ?? activeResultIndex}`
-      : undefined;
+    showRecent && !normalizedQuery && recentSearches.length > 0
+      ? `${recentListId}-option-${activeRecentIndex}`
+      : visibleResults.length > 0
+        ? `${resultsListId}-option-${activeResultIndex}`
+        : undefined;
 
   return (
     <OptimizedFadeIn direction="up" delay={50}>
@@ -402,7 +426,7 @@ export function SearchBooksCard() {
             ) : null}
           </div>
 
-          <div className="mb-4">
+          <div ref={searchContainerRef} className="relative mb-4">
             <label htmlFor="search-query" className="sr-only">
               {t('search.title')}
             </label>
@@ -417,12 +441,33 @@ export function SearchBooksCard() {
                 ref={searchInputRef}
                 value={queryInput}
                 onChange={event => setQueryInput(event.target.value)}
-                onFocus={() => setShowRecent(true)}
+                onFocus={() => {
+                  setRecentSearches(getRecentSearches());
+                  setActiveRecentIndex(0);
+                  setShowRecent(true);
+                }}
                 onKeyDown={event => {
                   if (event.key === 'Escape') {
                     event.preventDefault();
                     searchInputRef.current?.blur();
                     setShowRecent(false);
+                  }
+
+                  if (showRecent && !normalizedQuery && recentSearches.length > 0) {
+                    if (event.key === 'ArrowDown') {
+                      event.preventDefault();
+                      setActiveRecentIndex(current =>
+                        Math.min(current + 1, recentSearches.length - 1)
+                      );
+                    } else if (event.key === 'ArrowUp') {
+                      event.preventDefault();
+                      setActiveRecentIndex(current => Math.max(current - 1, 0));
+                    } else if (event.key === 'Enter') {
+                      event.preventDefault();
+                      setQueryInput(recentSearches[activeRecentIndex] ?? '');
+                      setShowRecent(false);
+                    }
+                    return;
                   }
 
                   if (visibleResults.length === 0) {
@@ -454,10 +499,19 @@ export function SearchBooksCard() {
                   }
                 }}
                 placeholder={t('search.placeholder')}
+                role="combobox"
                 aria-activedescendant={activeDescendant}
                 aria-autocomplete="list"
-                aria-controls="search-results"
-                aria-expanded={visibleResults.length > 0}
+                aria-controls={
+                  showRecent && !normalizedQuery && recentSearches.length > 0
+                    ? recentListId
+                    : resultsListId
+                }
+                aria-expanded={
+                  (showRecent && !normalizedQuery && recentSearches.length > 0) ||
+                  visibleResults.length > 0
+                }
+                aria-haspopup="listbox"
                 className="mobile-full min-h-touch min-w-0 w-full rounded-lg border border-input bg-background py-3 pl-10 pr-20 text-base leading-tight text-foreground outline-none transition placeholder:text-muted-foreground focus:border-primary/70 focus:ring-2 focus:ring-primary/25 sm:py-2 sm:text-sm"
               />
 
@@ -493,13 +547,15 @@ export function SearchBooksCard() {
             {/* Recent searches dropdown */}
             {showRecent && recentSearches.length > 0 && !normalizedQuery ? (
               <div
-                ref={recentRef}
+                id={recentListId}
+                role="listbox"
+                aria-label={t('search.recent.title')}
                 className="absolute z-50 mt-1 w-full overflow-hidden rounded-xl border border-border bg-card shadow-lg"
                 style={{ width: 'calc(100% - 2rem)' }}
               >
                 <div className="flex items-center justify-between border-b border-border px-3 py-2">
                   <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                    Recientes
+                    {t('search.recent.title')}
                   </span>
                   <button
                     type="button"
@@ -510,13 +566,16 @@ export function SearchBooksCard() {
                     }}
                     className="text-[10px] text-muted-foreground hover:text-foreground transition"
                   >
-                    Limpiar
+                    {t('search.recent.clear')}
                   </button>
                 </div>
                 {recentSearches.map((search, i) => (
                   <button
                     key={`${search}-${i}`}
                     type="button"
+                    id={`${recentListId}-option-${i}`}
+                    role="option"
+                    aria-selected={i === activeRecentIndex}
                     className="flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm text-foreground transition hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
                     onClick={() => {
                       setQueryInput(search);
@@ -613,7 +672,7 @@ export function SearchBooksCard() {
           <AnimatedLayoutGroup className="relative z-0">
             <div className="chapter-scroll max-h-[360px] overflow-y-auto overflow-x-hidden pr-1">
               <ul
-                id="search-results"
+                id={resultsListId}
                 ref={resultsListRef}
                 className={`m-0 list-none space-y-2 p-0 ${isSearching ? 'opacity-90' : ''}`}
                 aria-busy={isSearching}
@@ -639,8 +698,7 @@ export function SearchBooksCard() {
                               // silent prefetch failure
                             });
                           }}
-                          aria-pressed={isSelected}
-                          id={`search-result-${book.id}`}
+                          id={`${resultsListId}-option-${index}`}
                           data-result-index={visibleResults.findIndex(item => item.id === book.id)}
                           role="option"
                           aria-selected={isSelected || isActive}
