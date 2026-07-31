@@ -65,8 +65,12 @@ class DownloadJobDTO(BaseModel):
         data: dict[str, Any] = obj
         processed = dict(data)
         processed["job_id"] = str(data.get("job_id", secrets.token_hex(16)))
-        processed["book_id"] = str(data["book_id"])
-        processed["output_dir"] = Path(str(data.get("output_dir", ".")))
+        if "book_id" in data:
+            processed["book_id"] = None if data["book_id"] is None else str(data["book_id"])
+        if "output_dir" in data:
+            processed["output_dir"] = (
+                None if data["output_dir"] is None else Path(str(data["output_dir"]))
+            )
         processed["formats"] = [str(f) for f in data.get("formats", ["epub"])]
         if data.get("selected_chapters") is not None:
             processed["selected_chapters"] = [int(i) for i in data["selected_chapters"]]

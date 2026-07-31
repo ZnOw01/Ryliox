@@ -9,6 +9,7 @@ import sys
 import time
 import uuid
 from contextvars import ContextVar
+from datetime import UTC, datetime
 from typing import Any
 
 # Context variables for request correlation
@@ -39,7 +40,9 @@ class JSONLogFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:
         """Format log record as JSON."""
         log_data: dict[str, Any] = {
-            "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S.%fZ", time.gmtime(record.created)),
+            "timestamp": datetime.fromtimestamp(record.created, UTC)
+            .isoformat(timespec="milliseconds")
+            .replace("+00:00", "Z"),
             "level": record.levelname,
             "logger": record.name,
             "message": record.getMessage(),

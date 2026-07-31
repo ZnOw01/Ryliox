@@ -120,6 +120,11 @@ class TestDownloadJobDTO:
         with pytest.raises(ValidationError):
             DownloadJobDTO(book_id="b1")
 
+    @pytest.mark.parametrize("data", [{}, {"book_id": "b1"}, {"output_dir": "/tmp"}])
+    def test_model_validate_missing_required_fields_raises_validation_error(self, data):
+        with pytest.raises(ValidationError):
+            DownloadJobDTO.model_validate(data)
+
     def test_model_validate_selected_chapters_as_list(self):
         data = {
             "book_id": "b1",

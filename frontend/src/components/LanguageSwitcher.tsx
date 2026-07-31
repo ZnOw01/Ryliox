@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { LANGUAGE_NAMES, AVAILABLE_LANGUAGES, type Language } from '../i18n/config';
 
 export function LanguageSwitcher() {
-  const { i18n } = useTranslation();
+  const { t, i18n } = useTranslation();
   const currentLanguage = ((i18n.resolvedLanguage || i18n.language).split('-')[0] ||
     'es') as Language;
 
@@ -17,13 +17,17 @@ export function LanguageSwitcher() {
   };
 
   return (
-    <div className="flex items-center gap-1" role="group" aria-label="Language selector">
+    <div
+      className="flex items-center gap-1"
+      role="group"
+      aria-label={t('accessibility.language_switcher')}
+    >
       {AVAILABLE_LANGUAGES.map(lng => (
         <button
           key={lng}
           onClick={() => handleLanguageChange(lng)}
           aria-pressed={currentLanguage === lng}
-          aria-label={`Switch to ${LANGUAGE_NAMES[lng]}`}
+          aria-label={t('accessibility.switch_language', { language: LANGUAGE_NAMES[lng] })}
           title={LANGUAGE_NAMES[lng]}
           className={`rounded-md px-2 py-1 text-xs font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/60 ${
             currentLanguage === lng

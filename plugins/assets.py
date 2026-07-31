@@ -83,8 +83,8 @@ class AssetsPlugin(Plugin):
         for i, url in enumerate(urls):
             filename = self._filename_from_url(url, default=f"image{i:03d}.bin")
             save_path = output_dir / "Images" / filename
-            await self.download_image(url, save_path)
-            downloaded[url] = save_path
+            downloaded_path = await self.download_image(url, save_path)
+            downloaded[url] = downloaded_path or save_path
             if progress_callback:
                 progress_callback(i + 1, total)
         return downloaded

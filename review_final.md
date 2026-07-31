@@ -245,7 +245,8 @@ docker compose config --quiet
 
 ### Fase 1 — Correcciones pequeñas y deterministas
 
-**Estado:** pendiente.
+**Estado:** completada el 2026-07-30.
+**Evidencia:** 316 unitarias, 3 contratos y 74 integraciones (incluidas las lentas) aprobaron; también Ruff, Mypy, 49 pruebas de seguridad sin servidor (24 omitidas), 20 pruebas frontend, Prettier, Astro build y smoke del wheel. Se corrigió además una prueba lenta obsoleta que utilizaba IDs de libro inválidos. Las revisiones independientes detectaron y se corrigieron tres regresiones antes del commit: la cadena legacy `epub,pdf` ahora atraviesa schema y ruta de forma canónica; todas las descripciones del modal de atajos usan claves i18n estables; y los estados dinámicos y controles de portapapeles de autenticación ya no muestran español al seleccionar inglés. La suite de seguridad contra servidor vivo reveló 13 fallos ya presentes en `main` y 2 adicionales condicionados por la presencia del `frontend/dist` (el fallback SPA responde 200 a rutas arbitrarias); quedan registrados para las Fases 3 y 7, no fueron causados por este diff. Se preservaron entradas legacy válidas de formato (`EPUB`, listas, `all` y cadenas separadas por comas), y se eliminó el reformateo accidental de los locales propuesto por OpenCode.
 **Objetivo:** resolver defectos aislados con bajo riesgo y pruebas directas.
 
 **Archivos:** `.github/workflows/ci.yml`, `config.py`, `core/logging_config.py`, `core/dto.py`, `web/schemas.py`, `plugins/downloader.py`, `plugins/assets.py`, `web/routes/downloads.py`, Toast/i18n y tests asociados.

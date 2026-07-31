@@ -1,6 +1,7 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { create } from 'zustand';
-import { useEffect, useCallback } from 'react';
+import { useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { cn } from '../../lib/cn';
 import { CheckCircle, XCircle, Warning, Info, X, Sparkle } from '@phosphor-icons/react';
 
@@ -27,8 +28,6 @@ interface ToastState {
   removeToast: (id: string) => void;
   updateToast: (id: string, updates: Partial<Omit<Toast, 'id'>>) => void;
   clearAll: () => void;
-  pauseToast: (id: string) => void;
-  resumeToast: (id: string) => void;
 }
 
 const generateId = () => `toast-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -65,8 +64,6 @@ export const useToastStore = create<ToastState>((set, get) => ({
     get().toasts.forEach(t => t.onDismiss?.());
     set({ toasts: [] });
   },
-  pauseToast: () => {}, // Placeholder for future implementation
-  resumeToast: () => {}, // Placeholder for future implementation
 }));
 
 // Toast helper functions
@@ -212,6 +209,7 @@ interface ToastItemProps {
 }
 
 function ToastItem({ toast: toastItem, onDismiss, index }: ToastItemProps) {
+  const { t } = useTranslation();
   const config = toastConfig[toastItem.type];
   const Icon = config.icon;
 
@@ -247,10 +245,8 @@ function ToastItem({ toast: toastItem, onDismiss, index }: ToastItemProps) {
         config.bg,
         config.border
       )}
-      role="alert"
-      aria-live="polite"
-      onMouseEnter={() => {}}
-      onMouseLeave={() => {}}
+      role={toastItem.type === 'error' || toastItem.type === 'warning' ? 'alert' : undefined}
+      aria-live={toastItem.type === 'error' || toastItem.type === 'warning' ? undefined : 'polite'}
     >
       {/* Progress bar */}
       {toastItem.duration !== Infinity && toastItem.duration && (
@@ -334,7 +330,7 @@ function ToastItem({ toast: toastItem, onDismiss, index }: ToastItemProps) {
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1',
               'transition-colors duration-200'
             )}
-            aria-label="Cerrar notificación"
+            aria-label={t('toast.close')}
             whileHover={{ scale: 1.1, rotate: 90 }}
             whileTap={{ scale: 0.9 }}
           >
@@ -347,13 +343,14 @@ function ToastItem({ toast: toastItem, onDismiss, index }: ToastItemProps) {
 }
 
 export function BeautifulToastContainer() {
+  const { t } = useTranslation();
   const { toasts, removeToast } = useToastStore();
 
   return (
     <div
       className="fixed bottom-6 right-6 z-[100] flex flex-col items-end gap-3"
       role="region"
-      aria-label="Notificaciones"
+      aria-label={t('toast.region_label')}
     >
       <AnimatePresence mode="popLayout">
         {toasts.map((toastItem, index) => (
