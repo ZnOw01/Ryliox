@@ -192,21 +192,36 @@ class DownloaderPlugin(Plugin):
         return getter(name)
 
     @classmethod
-    def parse_formats(cls, format_input: str | list[str]) -> list[str]:
+    def parse_formats(cls, format_input: str | list[str] | None) -> list[str]:
         """Parse format specification into canonical format names."""
+        if format_input is None:
+            return ["epub"]
+
         if isinstance(format_input, list):
-            raw_formats = format_input
+            raw_formats = [fmt.strip().lower() for fmt in format_input]
         else:
-            if format_input == "all":
-                return ["epub", "pdf"]
             raw_formats = [f.strip().lower() for f in format_input.split(",") if f.strip()]
+
+        if not raw_formats:
+            raise ValueError("At least one download format is required")
+
+        unknown = [
+            fmt
+            for fmt in raw_formats
+            if fmt != "all" and cls.FORMAT_ALIASES.get(fmt, fmt) not in cls.SUPPORTED_FORMATS
+        ]
+        if unknown:
+            raise ValueError(f"Unknown download format(s): {', '.join(sorted(set(unknown)))}")
+
+        if "all" in raw_formats:
+            return ["epub", "pdf"]
 
         formats: list[str] = []
         seen: set[str] = set()
 
         for fmt in raw_formats:
             canonical = cls.FORMAT_ALIASES.get(fmt, fmt)
-            if canonical not in cls.SUPPORTED_FORMATS or canonical in seen:
+            if canonical in seen:
                 continue
             formats.append(canonical)
             seen.add(canonical)

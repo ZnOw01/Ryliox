@@ -1,5 +1,6 @@
 import { useEffect, useCallback, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
 import { cn } from '../../lib/cn';
 import { X, Keyboard } from '@phosphor-icons/react';
 
@@ -223,40 +224,44 @@ interface KeyboardShortcutsHelpProps {
 
 const shortcutsList = [
   {
-    category: 'Navegación',
+    categoryKey: 'keyboard_shortcuts.navigation',
     items: [
-      { keys: ['↑', '↓'], description: 'Navegar entre resultados' },
-      { keys: ['Enter'], description: 'Seleccionar elemento' },
-      { keys: ['Esc'], description: 'Cerrar o cancelar' },
-      { keys: ['Tab'], description: 'Mover entre elementos' },
+      { keys: ['↑', '↓'], descriptionKey: 'keyboard_shortcuts.shortcuts.navigate_results' },
+      { keys: ['Enter'], descriptionKey: 'keyboard_shortcuts.shortcuts.select_book' },
+      { keys: ['Esc'], descriptionKey: 'keyboard_shortcuts.shortcuts.close_or_cancel' },
+      { keys: ['Tab'], descriptionKey: 'keyboard_shortcuts.shortcuts.move_focus' },
     ],
   },
   {
-    category: 'Búsqueda',
+    categoryKey: 'keyboard_shortcuts.search',
     items: [
-      { keys: ['/'], description: 'Foco en búsqueda' },
-      { keys: ['Ctrl', 'K'], description: 'Abrir búsqueda rápida' },
-      { keys: ['Ctrl', 'L'], description: 'Limpiar búsqueda' },
+      { keys: ['/'], descriptionKey: 'keyboard_shortcuts.shortcuts.focus_search' },
+      { keys: ['Ctrl', 'K'], descriptionKey: 'keyboard_shortcuts.shortcuts.quick_search' },
+      { keys: ['Ctrl', 'L'], descriptionKey: 'keyboard_shortcuts.shortcuts.clear_search' },
     ],
   },
   {
-    category: 'Descarga',
+    categoryKey: 'keyboard_shortcuts.download',
     items: [
-      { keys: ['Ctrl', 'D'], description: 'Iniciar descarga' },
-      { keys: ['Ctrl', 'Shift', 'D'], description: 'Cancelar descarga' },
+      { keys: ['Ctrl', 'D'], descriptionKey: 'keyboard_shortcuts.shortcuts.start_download' },
+      {
+        keys: ['Ctrl', 'Shift', 'D'],
+        descriptionKey: 'keyboard_shortcuts.shortcuts.cancel_download',
+      },
     ],
   },
   {
-    category: 'General',
+    categoryKey: 'keyboard_shortcuts.general',
     items: [
-      { keys: ['Ctrl', 'T'], description: 'Cambiar tema' },
-      { keys: ['?'], description: 'Mostrar ayuda' },
-      { keys: ['Ctrl', '/'], description: 'Este menú' },
+      { keys: ['Ctrl', 'T'], descriptionKey: 'keyboard_shortcuts.shortcuts.toggle_theme' },
+      { keys: ['?'], descriptionKey: 'keyboard_shortcuts.shortcuts.toggle_help' },
+      { keys: ['Ctrl', '/'], descriptionKey: 'keyboard_shortcuts.shortcuts.this_menu' },
     ],
   },
 ];
 
 export function KeyboardShortcutsModal({ isOpen, onClose }: KeyboardShortcutsHelpProps) {
+  const { t } = useTranslation();
   const containerRef = useRef<HTMLDivElement>(null);
   const { handleKeyDown } = useFocusTrap(isOpen, containerRef);
 
@@ -313,9 +318,11 @@ export function KeyboardShortcutsModal({ isOpen, onClose }: KeyboardShortcutsHel
                 </div>
                 <div>
                   <h2 id="shortcuts-title" className="text-lg font-semibold text-foreground">
-                    Atajos de teclado
+                    {t('keyboard_shortcuts.title')}
                   </h2>
-                  <p className="text-xs text-muted-foreground">Navega más rápido con el teclado</p>
+                  <p className="text-xs text-muted-foreground">
+                    {t('keyboard_shortcuts.modal.description')}
+                  </p>
                 </div>
               </div>
               <motion.button
@@ -323,7 +330,7 @@ export function KeyboardShortcutsModal({ isOpen, onClose }: KeyboardShortcutsHel
                 className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                aria-label="Cerrar"
+                aria-label={t('common.close')}
               >
                 <X className="h-5 w-5" weight="regular" />
               </motion.button>
@@ -334,13 +341,13 @@ export function KeyboardShortcutsModal({ isOpen, onClose }: KeyboardShortcutsHel
               <div className="grid gap-6">
                 {shortcutsList.map((category, i) => (
                   <motion.div
-                    key={category.category}
+                    key={category.categoryKey}
                     initial={{ opacity: 0, x: -10 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: i * 0.1 }}
                   >
                     <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                      {category.category}
+                      {t(category.categoryKey)}
                     </h3>
                     <div className="space-y-2">
                       {category.items.map((item, j) => (
@@ -349,7 +356,7 @@ export function KeyboardShortcutsModal({ isOpen, onClose }: KeyboardShortcutsHel
                           className="flex items-center justify-between rounded-lg bg-muted/50 px-4 py-3"
                           whileHover={{ backgroundColor: 'rgba(0,0,0,0.04)' }}
                         >
-                          <span className="text-sm text-foreground">{item.description}</span>
+                          <span className="text-sm text-foreground">{t(item.descriptionKey)}</span>
                           <ShortcutHint keys={item.keys} />
                         </motion.div>
                       ))}
@@ -362,8 +369,9 @@ export function KeyboardShortcutsModal({ isOpen, onClose }: KeyboardShortcutsHel
             {/* Footer */}
             <div className="border-t border-border bg-muted/30 px-6 py-3">
               <p className="text-center text-xs text-muted-foreground">
-                Presiona <kbd className="rounded bg-background px-1.5 py-0.5 font-medium">?</kbd> en
-                cualquier momento para ver esta ayuda
+                {t('keyboard_shortcuts.modal.hint_prefix')}
+                <kbd className="rounded bg-background px-1.5 py-0.5 font-medium">?</kbd>
+                {t('keyboard_shortcuts.modal.hint_suffix')}
               </p>
             </div>
           </motion.div>
@@ -427,6 +435,7 @@ interface FloatingShortcutsProps {
 }
 
 export function FloatingShortcuts({ shortcuts, className }: FloatingShortcutsProps) {
+  const { t } = useTranslation();
   const [isVisible, setIsVisible] = useState(true);
 
   useEffect(() => {
@@ -460,7 +469,7 @@ export function FloatingShortcuts({ shortcuts, className }: FloatingShortcutsPro
         <button
           onClick={() => setIsVisible(false)}
           className="ml-2 rounded-full p-1 text-muted-foreground/50 hover:bg-accent hover:text-foreground"
-          aria-label="Ocultar atajos"
+          aria-label={t('keyboard_shortcuts.hide_hint')}
         >
           <X className="h-3 w-3" weight="bold" />
         </button>

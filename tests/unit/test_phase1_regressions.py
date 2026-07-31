@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import os
 import zipfile
 from typing import TYPE_CHECKING
 from xml.etree import ElementTree
 
 import pytest
 
+import config
 from core.dto import DownloadJobDTO, DownloadResultDTO
 from core.repository import DownloadJobRepository
 from plugins.downloader import DownloaderPlugin
@@ -15,6 +17,22 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 pytestmark = pytest.mark.unit
+
+
+def test_config_reload_preserves_extra_headers(monkeypatch: pytest.MonkeyPatch) -> None:
+    previous = os.environ.get("HTTP__EXTRA_HEADERS")
+    monkeypatch.setenv("HTTP__EXTRA_HEADERS", '{"Trace": "enabled"}')
+
+    try:
+        config.reload()
+        assert config.SETTINGS.http.extra_headers == {"Trace": "enabled"}
+        assert config.HEADERS["X-Trace"] == "enabled"
+    finally:
+        if previous is None:
+            monkeypatch.delenv("HTTP__EXTRA_HEADERS", raising=False)
+        else:
+            monkeypatch.setenv("HTTP__EXTRA_HEADERS", previous)
+        config.reload()
 
 
 def _chapter(filename: str, title: str) -> dict[str, object]:

@@ -26,7 +26,8 @@
 		"service": {
 			"available": "Servicio disponible",
 			"unavailable": "Servicio no disponible",
-			"checking": "Verificando servicio..."
+			"checking": "Verificando servicio...",
+			"status": "Servicio: {{status}}"
 		},
 		"cookies": {
 			"saved": "Cookies guardadas",
@@ -44,7 +45,12 @@
 				"Copia las cookies de tu sesión",
 				"Pégala aquí y empieza a descargar"
 			],
-			"configure": "Configurar cookies"
+			"configure": "Configurar cookies",
+			"help_link": "¿Cómo obtenerlas?",
+			"format_json": "Formatear JSON",
+			"preview": "Vista previa",
+			"copy_to_clipboard": "Copiar al portapapeles",
+			"copy_json_to_clipboard": "Copiar JSON al portapapeles"
 		},
 		"refresh": "Actualizar",
 		"uptime": "Uptime"
@@ -217,6 +223,10 @@
 			"cookies_error": "Error al guardar las cookies"
 		}
 	},
+	"toast": {
+		"close": "Cerrar notificación",
+		"region_label": "Notificaciones"
+	},
 	"common": {
 		"navigation": "Navegación móvil",
 		"close": "Cerrar",
@@ -275,11 +285,19 @@
 			"cancel_download": "Cancelar descarga",
 			"toggle_theme": "Cambiar tema",
 			"toggle_help": "Mostrar/ocultar ayuda",
-			"close_modals": "Cerrar diálogos"
+			"close_modals": "Cerrar diálogos",
+			"close_or_cancel": "Cerrar o cancelar",
+			"move_focus": "Mover entre elementos",
+			"quick_search": "Abrir búsqueda rápida",
+			"this_menu": "Este menú"
 		},
+		"download": "Descarga",
+		"general": "General",
+		"hide_hint": "Ocultar atajos",
 		"modal": {
 			"description": "Navega más rápido con el teclado",
-			"hint": "Presiona ? en cualquier momento para ver esta ayuda"
+			"hint_prefix": "Presiona ",
+			"hint_suffix": " en cualquier momento para ver esta ayuda"
 		}
 	},
 	"accessibility": {
@@ -288,7 +306,9 @@
 		"reduced_motion": "Reducir animaciones",
 		"screen_reader_hints": "Pistas para lectores de pantalla",
 		"keyboard_navigation": "Navegación por teclado activada",
-		"mouse_navigation": "Navegación con mouse activada"
+		"mouse_navigation": "Navegación con mouse activada",
+		"language_switcher": "Selector de idioma",
+		"switch_language": "Cambiar a {{language}}"
 	},
 	"errors": {
 		"network": "Error de conexión",

@@ -279,6 +279,7 @@ def reload() -> Settings:
         "Accept": SETTINGS.http.accept,
         "Accept-Encoding": SETTINGS.http.accept_encoding,
         "Accept-Language": SETTINGS.http.accept_language,
+        **{f"X-{k}": v for k, v in SETTINGS.http.extra_headers.items()},
     }
     return SETTINGS
 

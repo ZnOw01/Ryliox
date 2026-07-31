@@ -242,7 +242,7 @@ export function AuthStatusCard() {
             onClick={() => setIsExpanded(true)}
             className="flex items-center gap-1.5 rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs font-semibold text-foreground transition hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring shrink-0"
           >
-            {t('auth.cookies.configure', { defaultValue: 'Administrar' })}
+            {t('auth.cookies.configure')}
           </button>
         </div>
       </section>
@@ -260,7 +260,7 @@ export function AuthStatusCard() {
               onClick={() => setIsExpanded(false)}
               className="text-xs text-muted-foreground hover:text-foreground transition underline underline-offset-2"
             >
-              {t('common.collapse', { defaultValue: 'Contraer' })}
+              {t('common.collapse')}
             </button>
           )}
         </div>
@@ -323,7 +323,7 @@ export function AuthStatusCard() {
             />
             {healthQuery.data.status === 'ok'
               ? t('auth.service.available')
-              : `Servicio: ${healthQuery.data.status}`}
+              : t('auth.service.status', { status: healthQuery.data.status })}
           </p>
           {typeof healthQuery.data.uptime_seconds === 'number' ? (
             <p className="text-xs text-muted-foreground">
@@ -402,7 +402,7 @@ export function AuthStatusCard() {
               rel="noopener noreferrer"
               className="text-xs text-primary hover:underline"
             >
-              ¿Cómo obtenerlas?
+              {t('auth.cookies.help_link')}
             </a>
             {cookiesText.trim() ? (
               <div className="flex gap-1">
@@ -410,7 +410,7 @@ export function AuthStatusCard() {
                   type="button"
                   onClick={formatCookiesJson}
                   className="rounded-md border border-border bg-background px-2 py-1 text-xs text-muted-foreground transition hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  title="Formatear JSON"
+                  title={t('auth.cookies.format_json')}
                 >
                   {'{}'}
                 </button>
@@ -418,8 +418,8 @@ export function AuthStatusCard() {
                   type="button"
                   onClick={copyCookiesToClipboard}
                   className="rounded-md border border-border bg-background px-2 py-1 text-muted-foreground transition hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  title="Copiar al portapapeles"
-                  aria-label="Copiar JSON al portapapeles"
+                  title={t('auth.cookies.copy_to_clipboard')}
+                  aria-label={t('auth.cookies.copy_json_to_clipboard')}
                 >
                   <Copy className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden="true" />
                 </button>
@@ -498,6 +498,7 @@ function maskValue(value: string): string {
 }
 
 function FormattedJsonPreview({ json }: { json: string }) {
+  const { t } = useTranslation();
   let parsed: Record<string, unknown> | null = null;
   try {
     parsed = JSON.parse(json);
@@ -511,7 +512,7 @@ function FormattedJsonPreview({ json }: { json: string }) {
   return (
     <div className="mt-3 overflow-hidden rounded-lg border border-border bg-muted/50">
       <div className="border-b border-border bg-muted px-3 py-1.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-        Vista previa
+        {t('auth.cookies.preview')}
       </div>
       <div className="divide-y divide-border">
         {entries.map(([key, value]) => (

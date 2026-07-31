@@ -87,10 +87,8 @@ class TestDownloadQueue:
                 headers={"Origin": "http://testserver"},
             )
 
-            assert response.status_code == 400
-            data = response.json()
-            detail = data if "error" in data else data.get("detail", {})
-            assert "Invalid format" in detail.get("error", "")
+            assert response.status_code == 422
+            assert "xyz" in response.text
 
     def test_download_invalid_output_dir(self, test_client: TestClient, mock_kernel):
         """Test download with invalid output directory."""
@@ -448,6 +446,49 @@ class TestDownloadProgressStream:
         assert response.headers["content-type"] == "text/event-stream; charset=utf-8"
         assert response.headers["cache-control"] == "no-cache"
 
+    @pytest.mark.asyncio
+    async def test_progress_stream_uses_temporal_deadline(self, monkeypatch):
+        from web.routes import downloads as downloads_routes
+
+        clock = 0.0
+
+        def fake_monotonic() -> float:
+            return clock
+
+        class Queue:
+            def get_progress_version(self) -> int:
+                return 0
+
+            def get_progress(self, job_id=None):
+                return None
+
+            async def wait_for_progress_change_async(self, version: int, timeout: float) -> int:
+                nonlocal clock
+                clock += timeout
+                return version
+
+        request = MagicMock()
+        request.is_disconnected = AsyncMock(return_value=False)
+        monkeypatch.setattr(downloads_routes.time, "monotonic", fake_monotonic)
+        monkeypatch.setattr(
+            downloads_routes,
+            "SSE_MAX_DURATION_SECONDS",
+            1.0,
+            raising=False,
+        )
+
+        response = await downloads_routes.progress_stream(
+            request=request,
+            job_id=None,
+            download_queue=Queue(),
+            request_id="test-request-id",
+        )
+
+        stream = response.body_iterator
+        assert (await anext(stream)).startswith("event: progress")
+        with pytest.raises(StopAsyncIteration):
+            await anext(stream)
+
     def test_progress_stream_cross_origin_blocked(self, test_client: TestClient):
         """Test that cross-origin SSE requests are blocked."""
         response = test_client.get(
@@ -567,7 +608,7 @@ class TestDownloadWorkflow:
         for i in range(3):
             response = test_client.post(
                 "/api/download",
-                json={"book_id": f"book-{i}", "format": ["epub"]},
+                json={"book_id": f"urn:orm:book:{i:032x}", "format": ["epub"]},
                 headers={"Origin": "http://testserver"},
             )
             assert response.status_code == 200

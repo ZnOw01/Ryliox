@@ -51,6 +51,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api", tags=["downloads"])
 
 SSE_HEARTBEAT_INTERVAL_SECONDS: float = 15.0
+SSE_MAX_DURATION_SECONDS: float = 3_600.0
 _PROGRESS_ADAPTER: TypeAdapter[ProgressResponse] = TypeAdapter(ProgressResponse)
 
 
@@ -280,15 +281,12 @@ async def progress_stream(
         last_signature: str | None = None
         last_heartbeat_at = time.monotonic()
         progress_version = download_queue.get_progress_version()
-        max_iterations = 3600  # 1 hour máximo
-        iteration = 0
+        deadline = time.monotonic() + SSE_MAX_DURATION_SECONDS
         disconnect_check_interval = 0.5  # Check disconnect every 500ms
         last_disconnect_check = time.monotonic()
 
         try:
-            while iteration < max_iterations:
-                iteration += 1
-
+            while time.monotonic() < deadline:
                 # Check for client disconnection periodically
                 now = time.monotonic()
                 if now - last_disconnect_check >= disconnect_check_interval:
@@ -319,7 +317,13 @@ async def progress_stream(
                     break
 
                 now = time.monotonic()
-                wait = max(0.1, SSE_HEARTBEAT_INTERVAL_SECONDS - (now - last_heartbeat_at))
+                remaining = deadline - now
+                if remaining <= 0:
+                    break
+                wait = min(
+                    remaining,
+                    max(0.1, SSE_HEARTBEAT_INTERVAL_SECONDS - (now - last_heartbeat_at)),
+                )
 
                 next_version = await download_queue.wait_for_progress_change_async(
                     progress_version,
@@ -328,6 +332,8 @@ async def progress_stream(
                 progress_version = next_version
 
                 now = time.monotonic()
+                if now >= deadline:
+                    break
                 if now - last_heartbeat_at >= SSE_HEARTBEAT_INTERVAL_SECONDS:
                     last_heartbeat_at = now
                     yield sse_comment("heartbeat")
@@ -400,7 +406,7 @@ def download(
         formats = DownloaderPlugin.parse_formats(data.format)
     except ValueError as exc:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail={"error": str(exc), "code": ErrorCode.INVALID_FORMAT},
         )
 

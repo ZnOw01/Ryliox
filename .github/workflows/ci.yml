@@ -49,4 +49,12 @@ jobs:
           version: 0.11.28
           enable-cache: true
       - run: uv build
-      - run: uv run --isolated --no-project --with ./dist/ryliox-2.0.0-py3-none-any.whl python -c "import config, main; assert callable(main.main)"
+      - run: |
+          set -e
+          shopt -s nullglob
+          wheels=(dist/*.whl)
+          if [ ${#wheels[@]} -ne 1 ]; then
+            echo "Expected exactly one .whl in dist/, found ${#wheels[@]}" >&2
+            exit 1
+          fi
+          uv run --isolated --no-project --with "./${wheels[0]}" python -c "import config, main; assert callable(main.main)"

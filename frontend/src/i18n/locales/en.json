@@ -26,7 +26,8 @@
 		"service": {
 			"available": "Service available",
 			"unavailable": "Service unavailable",
-			"checking": "Checking service..."
+			"checking": "Checking service...",
+			"status": "Service: {{status}}"
 		},
 		"cookies": {
 			"saved": "Cookies saved",
@@ -44,7 +45,12 @@
 				"Copy your session cookies",
 				"Paste them here and start downloading"
 			],
-			"configure": "Configure cookies"
+			"configure": "Configure cookies",
+			"help_link": "How to get them?",
+			"format_json": "Format JSON",
+			"preview": "Preview",
+			"copy_to_clipboard": "Copy to clipboard",
+			"copy_json_to_clipboard": "Copy JSON to clipboard"
 		},
 		"refresh": "Refresh",
 		"uptime": "Uptime"
@@ -217,6 +223,10 @@
 			"cookies_error": "Error saving cookies"
 		}
 	},
+	"toast": {
+		"close": "Close notification",
+		"region_label": "Notifications"
+	},
 	"common": {
 		"navigation": "Mobile navigation",
 		"close": "Close",
@@ -275,11 +285,19 @@
 			"cancel_download": "Cancel download",
 			"toggle_theme": "Toggle theme",
 			"toggle_help": "Show/hide help",
-			"close_modals": "Close dialogs"
+			"close_modals": "Close dialogs",
+			"close_or_cancel": "Close or cancel",
+			"move_focus": "Move between elements",
+			"quick_search": "Open quick search",
+			"this_menu": "This menu"
 		},
+		"download": "Download",
+		"general": "General",
+		"hide_hint": "Hide shortcuts",
 		"modal": {
 			"description": "Navigate faster with your keyboard",
-			"hint": "Press ? at any time to view this help"
+			"hint_prefix": "Press ",
+			"hint_suffix": " at any time to view this help"
 		}
 	},
 	"accessibility": {
@@ -288,7 +306,9 @@
 		"reduced_motion": "Reduce animations",
 		"screen_reader_hints": "Screen reader hints",
 		"keyboard_navigation": "Keyboard navigation enabled",
-		"mouse_navigation": "Mouse navigation enabled"
+		"mouse_navigation": "Mouse navigation enabled",
+		"language_switcher": "Language selector",
+		"switch_language": "Switch to {{language}}"
 	},
 	"errors": {
 		"network": "Connection error",

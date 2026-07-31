@@ -12,6 +12,7 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
+from plugins.downloader import DownloaderPlugin
 from web.schemas import (
     BookChaptersResponse,
     BookInfoResponse,
@@ -103,6 +104,40 @@ class TestDownloadRequest:
         """Test that invalid format type raises error."""
         with pytest.raises(ValidationError):
             DownloadRequest(book_id="urn:orm:book:aabbccddeeff00112233aabbccddeeff", format=123)
+
+    def test_unknown_format_error(self):
+        """Test that an unknown download format is rejected by validation."""
+        with pytest.raises(ValidationError, match="Unknown download format"):
+            DownloadRequest(
+                book_id="urn:orm:book:aabbccddeeff00112233aabbccddeeff",
+                format=["epbu"],
+            )
+
+    def test_empty_format_list_remains_invalid(self):
+        """Test that an explicitly empty format list is not treated as the default."""
+        with pytest.raises(ValidationError):
+            DownloadRequest(
+                book_id="urn:orm:book:aabbccddeeff00112233aabbccddeeff",
+                format=[],
+            )
+
+    @pytest.mark.parametrize(
+        ("value", "expected"),
+        [
+            ("EPUB", ["epub"]),
+            ("epub,pdf", ["epub", "pdf"]),
+            (["PDF", "epub", "pdf"], ["pdf", "epub"]),
+            ("all", ["epub", "pdf"]),
+        ],
+    )
+    def test_known_format_validation_preserves_legacy_inputs(self, value, expected):
+        """Schema output remains consumable by the route's format parser."""
+        request = DownloadRequest(
+            book_id="urn:orm:book:aabbccddeeff00112233aabbccddeeff",
+            format=value,
+        )
+
+        assert DownloaderPlugin.parse_formats(request.format) == expected
 
     def test_negative_chapter_indexes_error(self):
         """Test that negative chapter indexes raise error."""

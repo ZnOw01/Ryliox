@@ -293,6 +293,17 @@ class DownloadRequest(_RequestModel):
             "format must be a string or an array of strings (for example: 'epub' or ['epub','pdf'])"
         )
 
+    @field_validator("format", mode="after")
+    @classmethod
+    def _validate_known_formats(cls, value: list[str]) -> list[str]:
+        """Reject unknown formats before a download job is queued."""
+        from plugins.downloader import DownloaderPlugin
+
+        try:
+            return DownloaderPlugin.parse_formats(",".join(value))
+        except ValueError as exc:
+            raise ValueError(str(exc)) from exc
+
     @field_validator("output_dir", mode="after")
     @classmethod
     def _validate_output_dir(cls, v: str | None) -> str | None:
