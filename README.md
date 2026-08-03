@@ -1,9 +1,9 @@
 <div align="center">
 
-# 📚 Ryliox
+# Ryliox
 
-**Your O'Reilly Learning library, yours to keep.**
-**Export any book to EPUB 3 or PDF from a single, beautiful local web app.**
+**Your O'Reilly Learning library, yours to keep.**<br/>
+Export any book to EPUB 3 or PDF from a single, beautiful local web app.
 
 [![CI](https://img.shields.io/github/actions/workflow/status/ZnOw01/Ryliox/ci.yml?branch=main&style=for-the-badge&logo=githubactions&logoColor=white&label=CI)](https://github.com/ZnOw01/Ryliox/actions/workflows/ci.yml)
 [![Version](https://img.shields.io/badge/version-2.0.0-7C3AED?style=for-the-badge&logo=semver&logoColor=white)](https://github.com/ZnOw01/Ryliox/blob/main/CHANGELOG.md)
@@ -14,12 +14,12 @@
 [![Code style: Ruff](https://img.shields.io/badge/code_style-Ruff-D7FF64?style=for-the-badge&logo=ruff&logoColor=black)](https://docs.astral.sh/ruff/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-3DA639?style=for-the-badge&logo=opensourceinitiative&logoColor=white)](LICENSE)
 
-[✨ Features](#-features) ·
-[🚀 Quick Start](#-quick-start) ·
-[🏗️ Architecture](#%EF%B8%8F-architecture) ·
-[⚙️ Configuration](#%EF%B8%8F-configuration) ·
-[🤝 Contributing](CONTRIBUTING.md) ·
-[📋 Changelog](CHANGELOG.md)
+[Features](#features) ·
+[Quick Start](#quick-start) ·
+[Architecture](#architecture) ·
+[Configuration](#configuration) ·
+[Contributing](CONTRIBUTING.md) ·
+[Changelog](CHANGELOG.md)
 
 </div>
 
@@ -28,25 +28,25 @@
 > [!CAUTION]
 > **Disclaimer — read before use.** Ryliox is for **personal and educational use only**. By using it, you agree to the [O'Reilly Terms of Service](https://www.oreilly.com/terms/). The authors are **not affiliated with O'Reilly Media** and assume no liability for how the tool is used. Only export content you have legal access to.
 
-## ✨ Features
+## Features
 
-| | Feature | What you get |
-| :-: | --- | --- |
-| 📖 | **EPUB 3 export** | Clean, reflowable e-books built with EbookLib |
-| 📄 | **PDF export** | Print-quality rendering via WeasyPrint |
-| 🔄 | **Persistent download queue** | Jobs survive restarts — persisted in SQLite |
-| 📡 | **Live progress** | Real-time status streamed with Server-Sent Events |
-| 🍪 | **Session vault** | Cookie-based auth, SQLite-first storage with Fernet encryption |
-| 🧩 | **Microkernel architecture** | Auth, book, chapters, assets, EPUB and PDF as hot-pluggable plugins |
-| 🛡️ | **OWASP-aware defaults** | Same-origin checks, security headers, CSP, rate limiting, audit logging with HMAC |
-| 📊 | **Observability** | Prometheus metrics, health probes, typed Pydantic configuration |
-| 🌍 | **Internationalized UI** | i18next-powered Astro 7 + React 19 + Tailwind CSS 4 frontend |
-| 🐳 | **One-command Docker** | `docker compose up -d` and you're done |
-| 🧪 | **Full test matrix** | Unit, integration, contract, security, e2e, a11y and performance suites |
+| Feature | What you get |
+| --- | --- |
+| **EPUB 3 export** | Clean, reflowable e-books built with EbookLib |
+| **PDF export** | Print-quality rendering via WeasyPrint |
+| **Persistent download queue** | Jobs survive restarts — persisted in SQLite |
+| **Live progress** | Real-time status streamed with Server-Sent Events |
+| **Session vault** | Cookie-based auth, SQLite-first storage with Fernet encryption |
+| **Microkernel architecture** | Auth, book, chapters, assets, EPUB and PDF as hot-pluggable plugins |
+| **OWASP-aware defaults** | Same-origin checks, security headers, CSP, rate limiting, audit logging with HMAC |
+| **Observability** | Prometheus metrics, health probes, typed Pydantic configuration |
+| **Internationalized UI** | i18next-powered Astro 7 + React 19 + Tailwind CSS 4 frontend |
+| **One-command Docker** | `docker compose up -d` and you're done |
+| **Full test matrix** | Unit, integration, contract, security, e2e, a11y and performance suites |
 
-## 🚀 Quick Start
+## Quick Start
 
-### 🐳 Docker (recommended)
+### Docker (recommended)
 
 ```bash
 git clone https://github.com/ZnOw01/Ryliox.git
@@ -57,18 +57,18 @@ docker compose up -d
 Then open **<http://localhost:8000>**.
 
 > [!WARNING]
-> The Compose port is bound to `127.0.0.1` **intentionally**. Ryliox does not authenticate clients of its own API, and the cookie endpoint can return stored O'Reilly cookie values to the local UI. **Never expose port 8000** to a LAN or the public internet without an authenticating reverse proxy — see [🔒 Secure Deployment](#-secure-deployment).
+> The Compose port is bound to `127.0.0.1` **intentionally**. Ryliox does not authenticate clients of its own API, and the cookie endpoint can return stored O'Reilly cookie values to the local UI. **Never expose port 8000** to a LAN or the public internet without an authenticating reverse proxy — see [Secure Deployment](#secure-deployment).
 
-### 💻 Local
+### Local
 
 **Requirements**
 
 | Tool | Version | Notes |
 | --- | --- | --- |
-| 🐍 Python | 3.11 · 3.12 · 3.13 | Managed with [uv](https://docs.astral.sh/uv/) |
-| 🥟 Bun | 1.3+ | Frontend toolchain |
-| 🟢 Node.js | 22.13+ or 24+ | Required by Bun/Astro tooling |
-| 🖼️ GTK3 runtime | Windows only | Needed by WeasyPrint for PDF export — [GTK for Windows][gtk] |
+| Python | 3.11 · 3.12 · 3.13 | Managed with [uv](https://docs.astral.sh/uv/) |
+| Bun | 1.3+ | Frontend toolchain |
+| Node.js | 22.13+ or 24+ | Required by Bun/Astro tooling |
+| GTK3 runtime | Windows only | Needed by WeasyPrint for PDF export — [GTK for Windows][gtk] |
 
 ```bash
 git clone https://github.com/ZnOw01/Ryliox.git
@@ -83,13 +83,13 @@ The launcher creates an isolated Python environment in `.run/venv`, installs fro
 
 [gtk]: https://github.com/tschoonj/GTK-for-Windows-Runtime-Environment-Installer/releases
 
-## 🍪 Cookie Setup
+## Cookie Setup
 
 Ryliox needs your O'Reilly session cookies to access purchased or subscribed content.
 
-1. 🖥️ Open the web UI.
-2. 🔧 Click **Set cookies**.
-3. 📋 Paste a full JSON cookie export from a browser extension such as **EditThisCookie**.
+1. Open the web UI.
+2. Click **Set cookies**.
+3. Paste a full JSON cookie export from a browser extension such as **EditThisCookie**.
 
 > [!IMPORTANT]
 > Use a **full browser export**, not a console snippet. Only the export can include the HttpOnly `orm-rt` refresh cookie — `document.cookie` cannot read HttpOnly cookies, so sessions created that way **expire quickly**.
@@ -103,27 +103,29 @@ Ryliox needs your O'Reilly session cookies to access purchased or subscribed con
 > [!WARNING]
 > Protect the local account, filesystem, backups and Docker volume that contain `data/session.sqlite3`. Deleting cookies from the UI or the database does **not** revoke an O'Reilly session already copied elsewhere.
 
-## 🏗️ Architecture
+## Architecture
 
 ```mermaid
 flowchart TB
-    subgraph Client["🖥️ Browser"]
+    subgraph Client["Browser"]
         UI["Astro 7 + React 19<br/><code>frontend/</code>"]
     end
 
-    subgraph Server["⚡ FastAPI application — <code>web/</code>"]
+    subgraph Server["FastAPI application — <code>web/</code>"]
+        direction TB
         MW["Security middleware"]
         API["REST routes"]
         SSE["SSE progress stream"]
     end
 
-    subgraph Core["🧠 Core — <code>core/</code>"]
+    subgraph Core["Core — <code>core/</code>"]
+        direction TB
         SVC["Services"]
         REPO["Repository · DTOs · Mappers"]
         KRN["Microkernel"]
     end
 
-    subgraph Plugins["🧩 Plugins — <code>plugins/</code>"]
+    subgraph Plugins["Plugins — <code>plugins/</code>"]
         direction LR
         P1["auth"]
         P2["book"]
@@ -133,14 +135,18 @@ flowchart TB
         P6["pdf"]
     end
 
-    DB[("🗄️ SQLite<br/><code>data/*.sqlite3</code>")]
-    OR["☁️ O'Reilly V2 API"]
+    DB[("SQLite<br/><code>data/*.sqlite3</code>")]
+    OR["O'Reilly V2 API"]
 
-    UI --> API & SSE
-    API --> MW --> SVC
+    UI --> MW
+    MW --> API & SSE
+    API --> SVC
     SVC --> REPO --> DB
     SVC --> KRN --> Plugins
     P2 & P3 & P4 --> OR
+
+    classDef external fill:#f3f4f6,stroke:#6b7280,color:#111827,stroke-dasharray:4 3
+    class DB,OR external
 ```
 
 **A download, step by step:**
@@ -148,12 +154,12 @@ flowchart TB
 ```mermaid
 sequenceDiagram
     autonumber
-    actor U as 👤 User
-    participant F as 🖥️ Frontend
-    participant A as ⚡ FastAPI
-    participant Q as 🗄️ Queue (SQLite)
-    participant W as ⚙️ Worker
-    participant O as ☁️ O'Reilly API
+    actor U as User
+    participant F as Frontend
+    participant A as FastAPI
+    participant Q as Queue (SQLite)
+    participant W as Worker
+    participant O as O'Reilly API
 
     U->>F: Save cookies · pick a book
     F->>A: POST /api/download
@@ -164,10 +170,10 @@ sequenceDiagram
         W->>O: Fetch chapter + assets
         O-->>W: HTML · images · CSS
         W->>Q: Persist progress
-        Q-->>F: 📡 SSE update (live %)
+        Q-->>F: SSE update (live %)
     end
     W->>W: Build EPUB 3 / PDF
-    W-->>U: ✅ Saved to output/
+    W-->>U: Saved to output/
 ```
 
 **Runtime flow, in words:**
@@ -179,37 +185,37 @@ sequenceDiagram
 5. A worker runs `DownloaderPlugin`, which fetches chapters, assets and output formats.
 6. Progress is persisted and streamed through `/api/progress/stream`.
 
-## 🌐 API Surface
+## API Surface
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| `GET` | `/api/status` | 🔐 Auth and cookie status |
-| `GET` | `/api/search?q=` | 🔎 Search books |
-| `GET` | `/api/book/{id}` | 📕 Book metadata |
-| `GET` | `/api/book/{id}/chapters` | 📑 Chapter list |
-| `POST` | `/api/download` | ⬇️ Queue a download |
-| `GET` | `/api/progress?job_id=` | 📈 Job progress snapshot |
-| `GET` | `/api/progress/stream` | 📡 Live progress stream |
-| `POST` | `/api/cancel` | ⛔ Cancel a job |
-| `POST` | `/api/cookies` | 🍪 Save session cookies |
-| `GET` | `/api/health` | 💓 Liveness probe |
-| `GET` | `/api/health/detailed` | 🩺 Disk, memory, SQLite, external APIs |
-| `GET` | `/metrics` | 📊 Prometheus metrics |
-| `GET` | `/api/docs` | 📖 Swagger UI (development) |
+| `GET` | `/api/status` | Auth and cookie status |
+| `GET` | `/api/search?q=` | Search books |
+| `GET` | `/api/book/{id}` | Book metadata |
+| `GET` | `/api/book/{id}/chapters` | Chapter list |
+| `POST` | `/api/download` | Queue a download |
+| `GET` | `/api/progress?job_id=` | Job progress snapshot |
+| `GET` | `/api/progress/stream` | Live progress stream |
+| `POST` | `/api/cancel` | Cancel a job |
+| `POST` | `/api/cookies` | Save session cookies |
+| `GET` | `/api/health` | Liveness probe |
+| `GET` | `/api/health/detailed` | Disk, memory, SQLite, external APIs |
+| `GET` | `/metrics` | Prometheus metrics |
+| `GET` | `/api/docs` | Swagger UI (development) |
 
-## ⚙️ Configuration
+## Configuration
 
 Configuration is loaded from `.env` into a **typed Pydantic settings model**. Start from the fully commented [`.env.example`](.env.example).
 
 | Area | Examples | Notes |
 | --- | --- | --- |
-| 🖥️ Server | `HOST`, `PORT`, `APP_VERSION` | Bind address and app metadata |
-| 🌐 HTTP | `REQUEST_*`, `USER_AGENT`, `ACCEPT_*` | Outbound client behavior |
-| 🛡️ Security | `ENVIRONMENT`, `CSP_POLICY`, `ALLOWED_HOSTS` | Headers, host checks, CSP |
-| 🚦 Rate limit | `RATE_LIMIT_*`, `API_RATE_LIMIT_*` | Endpoint throttling |
-| 🔑 Secrets | `SECRET_MASTER_PASSWORD` | Encryption and rotation |
-| 🧾 Audit | `AUDIT_*` | Audit log retention and integrity |
-| ⚡ Cache | `CACHE_*` | Resource cache sizes and TTLs |
+| Server | `HOST`, `PORT`, `APP_VERSION` | Bind address and app metadata |
+| HTTP | `REQUEST_*`, `USER_AGENT`, `ACCEPT_*` | Outbound client behavior |
+| Security | `ENVIRONMENT`, `CSP_POLICY`, `ALLOWED_HOSTS` | Headers, host checks, CSP |
+| Rate limit | `RATE_LIMIT_*`, `API_RATE_LIMIT_*` | Endpoint throttling |
+| Secrets | `SECRET_MASTER_PASSWORD` | Encryption and rotation |
+| Audit | `AUDIT_*` | Audit log retention and integrity |
+| Cache | `CACHE_*` | Resource cache sizes and TTLs |
 
 Runtime paths default to local, git-ignored directories:
 
@@ -219,7 +225,7 @@ Runtime paths default to local, git-ignored directories:
 | `output/` | Generated EPUB / PDF files |
 | `.run/` | Launcher-managed local runtime files |
 
-## 🔒 Secure Deployment
+## Secure Deployment
 
 Localhost keeps the zero-configuration workflow. **A non-loopback bind — and every production deployment — requires:**
 
@@ -232,11 +238,11 @@ Localhost keeps the zero-configuration workflow. **A non-loopback bind — and e
 
 **Migrations & filesystem safety**
 
-- On first startup, plaintext cookie rows and legacy cookie files are imported, **encrypted transactionally**, and the plaintext source is removed. 💾 **Back up before upgrading.**
+- On first startup, plaintext cookie rows and legacy cookie files are imported, **encrypted transactionally**, and the plaintext source is removed. **Back up before upgrading.**
 - Development keys are stored with mode `0600` in the platform user configuration directory, separate from SQLite and audit ciphertext.
 - Output paths — including values selected by the local native picker — must remain below `RYLIOX_PATHS__OUTPUT_ROOT` (default `./output`). The native picker is **disabled for remote binds**.
 
-## 🛠️ Development
+## Development
 
 ```bash
 uv sync --extra dev   # install Python dependencies
@@ -276,17 +282,17 @@ uv run pytest tests/security -q --run-security
 > uv sync --extra dev
 > ```
 
-## 🧯 Troubleshooting
+## Troubleshooting
 
 <details>
-<summary><b>❌ <code>bun test --run</code> fails with Vitest errors</b></summary>
+<summary><b><code>bun test --run</code> fails with Vitest errors</b></summary>
 
 Use `bun run test`. The test script runs `vitest run` with the configured JSDOM environment.
 
 </details>
 
 <details>
-<summary><b>❌ <code>uv run</code> fails on <code>.venv/lib64</code> with access denied</b></summary>
+<summary><b><code>uv run</code> fails on <code>.venv/lib64</code> with access denied</b></summary>
 
 The local `.venv` is likely incomplete or has a Windows symlink permission problem. Use an ignored project environment:
 
@@ -298,66 +304,66 @@ uv sync --extra dev
 </details>
 
 <details>
-<summary><b>❌ PDF export fails on Windows</b></summary>
+<summary><b>PDF export fails on Windows</b></summary>
 
-Install the GTK3 runtime linked in [Quick Start](#-quick-start). WeasyPrint needs native libraries to render PDFs.
+Install the GTK3 runtime linked in [Quick Start](#quick-start). WeasyPrint needs native libraries to render PDFs.
 
 </details>
 
 <details>
-<summary><b>❌ Cookies save but auth expires quickly</b></summary>
+<summary><b>Cookies save but auth expires quickly</b></summary>
 
-Use a full browser cookie JSON export. Console-based cookie snippets cannot read the HttpOnly `orm-rt` refresh cookie — see [🍪 Cookie Setup](#-cookie-setup).
+Use a full browser cookie JSON export. Console-based cookie snippets cannot read the HttpOnly `orm-rt` refresh cookie — see [Cookie Setup](#cookie-setup).
 
 </details>
 
-## 🗂️ Project Structure
+## Project Structure
 
 ```text
 Ryliox/
-├── 🧠 config.py            Typed settings and legacy module-level constants
-├── 🚪 main.py              Thin server entry point
-├── 🚀 launcher/            Local workflow launcher (venv, frontend, Docker)
-├── ⚡ web/                 FastAPI app, middleware, schemas, routes
-├── 🧩 core/                Services, repository, DTOs, kernel, security, storage
-├── 🔌 plugins/             Auth, book, chapter, asset, EPUB, PDF, downloader
-├── 🔧 utils/               File and filename helpers
-├── 🖥️ frontend/            Astro 7 + React 19 + Tailwind CSS 4
-├── 🧪 tests/               Unit · integration · contract · security · e2e · a11y · performance
-├── 🐳 Dockerfile           Multi-stage production image
-├── 🐙 docker-compose.yml   Local orchestration (loopback-only)
-└── 📊 epubcheck/           EPUB validation assets
+├── config.py            Typed settings and legacy module-level constants
+├── main.py              Thin server entry point
+├── launcher/            Local workflow launcher (venv, frontend, Docker)
+├── web/                 FastAPI app, middleware, schemas, routes
+├── core/                Services, repository, DTOs, kernel, security, storage
+├── plugins/             Auth, book, chapter, asset, EPUB, PDF, downloader
+├── utils/               File and filename helpers
+├── frontend/            Astro 7 + React 19 + Tailwind CSS 4
+├── tests/               Unit · integration · contract · security · e2e · a11y · performance
+├── Dockerfile           Multi-stage production image
+├── docker-compose.yml   Local orchestration (loopback-only)
+└── epubcheck/           EPUB validation assets
 ```
 
-## 🗺️ Roadmap
+## Roadmap
 
-- [x] 🔄 Unified FastAPI backend with persistent SQLite queue
-- [x] 🖥️ Astro 7 + React 19 frontend with i18n
-- [x] 🔐 Encrypted session storage and audit logging
-- [ ] 🖥️ Standalone CLI mode
-- [ ] 📦 Prebuilt Docker image published to GHCR
-- [ ] ✅ EPUB validation in CI (epubcheck)
-- [ ] 🌐 More UI languages
+- [x] Unified FastAPI backend with persistent SQLite queue
+- [x] Astro 7 + React 19 frontend with i18n
+- [x] Encrypted session storage and audit logging
+- [ ] Standalone CLI mode
+- [ ] Prebuilt Docker image published to GHCR
+- [ ] EPUB validation in CI (epubcheck)
+- [ ] More UI languages
 
-## 🤝 Contributing
+## Contributing
 
-Contributions of all kinds are welcome — bug reports, features, docs and translations. Read the [📖 Contributing Guide](CONTRIBUTING.md) and follow the [🤲 Code of Conduct](CODE_OF_CONDUCT.md).
+Contributions of all kinds are welcome — bug reports, features, docs and translations. Read the [Contributing Guide](CONTRIBUTING.md) and follow the [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ```bash
 # The short version
 git checkout -b feat/my-change
 uv run ruff check . && uv run mypy && uv run pytest
-# open a PR 🎉
+# open a PR
 ```
 
-## 🙏 Credits
+## Credits
 
 Ryliox is a from-scratch refactor inspired by:
 
 - [Mosaibah/oreilly-ingest](https://github.com/Mosaibah/oreilly-ingest)
 - [lorenzodifuccia/safaribooks](https://github.com/lorenzodifuccia/safaribooks)
 
-## 📜 License
+## License
 
 Distributed under the **MIT License** — see [LICENSE](LICENSE).
 
@@ -367,6 +373,6 @@ Distributed under the **MIT License** — see [LICENSE](LICENSE).
 
 **If Ryliox helps you, consider giving it a ⭐ — it helps others find it!**
 
-[⬆ Back to top](#-ryliox)
+[Back to top](#ryliox)
 
 </div>
