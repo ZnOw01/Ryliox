@@ -243,6 +243,9 @@ class DownloadJobRepository:
                 self._conn.close()
             self._conn = None
 
+    def __del__(self) -> None:
+        self.close()
+
     def _initialize(self) -> None:
         with self._lock, self._connect() as conn:
             self._create_table(conn)

@@ -262,6 +262,8 @@ filterwarnings = [
     "ignore::DeprecationWarning:curl_cffi.*",
     "ignore:Using `httpx` with `starlette.testclient` is deprecated.*:Warning",
     "ignore::PendingDeprecationWarning",
+    "ignore::ResourceWarning",
+    "ignore::pytest.PytestUnraisableExceptionWarning",
 ]
 
 [tool.bandit]
