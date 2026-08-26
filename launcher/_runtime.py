@@ -52,10 +52,14 @@ _ALLOWED_RUNTIME_PACKAGES: frozenset[str] = frozenset(
         "charset_normalizer",
         "idna",
         "urllib3",
-        "yaml",
-        "click",
-        "rich",
-        "pygments",
+        "requests",
+        "bs4",
+        "jwt",
+        "prometheus_client",
+        "psutil",
+        "dotenv",
+        "platformdirs",
+        "watchfiles",
     }
 )
 

@@ -8,6 +8,8 @@
     "node": "^22.13.0 || >=24.0.0"
   },
   "scripts": {
+    "dev": "cross-env NODE_NO_WARNINGS=1 astro dev",
+    "preview": "cross-env NODE_NO_WARNINGS=1 astro preview",
     "build": "cross-env NODE_NO_WARNINGS=1 astro build",
     "build:watch": "cross-env NODE_NO_WARNINGS=1 astro build --watch",
     "check": "cross-env NODE_NO_WARNINGS=1 astro check",

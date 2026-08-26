@@ -75,24 +75,6 @@ class FeatureFlags:
             result[flag_name] = {**config, "enabled": self._flags.get(flag_name, False)}
         return result
 
-    def set_flag(self, flag_name: str, enabled: bool) -> None:
-        """Set a feature flag state (for runtime toggling)."""
-        if flag_name in FEATURE_FLAGS_CONFIG:
-            self._flags[flag_name] = enabled
-
-    def get_flags_by_category(self, category: str) -> dict[str, bool]:
-        """Get all flags for a specific category."""
-        return {
-            name: self._flags.get(name, False)
-            for name, config in FEATURE_FLAGS_CONFIG.items()
-            if config.get("category") == category
-        }
-
 
 # Global instance
 feature_flags = FeatureFlags()
-
-
-def is_feature_enabled(flag_name: str) -> bool:
-    """Convenience function to check if a feature is enabled."""
-    return feature_flags.is_enabled(flag_name)

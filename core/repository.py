@@ -6,8 +6,8 @@ import logging
 import sqlite3
 import threading
 import time
-from collections.abc import Callable, Generator
-from contextlib import contextmanager, suppress
+from collections.abc import Callable
+from contextlib import suppress
 from functools import wraps
 from pathlib import Path
 from typing import Any, Literal, TypeVar
@@ -121,44 +121,66 @@ _ALLOWED_UPDATE_COLUMNS: frozenset[str] = frozenset(
 class UnitOfWork:
     """Unit of Work pattern for atomic transactions."""
 
-    def __init__(self, connection: sqlite3.Connection):
+    def __init__(
+        self,
+        connection: sqlite3.Connection,
+        lock: threading.RLock | None = None,
+    ):
         self._conn = connection
+        self._lock = lock
         self._committed = False
         self._active = False
 
     def __enter__(self) -> UnitOfWork:
         """Enter the database transaction context."""
-        self._conn.execute(f"PRAGMA busy_timeout={SQLITE_BUSY_TIMEOUT_MILLISECONDS}")
-        self._conn.execute("BEGIN IMMEDIATE")
-        self._active = True
-        self._committed = False
-        return self
+        if self._lock is not None:
+            self._lock.acquire()
+        try:
+            self._conn.execute(f"PRAGMA busy_timeout={SQLITE_BUSY_TIMEOUT_MILLISECONDS}")
+            self._conn.execute("BEGIN IMMEDIATE")
+            self._active = True
+            self._committed = False
+            return self
+        except Exception:
+            if self._lock is not None:
+                self._lock.release()
+            raise
 
     def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> Literal[False]:
         """Exit the database transaction context."""
-        if not self._active:
+        try:
+            if not self._active:
+                return False
+
+            if exc_type is None and self._committed:
+                pass
+            elif exc_type is None:
+                self.rollback()
+            else:
+                with suppress(Exception):
+                    self.rollback()
+
+            self._active = False
             return False
-
-        if exc_type is None and self._committed:
-            pass
-        elif exc_type is None:
-            self._conn.execute("ROLLBACK")
-        else:
-            with suppress(Exception):
-                self._conn.execute("ROLLBACK")
-
-        self._active = False
-        return False
+        finally:
+            if self._lock is not None:
+                self._lock.release()
 
     def commit(self) -> None:
         if self._active:
-            self._conn.execute("COMMIT")
-            self._committed = True
+            try:
+                self._conn.execute("COMMIT")
+                self._committed = True
+            finally:
+                self._active = False
 
     def rollback(self) -> None:
         if self._active:
-            self._conn.execute("ROLLBACK")
-            self._committed = False
+            try:
+                self._conn.execute("ROLLBACK")
+            finally:
+                self._active = False
+                self._committed = False
 
     @property
     def connection(self) -> sqlite3.Connection:
@@ -211,15 +233,7 @@ class DownloadJobRepository:
         return self._conn
 
     def unit_of_work(self) -> UnitOfWork:
-        return UnitOfWork(self._connect())
-
-    @contextmanager
-    def transaction(self) -> Generator[sqlite3.Connection, None, None]:
-        with self._lock:
-            conn = self._connect()
-            with UnitOfWork(conn) as uow:
-                yield conn
-                uow.commit()
+        return UnitOfWork(self._connect(), lock=self._lock)
 
     def close(self) -> None:
         with self._lock:
@@ -380,6 +394,24 @@ class DownloadJobRepository:
             ).fetchone()
             return int(row["total"]) if row else 0
 
+    def count_active(self) -> int:
+        """Return the number of jobs currently being processed."""
+        with self._lock, self._connect() as conn:
+            row = conn.execute(
+                """SELECT COUNT(*) AS total FROM download_jobs
+                WHERE status NOT IN (?,?,?) AND status <> 'queued'""",
+                tuple(TERMINAL_STATES),
+            ).fetchone()
+            return int(row["total"]) if row else 0
+
+    def has_queued_jobs(self) -> bool:
+        """Cheap read-only check for queued jobs, without a write transaction."""
+        with self._lock, self._connect() as conn:
+            row = conn.execute(
+                "SELECT 1 FROM download_jobs WHERE status = 'queued' LIMIT 1"
+            ).fetchone()
+            return row is not None
+
     def list_all(
         self, limit: int | None = None, status_filter: str | None = None
     ) -> list[dict[str, Any]]:
@@ -408,8 +440,8 @@ class DownloadJobRepository:
 
             return results
 
-    @sqlite_retry()
-    def save(self, job_dto: DownloadJobDTO) -> dict[str, Any]:
+    def _insert_job_conn(self, conn: sqlite3.Connection, job_dto: DownloadJobDTO) -> None:
+        """Insert a queued job using the caller's transaction."""
         db_data = self._job_mapper.to_db(job_dto)
         db_data.update(
             {
@@ -420,28 +452,53 @@ class DownloadJobRepository:
             }
         )
 
+        conn.execute(
+            """
+                INSERT INTO download_jobs (
+                    job_id, book_id, formats_json, chapters_json, output_dir, skip_images,
+                    status, percentage, message, cancel_requested, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)
+            """,
+            (
+                db_data["job_id"],
+                db_data["book_id"],
+                db_data["formats_json"],
+                db_data["chapters_json"],
+                db_data["output_dir"],
+                db_data["skip_images"],
+                db_data["status"],
+                db_data["percentage"],
+                db_data["message"],
+                db_data["created_at"],
+                db_data["updated_at"],
+            ),
+        )
+
+    @sqlite_retry()
+    def enqueue_if_capacity(
+        self, job_dto: DownloadJobDTO, max_queued_jobs: int
+    ) -> dict[str, Any] | None:
+        """Insert a job only when queue admission is available."""
+        with self._lock:
+            with self.unit_of_work() as uow:
+                conn = uow.connection
+                row = conn.execute(
+                    "SELECT COUNT(*) AS total FROM download_jobs WHERE status = 'queued'"
+                ).fetchone()
+                queued_count = int(row["total"]) if row else 0
+                if queued_count >= max_queued_jobs:
+                    uow.commit()
+                    return None
+
+                self._insert_job_conn(conn, job_dto)
+                snapshot = self._get_by_id_conn(conn, job_dto.job_id)
+                uow.commit()
+                return snapshot
+
+    @sqlite_retry()
+    def save(self, job_dto: DownloadJobDTO) -> dict[str, Any]:
         with self._lock, self._connect() as conn:
-            conn.execute(
-                """
-                    INSERT INTO download_jobs (
-                        job_id, book_id, formats_json, chapters_json, output_dir, skip_images,
-                        status, percentage, message, cancel_requested, created_at, updated_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)
-                    """,
-                (
-                    db_data["job_id"],
-                    db_data["book_id"],
-                    db_data["formats_json"],
-                    db_data["chapters_json"],
-                    db_data["output_dir"],
-                    db_data["skip_images"],
-                    db_data["status"],
-                    db_data["percentage"],
-                    db_data["message"],
-                    db_data["created_at"],
-                    db_data["updated_at"],
-                ),
-            )
+            self._insert_job_conn(conn, job_dto)
 
             snapshot = self._get_by_id_conn(conn, job_dto.job_id)
             conn.commit()
@@ -502,10 +559,23 @@ class DownloadJobRepository:
         with self._lock:
             with self.unit_of_work() as uow:
                 conn = uow.connection
+                now = time.time()
+                conn.execute(
+                    """UPDATE download_jobs SET
+                        status = 'cancelled',
+                        message = 'Cancelled',
+                        error = 'Download cancelled by user',
+                        code = 'download_cancelled',
+                        finished_at = ?,
+                        updated_at = ?
+                    WHERE status = 'queued' AND cancel_requested = 1""",
+                    (now, now),
+                )
+                self._prune_terminal_jobs_conn(conn)
                 row = conn.execute(
                     """
                     SELECT * FROM download_jobs
-                    WHERE status = 'queued'
+                    WHERE status = 'queued' AND cancel_requested = 0
                     ORDER BY seq ASC
                     LIMIT 1
                     """
@@ -515,12 +585,11 @@ class DownloadJobRepository:
                     uow.commit()
                     return None
 
-                now = time.time()
                 cursor = conn.execute(
                     """
                     UPDATE download_jobs
                     SET status = ?, updated_at = ?, started_at = COALESCE(started_at, ?), message = NULL
-                    WHERE job_id = ? AND status = 'queued'
+                    WHERE job_id = ? AND status = 'queued' AND cancel_requested = 0
                     """,
                     ("starting", now, now, row["job_id"]),
                 )
@@ -540,7 +609,6 @@ class DownloadJobRepository:
                     return None
 
                 return self._job_mapper.to_dto(claimed)
-        return None
 
     def is_cancel_requested(self, job_id: str) -> bool:
         with self._lock, self._connect() as conn:
@@ -552,87 +620,102 @@ class DownloadJobRepository:
 
     @sqlite_retry()
     def request_cancel(self, job_id: str) -> tuple[str, dict[str, Any] | None]:
-        with self._lock, self._connect() as conn:
-            row = conn.execute(
-                "SELECT * FROM download_jobs WHERE job_id = ? LIMIT 1",
-                (job_id,),
-            ).fetchone()
+        with self._lock:
+            with self.unit_of_work() as uow:
+                conn = uow.connection
+                row = conn.execute(
+                    "SELECT * FROM download_jobs WHERE job_id = ? LIMIT 1",
+                    (job_id,),
+                ).fetchone()
 
-            if row is None:
-                return "not_found", None
+                if row is None:
+                    uow.commit()
+                    return "not_found", None
 
-            current_status = str(row["status"])
-            if current_status in TERMINAL_STATES:
-                return "already_terminal", self._snapshot_mapper.to_dict(row)
+                current_status = str(row["status"])
+                if current_status in TERMINAL_STATES:
+                    uow.commit()
+                    return "already_terminal", self._snapshot_mapper.to_dict(row)
 
-            now = time.time()
-            if current_status == "queued":
+                # ``finalizing`` is the durable point of no return: the
+                # downloader has completed all cancellable work and is about
+                # to publish (or has just published) the staged directory.
+                # Accepting cancellation here could leave a visible artifact
+                # attached to a cancelled job.
+                if current_status == "finalizing":
+                    uow.commit()
+                    return "too_late", self._snapshot_mapper.to_dict(row)
+
+                now = time.time()
+                if current_status == "queued":
+                    conn.execute(
+                        """
+                            UPDATE download_jobs SET
+                                status = 'cancelled',
+                                message = 'Cancelled',
+                                error = 'Download cancelled by user',
+                                code = 'download_cancelled',
+                                cancel_requested = 1,
+                                finished_at = ?,
+                                updated_at = ?
+                            WHERE job_id = ? AND status = 'queued'
+                            """,
+                        (now, now, job_id),
+                    )
+                    self._prune_terminal_jobs_conn(conn)
+                    updated = self._get_by_id_conn(conn, job_id)
+                    uow.commit()
+                    return "cancelled", updated
+
+                message = row["message"] if row["message"] else "Cancel requested"
                 conn.execute(
                     """
-                        UPDATE download_jobs SET
-                            status = 'cancelled',
-                            message = 'Cancelled',
-                            error = 'Download cancelled by user',
-                            code = 'download_cancelled',
-                            cancel_requested = 1,
-                            finished_at = ?,
-                            updated_at = ?
-                        WHERE job_id = ?
+                        UPDATE download_jobs
+                        SET cancel_requested = 1, message = ?, updated_at = ?
+                        WHERE job_id = ? AND status NOT IN (?,?,?)
                         """,
-                    (now, now, job_id),
+                    (message, now, job_id, *tuple(TERMINAL_STATES)),
                 )
-                self._prune_terminal_jobs_conn(conn)
                 updated = self._get_by_id_conn(conn, job_id)
-                conn.commit()
-                return "cancelled", updated
-
-            message = row["message"] if row["message"] else "Cancel requested"
-            conn.execute(
-                """
-                    UPDATE download_jobs
-                    SET cancel_requested = 1, message = ?, updated_at = ?
-                    WHERE job_id = ?
-                    """,
-                (message, now, job_id),
-            )
-            updated = self._get_by_id_conn(conn, job_id)
-            conn.commit()
-            return "cancel_requested", updated
+                uow.commit()
+                return "cancel_requested", updated
 
     @sqlite_retry()
     def requeue_inflight(self) -> None:
         terminal_params = tuple(TERMINAL_STATES)
         now = time.time()
 
-        with self._lock, self._connect() as conn:
-            conn.execute(
-                """UPDATE download_jobs SET status = 'cancelled',
-                    error = COALESCE(error, 'Download cancelled before restart'),
-                    code = COALESCE(code, 'download_cancelled'),
-                    message = COALESCE(message, 'Cancelled'),
-                    finished_at = COALESCE(finished_at, ?),
-                    updated_at = ?
-                WHERE status NOT IN (?,?,?) AND cancel_requested = 1""",
-                (now, now, *terminal_params),
-            )
+        with self._lock:
+            with self.unit_of_work() as uow:
+                conn = uow.connection
+                conn.execute(
+                    """UPDATE download_jobs SET status = 'cancelled',
+                        error = COALESCE(error, 'Download cancelled before restart'),
+                        code = COALESCE(code, 'download_cancelled'),
+                        message = COALESCE(message, 'Cancelled'),
+                        finished_at = COALESCE(finished_at, ?),
+                        updated_at = ?
+                    WHERE status NOT IN (?,?,?) AND cancel_requested = 1""",
+                    (now, now, *terminal_params),
+                )
 
-            conn.execute(
-                """UPDATE download_jobs SET status = 'queued',
-                    percentage = 0,
-                    eta_seconds = NULL,
-                    current_chapter = NULL,
-                    total_chapters = NULL,
-                    chapter_title = NULL,
-                    message = 'Requeued after restart',
-                    started_at = NULL,
-                    updated_at = ?,
-                    cancel_requested = 0
-                WHERE status NOT IN (?,?,?) AND cancel_requested = 0""",
-                (now, *terminal_params),
-            )
+                conn.execute(
+                    """UPDATE download_jobs SET status = 'queued',
+                        percentage = 0,
+                        eta_seconds = NULL,
+                        current_chapter = NULL,
+                        total_chapters = NULL,
+                        chapter_title = NULL,
+                        message = 'Requeued after restart',
+                        started_at = NULL,
+                        updated_at = ?,
+                        cancel_requested = 0
+                    WHERE status NOT IN (?,?,?) AND cancel_requested = 0""",
+                    (now, *terminal_params),
+                )
 
-            self._prune_terminal_jobs_conn(conn)
-            conn.commit()
+                self._prune_terminal_jobs_conn(conn)
+                uow.commit()
 
     def prune_terminal(self) -> None:
         with self._lock, self._connect() as conn:
@@ -667,7 +750,7 @@ class DownloadJobRepository:
                         code = NULL,
                         details_json = NULL,
                         trace_log = NULL
-                    WHERE job_id = ? AND status NOT IN ('completed', 'error', 'cancelled')
+                    WHERE job_id = ? AND status NOT IN (?,?,?)
                     """,
                 (
                     db_data["status"],
@@ -679,6 +762,7 @@ class DownloadJobRepository:
                     db_data["chapter_title"],
                     db_data["updated_at"],
                     job_id,
+                    *tuple(TERMINAL_STATES),
                 ),
             )
             conn.commit()
@@ -707,7 +791,7 @@ class DownloadJobRepository:
                         updated_at = ?
                     WHERE job_id = ?
                       AND cancel_requested = 0
-                      AND status NOT IN ('completed', 'error', 'cancelled')
+                      AND status NOT IN (?,?,?)
                     """,
                 (
                     db_data["status"],
@@ -719,6 +803,7 @@ class DownloadJobRepository:
                     db_data["finished_at"],
                     db_data["updated_at"],
                     job_id,
+                    *tuple(TERMINAL_STATES),
                 ),
             )
             if cursor.rowcount == 0:
@@ -753,7 +838,7 @@ class DownloadJobRepository:
                         finished_at = ?,
                         updated_at = ?,
                         message = NULL
-                    WHERE job_id = ?
+                    WHERE job_id = ? AND status NOT IN (?,?,?)
                     """,
                 (
                     db_data["status"],
@@ -764,6 +849,7 @@ class DownloadJobRepository:
                     db_data["finished_at"],
                     db_data["updated_at"],
                     job_id,
+                    *tuple(TERMINAL_STATES),
                 ),
             )
             if cursor.rowcount == 0:
@@ -773,51 +859,3 @@ class DownloadJobRepository:
             self._prune_terminal_jobs_conn(conn)
             conn.commit()
             return True
-
-    # Legacy compatibility
-    def get_job_snapshot(self, job_id: str) -> dict[str, Any] | None:
-        return self.get_by_id(job_id)
-
-    def get_latest_job_snapshot(self) -> dict[str, Any] | None:
-        return self.get_latest()
-
-    def get_latest_cancellable_job_id(self) -> str | None:
-        return self.get_latest_cancellable()
-
-    def cancel_job(self, job_id: str) -> tuple[str, dict[str, Any] | None]:
-        return self.request_cancel(job_id)
-
-    def mark_completed_legacy(self, job_id: str, result: Any) -> None:
-        from plugins.downloader import DownloadResult
-
-        if isinstance(result, DownloadResult):
-            pdf_value = result.files.get("pdf")
-            dto = DownloadResultDTO(
-                book_id=result.book_id,
-                title=result.title,
-                epub_path=result.files.get("epub"),
-                pdf_paths=pdf_value,
-                chapters_count=result.chapters_count,
-            )
-        else:
-            dto = DownloadResultDTO.from_dict(result)
-
-        self.mark_completed(job_id, dto)
-
-    def mark_failed_legacy(
-        self,
-        *,
-        job_id: str,
-        status: str,
-        error: str,
-        code: str,
-        details: dict[str, Any] | None = None,
-        trace_log: str | None = None,
-    ) -> None:
-        dto = DownloadErrorDTO(
-            error=error,
-            code=code,
-            details=details,
-            trace_log=trace_log,
-        )
-        self.mark_failed(job_id, dto, status)

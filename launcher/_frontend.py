@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 
 TIMEOUT_BUN_SECONDS: int = int(os.getenv("RYLIOX_TIMEOUT_BUN", "300"))
 ASTRO_FALLBACK_NODE_VERSION: str = (
-    getattr(config.SETTINGS, "astro_fallback_node_version", None) or "22.20.0"
+    getattr(config.SETTINGS.server, "astro_fallback_node_version", None) or "22.20.0"
 )
 
 WATCH_EXTENSIONS: frozenset[str] = frozenset(

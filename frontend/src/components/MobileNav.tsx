@@ -1,15 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Search, KeyRound, Download, ArrowUp } from 'lucide-react';
 import { cn } from '../lib/cn';
 
-const MOBILE_SECTIONS = [
-  { id: 'search-section', label: 'Buscar', icon: SearchIcon },
-  { id: 'auth-section', label: 'Sesión', icon: UserIcon },
-  { id: 'download-section', label: 'Descarga', icon: DownloadIcon },
-] as const;
-
 const HEADER_OFFSET_PX = 104;
-type MobileSectionId = (typeof MOBILE_SECTIONS)[number]['id'];
+type MobileSectionId = 'search-section' | 'auth-section' | 'download-section';
 
 /**
  * MobileNav - Bottom navigation for mobile devices
@@ -21,22 +16,22 @@ export function MobileNav() {
     () =>
       [
         {
-          id: 'search-section',
+          id: 'search-section' as const,
           label: t('mobile_nav.labels.search', { defaultValue: 'Buscar' }),
           fullLabel: t('search.title'),
-          icon: SearchIcon,
+          icon: Search,
         },
         {
-          id: 'auth-section',
+          id: 'auth-section' as const,
           label: t('mobile_nav.labels.auth', { defaultValue: 'Sesión' }),
           fullLabel: t('auth.title'),
-          icon: UserIcon,
+          icon: KeyRound,
         },
         {
-          id: 'download-section',
+          id: 'download-section' as const,
           label: t('mobile_nav.labels.download', { defaultValue: 'Descarga' }),
           fullLabel: t('download.title'),
-          icon: DownloadIcon,
+          icon: Download,
         },
       ] as const,
     [t]
@@ -137,7 +132,7 @@ export function MobileNav() {
                 key={section.id}
                 active={activeSection === section.id}
                 onClick={() => scrollToSection(section.id)}
-                icon={<Icon />}
+                icon={<Icon className="h-5 w-5" strokeWidth={2} />}
                 label={section.label}
                 controls={section.id}
                 ariaLabel={section.fullLabel}
@@ -147,7 +142,7 @@ export function MobileNav() {
           <NavButton
             active={false}
             onClick={scrollToTop}
-            icon={<ArrowUpIcon />}
+            icon={<ArrowUp className="h-5 w-5" strokeWidth={2} />}
             label={t('mobile_nav.up')}
           />
         </div>
@@ -163,7 +158,7 @@ export function MobileNav() {
         )}
         aria-label={t('mobile_nav.up')}
       >
-        <ArrowUpIcon className="h-6 w-6" />
+        <ArrowUp className="h-6 w-6" strokeWidth={2} />
       </button>
     </>
   );
@@ -195,73 +190,5 @@ function NavButton({ active, onClick, icon, label, controls, ariaLabel }: NavBut
       <span className="h-5 w-5">{icon}</span>
       <span className="text-[10px] font-medium">{label}</span>
     </button>
-  );
-}
-
-function SearchIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className || 'h-5 w-5'}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <circle cx="11" cy="11" r="8" />
-      <path d="m21 21-4.35-4.35" />
-    </svg>
-  );
-}
-
-function UserIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className || 'h-5 w-5'}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
-      <circle cx="12" cy="7" r="4" />
-    </svg>
-  );
-}
-
-function DownloadIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className || 'h-5 w-5'}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-      <polyline points="7 10 12 15 17 10" />
-      <line x1="12" x2="12" y1="15" y2="3" />
-    </svg>
-  );
-}
-
-function ArrowUpIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className || 'h-5 w-5'}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="m18 15-6-6-6 6" />
-    </svg>
   );
 }

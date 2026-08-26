@@ -119,10 +119,7 @@ export function parseApiError(error: unknown): ParsedApiError {
   if (error instanceof Error) {
     let friendlyMessage = error.message;
     if (error.message.includes('404')) {
-      friendlyMessage = t('errors.not_found_description', {
-        defaultValue:
-          'No se pudo conectar con el servicio. Verifica tus cookies e intenta de nuevo.',
-      });
+      friendlyMessage = t('errors.not_found_description');
     } else if (error.message.includes('401') || error.message.includes('403')) {
       friendlyMessage = t('errors.cookies_required_description');
     } else if (
@@ -130,10 +127,7 @@ export function parseApiError(error: unknown): ParsedApiError {
       error.message.includes('502') ||
       error.message.includes('504')
     ) {
-      friendlyMessage = t('errors.service_unavailable_description', {
-        defaultValue:
-          'El servicio de descarga no está disponible temporalmente. Inténtalo más tarde.',
-      });
+      friendlyMessage = t('errors.service_unavailable_description');
     } else if (
       error.message.includes('Failed to fetch') ||
       error.message.includes('NetworkError')

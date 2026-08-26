@@ -2,23 +2,11 @@
 
 from __future__ import annotations
 
-from urllib.parse import urlparse
-
 import config
 from core.contracts import ChapterInfo
 
 from .base import Plugin
-
-# Hosts considered safe for chapter content (same allowlist as HttpClient).
-_DEFAULT_ALLOWED_HOSTS: tuple[str, ...] = (
-    "oreilly.com",
-    "oreillystatic.com",
-    "oreil.ly",
-)
-
-
-def _book_urn(book_id: str) -> str:
-    return book_id if book_id.startswith("urn:orm:book:") else f"urn:orm:book:{book_id}"
+from .book import book_urn
 
 
 class ChaptersPlugin(Plugin):
@@ -26,7 +14,7 @@ class ChaptersPlugin(Plugin):
 
     async def fetch_list(self, book_id: str) -> list[ChapterInfo]:
         """Fetch list of chapters for a book, paginating until ``next`` is missing or repeats."""
-        url: str | None = f"{config.API_V2}/epub-chapters/?epub_identifier={_book_urn(book_id)}"
+        url: str | None = f"{config.API_V2}/epub-chapters/?epub_identifier={book_urn(book_id)}"
         chapters: list[ChapterInfo] = []
         seen_urls: set[str] = set()
 
@@ -53,7 +41,7 @@ class ChaptersPlugin(Plugin):
         return chapters
 
     async def fetch_toc(self, book_id: str) -> list[dict]:
-        url = f"{config.API_V2}/epubs/{_book_urn(book_id)}/table-of-contents/"
+        url = f"{config.API_V2}/epubs/{book_urn(book_id)}/table-of-contents/"
         data = await self.http.get_json(url)
         if isinstance(data, list):
             return data
@@ -105,18 +93,6 @@ class ChaptersPlugin(Plugin):
 
     async def fetch_content(self, content_url: str) -> str:
         return await self.http.get_text(content_url)
-
-    def _sanitize_remote_url(self, url: str) -> str:
-        """Return the URL if its host is in the allowlist, else an empty string."""
-        if not url:
-            return ""
-        host = (urlparse(url).hostname or "").lower()
-        if not host:
-            return ""
-        for allowed in _DEFAULT_ALLOWED_HOSTS:
-            if host == allowed or host.endswith("." + allowed):
-                return url
-        return ""
 
     def _extract_filename(self, reference_id: str) -> str:
         if "-/" in reference_id:

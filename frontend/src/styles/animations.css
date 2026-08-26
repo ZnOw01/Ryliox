@@ -1,4 +1,4 @@
-/* Keyframes adicionales para mejoras de UX */
+/* Animation Keyframes & Utility Classes */
 
 @keyframes shimmer {
   0% {
@@ -80,32 +80,11 @@
   }
 }
 
-/* Focus visible con animación suave */
-*:focus-visible {
-  outline: 2px solid var(--ring);
-  outline-offset: 2px;
-  transition:
-    outline-offset 0.15s ease,
-    outline-color 0.15s ease;
-}
-
-/* Reduced motion support */
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-  }
-}
-
-/* Animación shimmer para skeletons */
+/* Animation utilities */
 .animate-shimmer {
   animation: shimmer 1.5s infinite;
 }
 
-/* Animaciones de entrada */
 .animate-slide-up {
   animation: slide-up-fade 0.4s ease-out both;
 }
@@ -126,7 +105,7 @@
   animation: float 3s ease-in-out infinite;
 }
 
-/* Delays escalonados para animaciones */
+/* Animation delays */
 .delay-100 {
   animation-delay: 100ms;
 }

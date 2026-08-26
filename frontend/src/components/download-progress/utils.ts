@@ -29,6 +29,17 @@ export function formatReadingMinutes(
   return `${formatDecimal(normalized)} ${t('common.reading_time_minutes')}`;
 }
 
+export function formatTotalReadingTime(minutes: number | null | undefined): string | null {
+  if (typeof minutes !== 'number' || Number.isNaN(minutes) || minutes <= 0) {
+    return null;
+  }
+  if (minutes < 60) {
+    return `${Math.round(minutes)} min`;
+  }
+  const hours = (minutes / 60).toFixed(1);
+  return `${hours} hrs`;
+}
+
 export function formatEta(seconds: number | null | undefined): string | null {
   if (typeof seconds !== 'number' || Number.isNaN(seconds) || seconds < 0) {
     return null;

@@ -75,6 +75,9 @@
 			"title": "Búsquedas recientes",
 			"clear": "Limpiar historial"
 		},
+		"suggested_topics": "Temas sugeridos",
+		"direct_url_detected": "Enlace directo de O'Reilly detectado",
+		"isbn_detected": "ISBN directo detectado",
 		"scopes": {
 			"all": "Todos los campos",
 			"title": "Título",
@@ -105,6 +108,12 @@
 			"loading": "Cargando formatos...",
 			"no_formats": "No hay formatos disponibles",
 			"helper_text": "Algunos formatos pueden quedar deshabilitados al seleccionar capítulos.",
+			"badges": {
+				"recommended": "Recomendado",
+				"complete_book": "Libro completo",
+				"single_file": "Archivo único",
+				"chapter_files": "Por capítulo"
+			},
 			"epub_single": "EPUB — Libro completo",
 			"pdf_combined": "PDF — Todo en un archivo",
 			"pdf_separate": "PDF — Un archivo por capítulo"
@@ -118,6 +127,7 @@
 			"select_all": "Seleccionar todo",
 			"clear": "Limpiar selección",
 			"clear_selection": "Limpiar",
+			"invert_selection": "Invertir",
 			"chapter": "Capítulo {{number}}",
 			"not_selectable": "{{format}} no acepta selección de capítulos. Cambia el formato o limpia la selección.",
 			"selected_count": "{{count}} seleccionados",
@@ -164,6 +174,12 @@
 			"status_completed": "Completado",
 			"status_error": "Error",
 			"status_cancelled": "Cancelado",
+			"steps": {
+				"queued": "En cola",
+				"downloading": "Descargando contenido",
+				"compiling": "Empaquetando",
+				"done": "Completado"
+			},
 			"queued": "En cola (posición {{position}})",
 			"connecting": "Conectando...",
 			"downloading": "Descargando...",

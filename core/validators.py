@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import concurrent.futures
 import ipaddress
 import logging
 import re
@@ -15,10 +14,6 @@ from typing import Any
 from urllib.parse import unquote, urlparse
 
 logger = logging.getLogger(__name__)
-
-# MED-001: DNS rebinding protection
-_DNS_CACHE: dict[str, tuple[str, float]] = {}
-_DNS_CACHE_TTL_SECONDS: float = 30.0
 
 # OWASP A03: XSS prevention patterns
 _DANGEROUS_HTML_PATTERNS: tuple[Pattern[str], ...] = (
@@ -145,123 +140,13 @@ def validate_book_id(book_id: str) -> str:
     )
 
 
-def _resolve_and_validate_dns(hostname: str, url: str) -> str | None:
-    """Resolve hostname and validate the IP is not private/reserved.
-
-    MED-001: DNS rebinding protection - validates IP at resolution time
-    and returns the resolved IP if valid, None otherwise.
-    """
-    import time
-
-    # Check cache first
-    now = time.monotonic()
-    if hostname in _DNS_CACHE:
-        cached_ip, timestamp = _DNS_CACHE[hostname]
-        if now - timestamp < _DNS_CACHE_TTL_SECONDS:
-            return cached_ip
-        del _DNS_CACHE[hostname]
-
-    try:
-        addr_info = socket.getaddrinfo(hostname, None)
-        for _, _, _, _, sockaddr in addr_info:
-            ip_str = str(sockaddr[0])
-            if _is_dangerous_ip(ip_str):
-                raise ValidationError(
-                    "url",
-                    f"URL hostname '{hostname}' resolves to private/reserved IP '{ip_str}'",
-                    url[:100],
-                )
-            # Cache and return the first valid IP
-            _DNS_CACHE[hostname] = (ip_str, now)
-            return ip_str
-    except ValidationError:
-        raise
-    except Exception as exc:
-        logger.debug("DNS validation failed for %s: %s", hostname, exc)
-    return None
-
-
 async def validate_url(url: str, allowed_hosts: set[str] | None = None) -> str:
-    """Validate URL against SSRF and injection attacks (async)."""
-    if not url:
-        raise ValidationError("url", "URL cannot be empty", url)
+    """Validate URL against SSRF and injection attacks (async).
 
-    if len(url) > MAX_URL_LENGTH:
-        raise ValidationError("url", f"URL too long (max {MAX_URL_LENGTH} chars)", url[:100])
-
-    parsed = urlparse(url)
-
-    scheme = parsed.scheme.lower()
-    if not scheme:
-        raise ValidationError("url", "URL must have a scheme (http/https)", url[:100])
-
-    if scheme not in _ALLOWED_SCHEMES:
-        raise ValidationError(
-            "url", f"URL scheme '{scheme}' not allowed. Use http or https.", url[:100]
-        )
-
-    hostname = parsed.hostname
-    if not hostname:
-        raise ValidationError("url", "URL must have a hostname", url[:100])
-
-    # Unicode normalization for homograph attack prevention
-    hostname_lower = _normalize_hostname(hostname)
-
-    # Block IDN/punycode domains
-    if hostname_lower.startswith("xn--") or "xn--" in hostname_lower:
-        raise ValidationError(
-            "url",
-            f"URL hostname '{hostname}' contains IDN/punycode characters (not allowed)",
-            url[:100],
-        )
-
-    # DNS rebinding protection: check if domain resolves to private IP with caching (MED-001)
-    try:
-        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-            future = executor.submit(_resolve_and_validate_dns, hostname, url)
-            resolved_ip = await asyncio.wait_for(
-                asyncio.wrap_future(future), timeout=_DNS_LOOKUP_TIMEOUT
-            )
-        # Re-validate at connection time: if DNS returned a valid IP, ensure it's still not dangerous
-        if resolved_ip and _is_dangerous_ip(resolved_ip):
-            raise ValidationError(
-                "url",
-                f"URL hostname '{hostname}' resolves to private/reserved IP '{resolved_ip}'",
-                url[:100],
-            )
-    except TimeoutError:
-        # DNS lookup timed out - continue with hostname validation
-        pass
-    except socket.gaierror:
-        # DNS resolution failed - this is acceptable, we'll validate the hostname itself
-        pass
-    except ValidationError:
-        raise
-    except Exception as exc:
-        # Other socket errors - continue with hostname validation
-        logger.debug("Async DNS validation failed for %s: %s", hostname, exc)
-
-    # Block localhost/private IPs (SSRF protection)
-    if hostname_lower in _DANGEROUS_URL_HOSTS:
-        raise ValidationError(
-            "url",
-            f"URL hostname '{hostname}' is not allowed (localhost/private)",
-            url[:100],
-        )
-
-    # Check for IP addresses (block private ranges)
-    _check_host_ip_dangerous(hostname, url)
-
-    if allowed_hosts and hostname_lower not in allowed_hosts:
-        raise ValidationError(
-            "url", f"URL hostname '{hostname}' not in allowed hosts list", url[:100]
-        )
-
-    # Check for credentials in URL
-    if parsed.username or parsed.password:
-        raise ValidationError("url", "URL must not contain credentials (user:pass@host)", url[:100])
-
-    return url
+    Runs the sync validator in a worker thread so the blocking DNS lookup
+    never stalls the event loop.
+    """
+    return await asyncio.to_thread(validate_url_sync, url, allowed_hosts)
 
 
 def validate_url_sync(url: str, allowed_hosts: set[str] | None = None) -> str:
@@ -490,45 +375,12 @@ def sanitize_for_logs(text: str, max_length: int = 500) -> str:
     return text
 
 
-class PydanticValidators:
-    """Pydantic-compatible validator functions for use in schemas."""
-
-    @classmethod
-    def validate_book_id_pydantic(cls, v: Any) -> str | None:
-        """Pydantic field validator for book IDs."""
-        if v is None:
-            return v
-        return validate_book_id(str(v))
-
-    @classmethod
-    def validate_url_pydantic(cls, v: Any, allowed_hosts: set[str] | None = None) -> str | None:
-        """Pydantic field validator for URLs."""
-        if v is None:
-            return v
-        return validate_url_sync(str(v), allowed_hosts)
-
-    @classmethod
-    def validate_safe_string(cls, v: Any, max_length: int = MAX_INPUT_LENGTH) -> str | None:
-        """Pydantic field validator for safe strings."""
-        if v is None:
-            return v
-        return validate_user_input(str(v), allow_html=False, max_length=max_length)
-
-    @classmethod
-    def validate_filename_pydantic(cls, v: Any) -> str | None:
-        """Pydantic field validator for filenames."""
-        if v is None:
-            return v
-        return validate_filename(str(v))
-
-
 __all__ = [
     "MAX_BOOK_ID_LENGTH",
     "MAX_FILENAME_LENGTH",
     "MAX_INPUT_LENGTH",
     "MAX_PATH_LENGTH",
     "MAX_URL_LENGTH",
-    "PydanticValidators",
     "ValidationError",
     "sanitize_for_logs",
     "validate_book_id",

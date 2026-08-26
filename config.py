@@ -24,17 +24,43 @@ REPO_ROOT: Path = Path(__file__).resolve().parent
 
 
 class ServerSettings(BaseSettings):
-    host: str = "127.0.0.1"
-    port: int = 8000
-    base_url: str = "https://learning.oreilly.com"
+    host: str = Field(
+        default="127.0.0.1",
+        validation_alias=AliasChoices("host", "HOST", "SERVER__HOST", "RYLIOX_SERVER__HOST"),
+    )
+    port: int = Field(
+        default=8000,
+        validation_alias=AliasChoices("port", "PORT", "SERVER__PORT", "RYLIOX_SERVER__PORT"),
+    )
+    base_url: str = Field(
+        default="https://learning.oreilly.com",
+        validation_alias=AliasChoices(
+            "base_url", "BASE_URL", "SERVER__BASE_URL", "RYLIOX_SERVER__BASE_URL"
+        ),
+    )
     app_version: str = "2.0.0"
     astro_fallback_node_version: str = "22.20.0"
 
 
 class PathSettings(BaseSettings):
-    output_dir: Path = Field(default=Path("./output"))
-    output_root: Path = Field(default=Path("./output"))
-    data_dir: Path = Field(default=Path("./data"))
+    output_dir: Path = Field(
+        default=Path("./output"),
+        validation_alias=AliasChoices(
+            "output_dir", "OUTPUT_DIR", "PATHS__OUTPUT_DIR", "RYLIOX_PATHS__OUTPUT_DIR"
+        ),
+    )
+    output_root: Path = Field(
+        default=Path("./output"),
+        validation_alias=AliasChoices(
+            "output_root", "OUTPUT_ROOT", "PATHS__OUTPUT_ROOT", "RYLIOX_PATHS__OUTPUT_ROOT"
+        ),
+    )
+    data_dir: Path = Field(
+        default=Path("./data"),
+        validation_alias=AliasChoices(
+            "data_dir", "DATA_DIR", "PATHS__DATA_DIR", "RYLIOX_PATHS__DATA_DIR"
+        ),
+    )
     cookies_file: Path | None = None
     session_db_file: Path | None = None
     log_dir: str = "logs"
@@ -64,22 +90,55 @@ class HttpSettings(BaseSettings):
 
 
 class SecuritySettings(BaseSettings):
-    environment: Literal["development", "production", "test"] = "development"
+    environment: Literal["development", "production", "test"] = Field(
+        default="development",
+        validation_alias=AliasChoices(
+            "environment", "ENVIRONMENT", "SECURITY__ENVIRONMENT", "RYLIOX_SECURITY__ENVIRONMENT"
+        ),
+    )
     enable_https_redirect: bool = False
     enable_security_headers: bool = True
     enable_hsts: bool = False
     hsts_max_age: int = 31_536_000
-    allowed_hosts: list[str] = Field(default_factory=lambda: ["localhost", "127.0.0.1", "::1"])
+    allowed_hosts: list[str] = Field(
+        default_factory=lambda: ["localhost", "127.0.0.1", "::1"],
+        validation_alias=AliasChoices(
+            "allowed_hosts",
+            "ALLOWED_HOSTS",
+            "RYLIOX_TRUSTED_HOSTS",
+            "SECURITY__ALLOWED_HOSTS",
+            "RYLIOX_SECURITY__ALLOWED_HOSTS",
+        ),
+    )
     csp_policy: str = (
         "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; "
         "style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; "
         "connect-src 'self'; frame-ancestors 'none';"
     )
     max_request_size_mb: int = 10
-    admin_token: str | None = None
-    allow_unauthenticated_local_proxy: bool = False
+    admin_token: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "admin_token", "ADMIN_TOKEN", "SECURITY__ADMIN_TOKEN", "RYLIOX_SECURITY__ADMIN_TOKEN"
+        ),
+    )
+    allow_unauthenticated_local_proxy: bool = Field(
+        default=False,
+        validation_alias=AliasChoices(
+            "allow_unauthenticated_local_proxy",
+            "ALLOW_UNAUTHENTICATED_LOCAL_PROXY",
+            "SECURITY__ALLOW_UNAUTHENTICATED_LOCAL_PROXY",
+            "RYLIOX_SECURITY__ALLOW_UNAUTHENTICATED_LOCAL_PROXY",
+        ),
+    )
     cors_origins: list[str] = Field(
-        default_factory=lambda: ["http://localhost:8000", "http://127.0.0.1:8000"]
+        default_factory=lambda: ["http://localhost:8000", "http://127.0.0.1:8000"],
+        validation_alias=AliasChoices(
+            "cors_origins",
+            "CORS_ORIGINS",
+            "SECURITY__CORS_ORIGINS",
+            "RYLIOX_SECURITY__CORS_ORIGINS",
+        ),
     )
 
 
@@ -97,11 +156,21 @@ class SecretsSettings(BaseSettings):
 
 
 class AuditSettings(BaseSettings):
-    enabled: bool = True
+    enabled: bool = Field(
+        default=True,
+        validation_alias=AliasChoices(
+            "enabled", "AUDIT_ENABLED", "AUDIT__ENABLED", "RYLIOX_AUDIT__ENABLED"
+        ),
+    )
     log_dir: Path = Field(default=Path("./data/audit"))
     log_file: Path = Field(default=Path("./data/audit.log"))
     retention_days: int = 365
-    hmac_key: str | None = None
+    hmac_key: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "hmac_key", "AUDIT_HMAC_KEY", "AUDIT__HMAC_KEY", "RYLIOX_AUDIT__HMAC_KEY"
+        ),
+    )
     hmac_key_file: Path | None = None
 
 
@@ -110,13 +179,26 @@ class SessionSettings(BaseSettings):
     cookie_httponly: bool = True
     cookie_samesite: Literal["Strict", "Lax", "None"] = "Lax"
     max_age: int = 86_400
-    encryption_key: str | None = None
+    encryption_key: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "encryption_key",
+            "SESSION_ENCRYPTION_KEY",
+            "SESSION__ENCRYPTION_KEY",
+            "RYLIOX_SESSION__ENCRYPTION_KEY",
+        ),
+    )
     old_encryption_keys: list[str] = Field(default_factory=list)
     encryption_key_file: Path | None = None
 
 
 class LoggingSettings(BaseSettings):
-    level: str = "INFO"
+    level: str = Field(
+        default="INFO",
+        validation_alias=AliasChoices(
+            "level", "LOG_LEVEL", "LOGGING__LEVEL", "RYLIOX_LOGGING__LEVEL"
+        ),
+    )
     json_logs: bool = False
 
 
@@ -223,6 +305,38 @@ def _resolve(value: Path | str | None, default: str) -> Path:
     return (REPO_ROOT / value).resolve()
 
 
+def _build_headers(settings: Settings) -> dict[str, str]:
+    return {
+        "User-Agent": settings.http.user_agent
+        or "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        "Accept": settings.http.accept,
+        "Accept-Encoding": settings.http.accept_encoding,
+        "Accept-Language": settings.http.accept_language,
+        **{f"X-{k}": v for k, v in settings.http.extra_headers.items()},
+    }
+
+
+def _apply_settings_globals(settings: Settings) -> None:
+    """Mirror ``settings`` onto the mutable module-level globals."""
+    global SETTINGS, OUTPUT_DIR, OUTPUT_ROOT, DATA_DIR, COOKIES_FILE, SESSION_DB_FILE
+    global DOWNLOAD_QUEUE_DB, DOWNLOAD_ERROR_LOG_DIR, BASE_URL
+    global REQUEST_DELAY, REQUEST_TIMEOUT, REQUEST_RETRIES, REQUEST_RETRY_BACKOFF, HEADERS
+    SETTINGS = settings
+    OUTPUT_DIR = _resolve(settings.paths.output_dir, "output")
+    OUTPUT_ROOT = _resolve(settings.paths.output_root, "output")
+    DATA_DIR = _resolve(settings.paths.data_dir, "data")
+    COOKIES_FILE = settings.paths.cookies_file or (DATA_DIR / "cookies.json")
+    SESSION_DB_FILE = settings.paths.session_db_file or (DATA_DIR / "session.sqlite3")
+    DOWNLOAD_QUEUE_DB = DATA_DIR / settings.queue.db_name
+    DOWNLOAD_ERROR_LOG_DIR = DATA_DIR / settings.queue.log_dir
+    BASE_URL = settings.server.base_url
+    REQUEST_DELAY = settings.http.delay
+    REQUEST_TIMEOUT = settings.http.timeout
+    REQUEST_RETRIES = settings.http.retries
+    REQUEST_RETRY_BACKOFF = settings.http.retry_backoff
+    HEADERS = _build_headers(settings)
+
+
 OUTPUT_DIR: Path = _resolve(SETTINGS.paths.output_dir, "output")
 OUTPUT_ROOT: Path = _resolve(SETTINGS.paths.output_root, "output")
 DATA_DIR: Path = _resolve(SETTINGS.paths.data_dir, "data")
@@ -232,55 +346,20 @@ DOWNLOAD_QUEUE_DB: Path = DATA_DIR / SETTINGS.queue.db_name
 DOWNLOAD_ERROR_LOG_DIR: Path = DATA_DIR / SETTINGS.queue.log_dir
 
 BASE_URL: str = SETTINGS.server.base_url
-API_V1: str = "/api/v1"
 API_V2: str = "/api/v2"
-API_PREFIX: str = "/api"
 
 REQUEST_DELAY: float = SETTINGS.http.delay
 REQUEST_TIMEOUT: int = SETTINGS.http.timeout
 REQUEST_RETRIES: int = SETTINGS.http.retries
 REQUEST_RETRY_BACKOFF: float = SETTINGS.http.retry_backoff
-DOWNLOAD_TIMEOUT_SECONDS: int = SETTINGS.http.request_timeout_seconds
 
-HEADERS: dict[str, str] = {
-    "User-Agent": SETTINGS.http.user_agent
-    or "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-    "Accept": SETTINGS.http.accept,
-    "Accept-Encoding": SETTINGS.http.accept_encoding,
-    "Accept-Language": SETTINGS.http.accept_language,
-    **{f"X-{k}": v for k, v in SETTINGS.http.extra_headers.items()},
-}
+HEADERS: dict[str, str] = _build_headers(SETTINGS)
 
 
 def reload() -> Settings:
     """Force-reload SETTINGS from the environment (used by tests)."""
-    global SETTINGS, OUTPUT_DIR, OUTPUT_ROOT, DATA_DIR, COOKIES_FILE, SESSION_DB_FILE
-    global DOWNLOAD_QUEUE_DB, DOWNLOAD_ERROR_LOG_DIR, BASE_URL
-    global REQUEST_DELAY, REQUEST_TIMEOUT, REQUEST_RETRIES, REQUEST_RETRY_BACKOFF
-    global DOWNLOAD_TIMEOUT_SECONDS, HEADERS
     _load_settings.cache_clear()
-    SETTINGS = _load_settings()
-    OUTPUT_DIR = _resolve(SETTINGS.paths.output_dir, "output")
-    OUTPUT_ROOT = _resolve(SETTINGS.paths.output_root, "output")
-    DATA_DIR = _resolve(SETTINGS.paths.data_dir, "data")
-    COOKIES_FILE = SETTINGS.paths.cookies_file or (DATA_DIR / "cookies.json")
-    SESSION_DB_FILE = SETTINGS.paths.session_db_file or (DATA_DIR / "session.sqlite3")
-    DOWNLOAD_QUEUE_DB = DATA_DIR / SETTINGS.queue.db_name
-    DOWNLOAD_ERROR_LOG_DIR = DATA_DIR / SETTINGS.queue.log_dir
-    BASE_URL = SETTINGS.server.base_url
-    REQUEST_DELAY = SETTINGS.http.delay
-    REQUEST_TIMEOUT = SETTINGS.http.timeout
-    REQUEST_RETRIES = SETTINGS.http.retries
-    REQUEST_RETRY_BACKOFF = SETTINGS.http.retry_backoff
-    DOWNLOAD_TIMEOUT_SECONDS = SETTINGS.http.request_timeout_seconds
-    HEADERS = {
-        "User-Agent": SETTINGS.http.user_agent
-        or "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-        "Accept": SETTINGS.http.accept,
-        "Accept-Encoding": SETTINGS.http.accept_encoding,
-        "Accept-Language": SETTINGS.http.accept_language,
-        **{f"X-{k}": v for k, v in SETTINGS.http.extra_headers.items()},
-    }
+    _apply_settings_globals(_load_settings())
     return SETTINGS
 
 
@@ -295,14 +374,11 @@ __all__ = [
     "DOWNLOAD_QUEUE_DB",
     "DOWNLOAD_ERROR_LOG_DIR",
     "BASE_URL",
-    "API_V1",
     "API_V2",
-    "API_PREFIX",
     "REQUEST_DELAY",
     "REQUEST_TIMEOUT",
     "REQUEST_RETRIES",
     "REQUEST_RETRY_BACKOFF",
-    "DOWNLOAD_TIMEOUT_SECONDS",
     "HEADERS",
     "reload",
     "Settings",

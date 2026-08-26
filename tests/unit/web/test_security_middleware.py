@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
@@ -117,18 +116,19 @@ class TestDependencyInjection:
         assert store is mock_request.app.state.session_store
         gen.close()
 
-    def test_get_session_store_wraps_unexpected_errors(self):
-        """Test that get_session_store converts unexpected errors to 500s."""
+    def test_get_session_store_propagates_unexpected_errors(self):
+        """Test that unexpected dependency errors propagate unwrapped.
+
+        The dependency is a plain pass-through: Starlette's server error
+        handling is responsible for turning unhandled exceptions into 500s.
+        """
         mock_request = MagicMock()
         mock_request.app.state.session_store = MagicMock()
 
         gen = get_session_store(mock_request)
         next(gen)
-        with pytest.raises(HTTPException) as exc_info:
+        with pytest.raises(RuntimeError, match="boom"):
             gen.throw(RuntimeError("boom"))
-
-        assert exc_info.value.status_code == 500
-        assert exc_info.value.detail == "Internal server error in session service"
 
     def test_get_download_queue_yields_queue(self):
         """Test that get_download_queue dependency yields the download queue."""
@@ -156,46 +156,6 @@ class TestDependencyInjection:
         request_id = get_request_id(mock_request)
 
         assert request_id == "unknown"
-
-
-class TestBackgroundTasks:
-    """Test cases for background tasks."""
-
-    @pytest.mark.asyncio
-    async def test_cleanup_old_files_task(self, tmp_path):
-        """Test that cleanup_old_files_task removes old files."""
-        import time
-
-        from web.routes.downloads import cleanup_old_files_task
-
-        # Create test files
-        old_file = tmp_path / "test.pdf"
-        old_file.write_text("old content")
-
-        # Set modification time to 25 hours ago
-        old_time = time.time() - (25 * 3600)
-        os.utime(old_file, (old_time, old_time))
-
-        # Run cleanup task
-        await cleanup_old_files_task(tmp_path, max_age_hours=24)
-
-        # File should be removed
-        assert not old_file.exists()
-
-    @pytest.mark.asyncio
-    async def test_cleanup_preserves_new_files(self, tmp_path):
-        """Test that cleanup_old_files_task preserves recent files."""
-        from web.routes.downloads import cleanup_old_files_task
-
-        # Create recent test file
-        new_file = tmp_path / "test.epub"
-        new_file.write_text("new content")
-
-        # Run cleanup task
-        await cleanup_old_files_task(tmp_path, max_age_hours=24)
-
-        # File should still exist
-        assert new_file.exists()
 
 
 class TestSSEDisconnection:

@@ -51,9 +51,9 @@
   --radius-xl: calc(var(--radius) * 1.4);
 
   /* Font families */
-  --font-sans: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
-  --font-heading: 'Lora', Georgia, serif;
-  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-heading: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', 'IBM Plex Mono', ui-monospace, SFMono-Regular, monospace;
 
   /* Animation timing */
   --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
@@ -70,6 +70,10 @@
   min-width: 2.75rem;
 }
 
+@utility tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
 /* Mobile full-width utility */
 @utility mobile-full {
   @media (max-width: 640px) {
@@ -80,8 +84,6 @@
 /* CSS Variables - Light Mode (OKLCH Enhanced) */
 :root {
   color-scheme: light;
-
-  /* Base tokens - OKLCH colors */
   --radius: 0.625rem;
   --background: var(--surface-base);
   --foreground: var(--text-primary);
@@ -185,6 +187,34 @@
   --scroll-track: var(--brand-950);
   --scroll-thumb: var(--brand-500);
   --scroll-thumb-hover: var(--brand-400);
+  --border: var(--border-default);
+  --input: var(--border-default);
+  --ring: var(--brand-400);
+
+  /* Brand colors - Dark */
+  --brand: var(--brand-400);
+  --brand-soft: var(--brand-950);
+  --brand-deep: var(--brand-300);
+  --ink: var(--text-primary);
+  --mist: var(--surface-base);
+
+  /* Info colors - Dark */
+  --info: var(--info-400);
+  --info-foreground: var(--info-950);
+
+  /* Success colors - Dark */
+  --success: var(--success-400);
+  --success-foreground: var(--success-950);
+
+  /* Warning colors - Dark */
+  --warning: var(--warning-400);
+  --warning-foreground: var(--warning-100);
+
+  /* Focus - Dark */
+  /* Scrollbar - Dark */
+  --scroll-track: var(--brand-950);
+  --scroll-thumb: var(--brand-500);
+  --scroll-thumb-hover: var(--brand-400);
 
   /* Focus - Dark */
   --focus-ring: var(--border-focus);
@@ -203,6 +233,14 @@
     @apply border-border;
   }
 
+  html,
+  body {
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11', 'tnum';
+  }
+
   body {
     @apply bg-background text-foreground;
     font-family: var(--font-sans);
@@ -210,12 +248,12 @@
 
   h1, h2, h3, h4, h5, h6, .font-heading {
     font-family: var(--font-heading), var(--font-sans);
+    letter-spacing: -0.025em;
   }
-}
 
-/* Global Reset */
-* {
-  box-sizing: border-box;
+  code, kbd, samp, pre {
+    font-family: var(--font-mono);
+  }
 }
 
 ::selection {
@@ -249,7 +287,7 @@ body {
   background-attachment: fixed;
 }
 
-/* Decorative ambient gradients on pseudo-elements — avoids repaints on body content changes */
+/* Decorative ambient gradients on pseudo-elements */
 body::before {
   content: '';
   position: fixed;
@@ -268,7 +306,7 @@ body::before {
     radial-gradient(ellipse 900px 400px at 50% 90%, oklch(35% 0.15 160 / 0.1) 0%, transparent 70%);
 }
 
-/* Grid overlay — separate pseudo-element to avoid blending issues */
+/* Grid overlay */
 body::after {
   content: '';
   position: fixed;
@@ -290,11 +328,6 @@ body::after {
 
 #astro-dev-toolbar {
   display: none !important;
-}
-
-code,
-pre {
-  font-family: var(--font-mono);
 }
 
 /* Skip Link */

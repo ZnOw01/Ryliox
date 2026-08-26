@@ -4,12 +4,15 @@ from __future__ import annotations
 
 import json
 from enum import StrEnum
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from fastapi import status
 from fastapi.responses import JSONResponse
 
 from web.schemas import ErrorResponse
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
 
 
 class ErrorCode(StrEnum):
@@ -18,6 +21,7 @@ class ErrorCode(StrEnum):
     BAD_REQUEST = "bad_request"
     NOT_FOUND = "not_found"
     INTERNAL_ERROR = "internal_error"
+    INVALID_BOOK_ID = "invalid_book_id"
     INVALID_COOKIES_PAYLOAD = "invalid_cookies_payload"
     INVALID_SESSION_AFTER_COOKIES = "invalid_session_after_cookies"
     COOKIES_SAVE_FAILED = "cookies_save_failed"
@@ -45,6 +49,7 @@ def error_response(
     status_code: int,
     code: ErrorCode | str = ErrorCode.BAD_REQUEST,
     details: dict[str, Any] | None = None,
+    headers: Mapping[str, str] | None = None,
 ) -> JSONResponse:
     """Construye un payload de error estable con ``code`` y ``details`` opcionales.
 
@@ -53,13 +58,14 @@ def error_response(
         status_code: Código HTTP. Debe ser 4xx o 5xx.
         code:        Código de error de máquina (``ErrorCode``).
         details:     Campos adicionales opcionales para debugging.
+        headers:     Encabezados HTTP opcionales para la respuesta.
     """
     if not (400 <= status_code < 600):
         raise ValueError(f"error_response requiere un status 4xx/5xx, recibido: {status_code}")
     payload = ErrorResponse(error=message, code=str(code), details=details).model_dump(
         exclude_none=True
     )
-    return JSONResponse(content=payload, status_code=status_code)
+    return JSONResponse(content=payload, status_code=status_code, headers=headers)
 
 
 def not_found_response(message: str, code: ErrorCode | str = ErrorCode.NOT_FOUND) -> JSONResponse:

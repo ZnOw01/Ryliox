@@ -152,7 +152,7 @@ async def test_progress_notification_is_async_and_thread_safe(tmp_path: Path) ->
 
 def test_queue_capacity_is_enforced_before_persistence(tmp_path: Path) -> None:
     repository = MagicMock()
-    repository.count_queued.return_value = 1
+    repository.enqueue_if_capacity.return_value = None
 
     async def kernel_factory():
         return MagicMock()

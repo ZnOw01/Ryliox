@@ -40,9 +40,6 @@ services:
       - ./main.py:/app/main.py
       - ./pyproject.toml:/app/pyproject.toml
 
-      # Pre-built frontend (NOT rebuilt by the container)
-      - ./frontend/dist:/app/frontend/dist:ro
-
       # Persistent runtime state
       - data-dev:/app/data
       - output-dev:/app/output

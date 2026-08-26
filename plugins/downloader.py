@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import contextlib
 import inspect
+import secrets
 import shutil
 import time
 from collections.abc import Callable
@@ -11,14 +13,9 @@ from pathlib import Path
 from typing import Any, Protocol, cast
 from urllib.parse import urlparse
 
-from core.contracts import ChapterInfo
+from core.contracts import ChapterInfo, DownloadCancelledError
+from core.http_client import host_is_allowed
 from plugins.base import Plugin
-
-_ALLOWED_DOWNLOAD_HOSTS: tuple[str, ...] = (
-    "oreilly.com",
-    "oreillystatic.com",
-    "oreil.ly",
-)
 
 
 @dataclass
@@ -104,6 +101,12 @@ class OutputPluginProtocol(Protocol):
     def get_oebps_dir(self, book_dir: Path) -> Path: ...
 
     def get_images_dir(self, book_dir: Path) -> Path: ...
+
+    def create_staging_dir(self, output_dir: Path, job_id: str) -> Path: ...
+
+    def publish_staged_dir(self, staged_book_dir: Path, output_dir: Path, book_id: str) -> Path: ...
+
+    def cleanup_staging(self, staging_dir: Path) -> None: ...
 
 
 class EpubPluginProtocol(Protocol):
@@ -263,10 +266,7 @@ class DownloaderPlugin(Plugin):
         if not url:
             return ""
         host = (urlparse(url).hostname or "").lower()
-        for allowed in _ALLOWED_DOWNLOAD_HOSTS:
-            if host == allowed or host.endswith("." + allowed):
-                return url
-        return ""
+        return url if host_is_allowed(host) else ""
 
     @staticmethod
     async def _resolve_result(value: Any) -> Any:
@@ -283,6 +283,7 @@ class DownloaderPlugin(Plugin):
         skip_images: bool = False,
         progress_callback: Callable[[DownloadProgress], None] | None = None,
         cancel_check: Callable[[], bool] | None = None,
+        job_id: str | None = None,
     ) -> DownloadResult:
         """Orchestrate full download pipeline for a book."""
         if formats is None:
@@ -313,6 +314,11 @@ class DownloaderPlugin(Plugin):
 
         def check_cancel() -> bool:
             return bool(cancel_check and cancel_check())
+
+        def ensure_not_cancelled() -> None:
+            """Abort the pipeline with a typed error once cancel was requested."""
+            if check_cancel():
+                raise DownloadCancelledError("Download cancelled by user")
 
         # Reject chapter selection on book-only formats BEFORE doing any work.
         for fmt in formats:
@@ -359,87 +365,59 @@ class DownloaderPlugin(Plugin):
         else:
             chapters = all_chapters
 
-        # Create output directory
-        book_dir = output_plugin.create_book_dir(
-            output_dir=output_dir,
-            book_id=book_id,
-            title=book_info.get("title", ""),
-            authors=book_info.get("authors"),
+        # Build everything inside a managed staging area so the output dir only
+        # ever observes complete books. Output plugins without staging support
+        # (legacy) fall back to writing directly into the output dir.
+        use_staging = all(
+            hasattr(output_plugin, name)
+            for name in ("create_staging_dir", "publish_staged_dir", "cleanup_staging")
         )
-        oebps = output_plugin.get_oebps_dir(book_dir)
+        staging_dir: Path | None
+        if use_staging:
+            job_token = job_id or secrets.token_hex(8)
+            staging_dir = output_plugin.create_staging_dir(output_dir, job_token)
+        else:
+            staging_dir = None
 
-        # Phase 3: Download cover
-        cover_image_name: str | None = None
-        if not skip_images:
-            report("downloading_cover", 12)
-            cover_url = book_info.get("cover_url")
-            if cover_url:
-                images_dir = output_plugin.get_images_dir(book_dir)
-                images_dir.mkdir(parents=True, exist_ok=True)
-                cover_path = await assets_plugin.download_image(cover_url, images_dir / "cover")
-                if cover_path:
-                    cover_image_name = cover_path.relative_to(images_dir).as_posix()
-
-        # Phase 4: Process chapters
-        all_css_urls: set[str] = set()
-        all_image_urls: set[str] = set()
-        chapters_data: list[tuple[str, str, str]] = []
-        total_chapters = len(chapters)
-        chapter_times: list[float] = []
-        chapter_start_time = time.time()
-
-        for i, ch in enumerate(chapters):
-            if check_cancel():
-                self._cleanup_on_cancel(book_dir)
-                raise Exception("Download cancelled by user")
-
-            chapter_pct = 15 + int((i / total_chapters) * 65) if total_chapters > 0 else 15
-
-            report(
-                "processing_chapters",
-                chapter_pct,
-                current_chapter=i + 1,
-                total_chapters=total_chapters,
-                chapter_title=ch.get("title", ""),
+        book_dir: Path | None = None
+        try:
+            book_dir = output_plugin.create_book_dir(
+                output_dir=staging_dir if staging_dir is not None else output_dir,
+                book_id=book_id,
+                title=book_info.get("title", ""),
+                authors=book_info.get("authors"),
             )
+            oebps = output_plugin.get_oebps_dir(book_dir)
 
-            filename = ch["filename"].replace(".html", ".xhtml")
-            file_path = (oebps / filename).resolve()
-            try:
-                file_path.relative_to(oebps.resolve())
-            except ValueError as exc:
-                raise ValueError(f"Chapter filename escapes output directory: {filename}") from exc
-            depth = filename.count("/")
-            path_prefix = "../" * depth if depth > 0 else ""
+            # Phase 3: Download cover
+            cover_image_name: str | None = None
+            if not skip_images:
+                report("downloading_cover", 12)
+                cover_url = book_info.get("cover_url")
+                if cover_url:
+                    images_dir = output_plugin.get_images_dir(book_dir)
+                    images_dir.mkdir(parents=True, exist_ok=True)
+                    cover_path = await assets_plugin.download_image(cover_url, images_dir / "cover")
+                    if cover_path:
+                        cover_image_name = cover_path.relative_to(images_dir).as_posix()
 
-            raw_html = await chapters_plugin.fetch_content(ch["content_url"])
-            processed, images = html_processor.process(
-                raw_html, book_id, skip_images=skip_images, path_prefix=path_prefix
-            )
-
-            all_css_urls.update(ch["stylesheets"])
-            for img_url in ch["images"]:
-                all_image_urls.add(img_url)
-            for img_url in images:
-                if img_url.startswith("http") or img_url.startswith("/"):
-                    all_image_urls.add(img_url)
-
-            css_refs = [f"{path_prefix}Styles/Style{j:02d}.css" for j in range(len(all_css_urls))]
-            xhtml = html_processor.wrap_xhtml(processed, css_refs, ch["title"])
-
-            file_path.parent.mkdir(parents=True, exist_ok=True)
-            file_path.write_text(xhtml, encoding="utf-8")
-
-            chapters_data.append((ch["filename"], ch["title"], processed))
-
-            chapter_time = time.time() - chapter_start_time
-            chapter_times.append(chapter_time)
+            # Phase 4: Process chapters
+            all_css_urls: set[str] = set()
+            all_image_urls: set[str] = set()
+            chapters_count = 0
+            total_chapters = len(chapters)
+            chapter_times: list[float] = []
             chapter_start_time = time.time()
 
-            if chapter_times:
-                avg_time = sum(chapter_times[-5:]) / len(chapter_times[-5:])
-                remaining = total_chapters - (i + 1)
-                eta_seconds = int(avg_time * remaining)
+            for i, ch in enumerate(chapters):
+                ensure_not_cancelled()
+
+                chapter_pct = 15 + int((i / total_chapters) * 65) if total_chapters > 0 else 15
+                eta_seconds = None
+                if chapter_times:
+                    avg_time = sum(chapter_times[-5:]) / len(chapter_times[-5:])
+                    eta_seconds = int(avg_time * (total_chapters - i))
+
                 report(
                     "processing_chapters",
                     chapter_pct,
@@ -449,99 +427,108 @@ class DownloaderPlugin(Plugin):
                     chapter_title=ch.get("title", ""),
                 )
 
-        # Phase 5: Download assets
-        report("downloading_assets", 80, eta_seconds=None)
+                filename = ch["filename"].replace(".html", ".xhtml")
+                file_path = (oebps / filename).resolve()
+                try:
+                    file_path.relative_to(oebps.resolve())
+                except ValueError as exc:
+                    raise ValueError(
+                        f"Chapter filename escapes output directory: {filename}"
+                    ) from exc
+                depth = filename.count("/")
+                path_prefix = "../" * depth if depth > 0 else ""
 
-        image_list = []
-        for img_url in all_image_urls:
-            if img_url.startswith("/"):
-                img_url = f"https://learning.oreilly.com{img_url}"
-            image_list.append(img_url)
-
-        css_list = list(all_css_urls)
-        total_assets = len(css_list) + len(image_list)
-        import config
-
-        if total_assets > config.SETTINGS.http.max_assets_per_book:
-            raise ValueError(
-                f"Book references {total_assets} assets; configured limit is "
-                f"{config.SETTINGS.http.max_assets_per_book}"
-            )
-
-        css_width = len(str(len(css_list)))
-
-        def css_progress(completed: int, total: int) -> None:
-            if total_assets > 0:
-                pct = 80 + int((completed / total_assets) * 10)
-                report(
-                    "downloading_assets",
-                    pct,
-                    f"{pct:2d}% - Downloading CSS ({completed:>{css_width}}/{len(css_list)})",
+                raw_html = await chapters_plugin.fetch_content(ch["content_url"])
+                processed, images = html_processor.process(
+                    raw_html, book_id, skip_images=skip_images, path_prefix=path_prefix
                 )
 
-        await assets_plugin.download_all_css(css_list, oebps, progress_callback=css_progress)
+                all_css_urls.update(ch["stylesheets"])
+                for img_url in ch["images"]:
+                    all_image_urls.add(img_url)
+                for img_url in images:
+                    if img_url.startswith("http") or img_url.startswith("/"):
+                        all_image_urls.add(img_url)
 
-        if not skip_images:
-            await assets_plugin.download_css_assets(css_list, oebps)
-            html_processor.inline_css_content_images(oebps)
+                css_refs = [
+                    f"{path_prefix}Styles/Style{j:02d}.css" for j in range(len(all_css_urls))
+                ]
+                xhtml = html_processor.wrap_xhtml(processed, css_refs, ch["title"])
 
-        if not skip_images:
-            img_width = len(str(len(image_list)))
+                file_path.parent.mkdir(parents=True, exist_ok=True)
+                file_path.write_text(xhtml, encoding="utf-8")
 
-            def image_progress(completed: int, total: int) -> None:
+                chapters_count += 1
+
+                chapter_times.append(time.time() - chapter_start_time)
+                chapter_start_time = time.time()
+
+            # Phase 5: Download assets
+            report("downloading_assets", 80, eta_seconds=None)
+            ensure_not_cancelled()
+
+            import config
+
+            image_list = []
+            for img_url in all_image_urls:
+                if img_url.startswith("/"):
+                    img_url = f"{config.BASE_URL.rstrip('/')}{img_url}"
+                image_list.append(img_url)
+
+            css_list = list(all_css_urls)
+            total_assets = len(css_list) + len(image_list)
+
+            if total_assets > config.SETTINGS.http.max_assets_per_book:
+                raise ValueError(
+                    f"Book references {total_assets} assets; configured limit is "
+                    f"{config.SETTINGS.http.max_assets_per_book}"
+                )
+
+            css_width = len(str(len(css_list)))
+
+            def css_progress(completed: int, total: int) -> None:
                 if total_assets > 0:
-                    pct = 80 + int(((len(css_list) + completed) / total_assets) * 10)
+                    pct = 80 + int((completed / total_assets) * 10)
                     report(
                         "downloading_assets",
                         pct,
-                        f"{pct:2d}% - Downloading images ({completed:>{img_width}}/{len(image_list)})",
+                        f"{pct:2d}% - Downloading CSS ({completed:>{css_width}}/{len(css_list)})",
                     )
 
-            await assets_plugin.download_all_images(
-                image_list, oebps, progress_callback=image_progress
-            )
+            await assets_plugin.download_all_css(css_list, oebps, progress_callback=css_progress)
 
-        # Phase 6: Generate output formats
-        result = DownloadResult(
-            book_id=book_id,
-            title=book_info.get("title", ""),
-            output_dir=book_dir,
-            chapters_count=len(chapters_data),
-        )
+            if not skip_images:
+                await assets_plugin.download_css_assets(css_list, oebps)
+                html_processor.inline_css_content_images(oebps)
 
-        if "epub" in formats:
-            report("generating_epub", 90)
-            epub_plugin = cast("EpubPluginProtocol", self._plugin("epub"))
-            epub_path = await self._resolve_result(
-                epub_plugin.generate(
-                    book_info=book_info,
-                    chapters=chapters,
-                    toc=toc,
-                    output_dir=book_dir,
-                    css_files=css_list,
-                    cover_image=cover_image_name or "cover.jpg",
+            if not skip_images:
+                img_width = len(str(len(image_list)))
+
+                def image_progress(completed: int, total: int) -> None:
+                    if total_assets > 0:
+                        pct = 80 + int(((len(css_list) + completed) / total_assets) * 10)
+                        report(
+                            "downloading_assets",
+                            pct,
+                            f"{pct:2d}% - Downloading images ({completed:>{img_width}}/{len(image_list)})",
+                        )
+
+                await assets_plugin.download_all_images(
+                    image_list, oebps, progress_callback=image_progress
                 )
-            )
-            result.files["epub"] = str(epub_path)
 
-        if any(f in formats for f in ("pdf", "all", "pdf-chapters")):
-            pdf_plugin = cast("PdfPluginProtocol", self._plugin("pdf"))
+            ensure_not_cancelled()
 
-            if "pdf-chapters" in formats:
-                report("generating_pdf_chapters", 95)
-                pdf_paths = await self._resolve_result(
-                    pdf_plugin.generate_chapters(
-                        book_info=book_info,
-                        chapters=chapters,
-                        output_dir=book_dir,
-                        css_files=css_list,
-                    )
-                )
-                result.files["pdf"] = [str(p) for p in pdf_paths]
-            else:
-                report("generating_pdf", 95)
-                pdf_path = await self._resolve_result(
-                    pdf_plugin.generate(
+            # Phase 6: Generate output formats
+            epub_path: Path | None = None
+            pdf_paths: Path | list[Path] | None = None
+
+            if "epub" in formats:
+                ensure_not_cancelled()
+                report("generating_epub", 90)
+                epub_plugin = cast("EpubPluginProtocol", self._plugin("epub"))
+                epub_path = await self._resolve_result(
+                    epub_plugin.generate(
                         book_info=book_info,
                         chapters=chapters,
                         toc=toc,
@@ -550,15 +537,94 @@ class DownloaderPlugin(Plugin):
                         cover_image=cover_image_name or "cover.jpg",
                     )
                 )
-                result.files["pdf"] = str(pdf_path)
+                ensure_not_cancelled()
 
-        if "epub" in formats:
-            cleanup = getattr(epub_plugin, "cleanup_build_artifacts", None)
-            if callable(cleanup):
-                cleanup(book_dir)
+            if any(f in formats for f in ("pdf", "all", "pdf-chapters")):
+                pdf_plugin = cast("PdfPluginProtocol", self._plugin("pdf"))
+                ensure_not_cancelled()
 
-        report("completed", 100)
-        return result
+                if "pdf-chapters" in formats:
+                    report("generating_pdf_chapters", 95)
+                    pdf_paths = await self._resolve_result(
+                        pdf_plugin.generate_chapters(
+                            book_info=book_info,
+                            chapters=chapters,
+                            output_dir=book_dir,
+                            css_files=css_list,
+                        )
+                    )
+                else:
+                    report("generating_pdf", 95)
+                    pdf_paths = await self._resolve_result(
+                        pdf_plugin.generate(
+                            book_info=book_info,
+                            chapters=chapters,
+                            toc=toc,
+                            output_dir=book_dir,
+                            css_files=css_list,
+                            cover_image=cover_image_name or "cover.jpg",
+                        )
+                    )
+                ensure_not_cancelled()
+
+            if "epub" in formats:
+                cleanup = getattr(epub_plugin, "cleanup_build_artifacts", None)
+                if callable(cleanup):
+                    cleanup(book_dir)
+
+            # Validate every generated output while the build is still private.
+            # A plugin returning a path outside the staged book must fail before
+            # publication, otherwise the job could expose a complete directory
+            # and then be marked failed while rewriting result paths.
+            epub_relative = epub_path.relative_to(book_dir) if epub_path is not None else None
+            pdf_relatives: Path | list[Path] | None
+            if isinstance(pdf_paths, list):
+                pdf_relatives = [path.relative_to(book_dir) for path in pdf_paths]
+            elif pdf_paths is not None:
+                pdf_relatives = pdf_paths.relative_to(book_dir)
+            else:
+                pdf_relatives = None
+
+            # The queue repository owns the terminal "completed" transition.
+            # Keep the final progress update non-terminal, then perform one last
+            # cancellation check before publication becomes externally visible.
+            report("finalizing", 99)
+            ensure_not_cancelled()
+
+            if staging_dir is not None:
+                published_dir = output_plugin.publish_staged_dir(book_dir, output_dir, book_id)
+                # Publication is the commit point. Failure to remove the now
+                # private staging container must not turn a complete output
+                # into a failed job.
+                with contextlib.suppress(Exception):
+                    output_plugin.cleanup_staging(staging_dir)
+            else:
+                published_dir = book_dir
+
+            result = DownloadResult(
+                book_id=book_id,
+                title=book_info.get("title", ""),
+                output_dir=published_dir,
+                chapters_count=chapters_count,
+            )
+            if epub_relative is not None:
+                result.files["epub"] = str(published_dir / epub_relative)
+            if pdf_relatives is not None:
+                if isinstance(pdf_relatives, list):
+                    result.files["pdf"] = [
+                        str(published_dir / relative_path) for relative_path in pdf_relatives
+                    ]
+                else:
+                    result.files["pdf"] = str(published_dir / pdf_relatives)
+
+            return result
+        except Exception as exc:
+            if staging_dir is not None:
+                with contextlib.suppress(Exception):
+                    output_plugin.cleanup_staging(staging_dir)
+            elif book_dir is not None and isinstance(exc, DownloadCancelledError):
+                self._cleanup_on_cancel(book_dir)
+            raise
 
     def _cleanup_on_cancel(self, book_dir: Path) -> None:
         """Remove build-only artifacts without deleting completed outputs."""

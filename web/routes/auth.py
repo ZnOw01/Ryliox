@@ -10,7 +10,7 @@ from typing import Any
 from fastapi import APIRouter, Body, Depends, HTTPException, Request, status
 
 from core.audit import AuditEventType, audit_data
-from core.cache import get_book_metadata_cache, get_chapter_list_cache, get_search_results_cache
+from core.cache import clear_all_caches
 from core.kernel import Kernel
 from core.session_store import SessionStore, normalize_cookies_payload
 from web.api_utils import ErrorCode
@@ -133,9 +133,7 @@ async def save_cookies(
             },
         )
 
-    await get_book_metadata_cache().clear()
-    await get_chapter_list_cache().clear()
-    await get_search_results_cache().clear()
+    await clear_all_caches()
     audit_data(
         AuditEventType.DATA_WRITE,
         "session_cookies_replaced",

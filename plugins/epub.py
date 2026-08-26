@@ -9,6 +9,7 @@ from urllib.parse import urlsplit, urlunsplit
 from utils import sanitize_filename
 
 from .base import Plugin
+from .html_processor import VOID_TAGS
 
 
 class EpubPlugin(Plugin):
@@ -256,6 +257,18 @@ class EpubPlugin(Plugin):
 
         (oebps / "nav.xhtml").write_text(content, encoding="utf-8")
 
+    @staticmethod
+    def _chapter_href(item: dict) -> str:
+        """Return the local ``.xhtml`` href (with fragment) for a TOC entry."""
+        reference_id = item.get("reference_id", "")
+        href = reference_id.split("-/")[-1] if reference_id else ""
+        parts = urlsplit(href)
+        href = urlunsplit(parts._replace(path=parts.path.replace(".html", ".xhtml")))
+        fragment = item.get("fragment")
+        if fragment:
+            href = f"{href}#{fragment}"
+        return href
+
     def _build_nav_points(
         self, toc_items: list[dict], play_order: int, indent: int = 4
     ) -> tuple[str, int]:
@@ -267,12 +280,7 @@ class EpubPlugin(Plugin):
                 item.get("fragment") or item.get("ourn", "").split(":")[-1].replace(".html", "")
             )
             label = html.escape(self._sanitize_xml_text(item.get("title", "")))
-            href = item.get("reference_id", "").split("-/")[-1] if item.get("reference_id") else ""
-            parts = urlsplit(href)
-            href = urlunsplit(parts._replace(path=parts.path.replace(".html", ".xhtml")))
-
-            if item.get("fragment"):
-                href = f"{href}#{item['fragment']}"
+            href = self._chapter_href(item)
 
             result.append(
                 f'{spaces}<navPoint id="{html.escape(nav_id, quote=True)}" playOrder="{play_order}">'
@@ -298,12 +306,7 @@ class EpubPlugin(Plugin):
 
         for item in toc_items:
             label = html.escape(self._sanitize_xml_text(item.get("title", "")))
-            href = item.get("reference_id", "").split("-/")[-1] if item.get("reference_id") else ""
-            parts = urlsplit(href)
-            href = urlunsplit(parts._replace(path=parts.path.replace(".html", ".xhtml")))
-
-            if item.get("fragment"):
-                href = f"{href}#{item['fragment']}"
+            href = self._chapter_href(item)
 
             children = item.get("children", [])
             if children:
@@ -401,26 +404,10 @@ class EpubPlugin(Plugin):
                 xhtml.write_text(text, encoding="utf-8")
 
         # 3. Also fix any malformed self-closing tags introduced by earlier steps.
-        void_tags = (
-            "br",
-            "img",
-            "input",
-            "meta",
-            "link",
-            "hr",
-            "source",
-            "track",
-            "wbr",
-            "area",
-            "base",
-            "col",
-            "embed",
-            "param",
-        )
         for xhtml in oebps.rglob("*.xhtml"):
             text = xhtml.read_text(encoding="utf-8")
             original = text
-            for tag in void_tags:
+            for tag in VOID_TAGS:
                 text = re.sub(
                     rf"<{tag}\b([^>]*?)\s*/\s*/>",
                     rf"<{tag}\1 />",

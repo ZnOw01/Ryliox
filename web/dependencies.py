@@ -2,20 +2,17 @@
 
 Implements:
 - OWASP A01: Access Control (same-origin validation)
-- OWASP A03: Input validation
-- OWASP A10: SSRF protection
+- OWASP A03/A10: Input validation delegated to :mod:`core.validators`
 """
 
 from __future__ import annotations
 
-import asyncio
 import ipaddress
 import logging
 from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 
-from fastapi import FastAPI, HTTPException, Request, status
-from fastapi.exceptions import RequestValidationError
+from fastapi import FastAPI, Request, status
 
 import config
 from core import create_default_kernel
@@ -24,28 +21,21 @@ from core import create_default_kernel
 from core.repository import DownloadJobRepository
 from core.services import DownloadQueueService
 from core.session_store import SessionStore
-from core.validators import (
-    ValidationError,
-    validate_book_id,
-    validate_file_path,
-    validate_url_sync,
-    validate_user_input,
-)
 
 if TYPE_CHECKING:
-    from collections.abc import Awaitable, Callable, Generator
+    from collections.abc import Callable, Generator
 
-    from core.interfaces import (
-        IDownloadJobRepository,
-        IDownloadQueueService,
-    )
+    from core.interfaces import IDownloadJobRepository
     from core.kernel import Kernel
 
 logger = logging.getLogger(__name__)
 
-DOWNLOAD_QUEUE_DB = config.DATA_DIR / "download_jobs.sqlite3"
-DOWNLOAD_ERROR_LOG_DIR = config.DATA_DIR / "logs"
-QUEUE_POLL_INTERVAL_SECONDS: float = 0.5
+# Queue storage and timing come straight from configuration so that
+# ``RYLIOX_QUEUE__*`` environment overrides apply. The module-level names are
+# kept as aliases for backward-compatible imports.
+DOWNLOAD_QUEUE_DB = config.DOWNLOAD_QUEUE_DB
+DOWNLOAD_ERROR_LOG_DIR = config.DOWNLOAD_ERROR_LOG_DIR
+QUEUE_POLL_INTERVAL_SECONDS: float = config.SETTINGS.queue.poll_interval_seconds
 _SAFE_METHODS = {"GET", "HEAD", "OPTIONS", "TRACE"}
 
 
@@ -66,20 +56,20 @@ def _build_download_queue(
     """Build DownloadQueueService with dependency injection."""
 
     async def _async_kernel_factory() -> Kernel:
-        return await create_default_kernel()
+        return create_default_kernel()
 
     # Si no se provee repository, crear el default
     if repository is None:
         repository = DownloadJobRepository(
-            db_path=DOWNLOAD_QUEUE_DB,
-            terminal_job_retention=500,
+            db_path=config.DOWNLOAD_QUEUE_DB,
+            terminal_job_retention=config.SETTINGS.queue.terminal_job_retention,
         )
 
     # Inyección de dependencias al service layer
     queue = DownloadQueueService(
         kernel_factory=_async_kernel_factory,
         repository=repository,  # Inyección del repository
-        error_log_dir=DOWNLOAD_ERROR_LOG_DIR,
+        error_log_dir=config.DOWNLOAD_ERROR_LOG_DIR,
         poll_interval_seconds=QUEUE_POLL_INTERVAL_SECONDS,
         max_queued_jobs=config.SETTINGS.queue.max_queued_jobs,
         download_timeout_seconds=config.SETTINGS.http.request_timeout_seconds,
@@ -94,21 +84,14 @@ async def initialize_app_services(
     repository: IDownloadJobRepository | None = None,
 ) -> None:
     """Initialize all application-scoped services during startup."""
-    from core.cache import (
-        get_book_metadata_cache,
-        get_chapter_list_cache,
-        get_search_results_cache,
-        start_all_cleanup_tasks,
-    )
+    from core.cache import clear_all_caches, start_all_cleanup_tasks
 
-    await get_book_metadata_cache().clear()
-    await get_chapter_list_cache().clear()
-    await get_search_results_cache().clear()
+    await clear_all_caches()
     await start_all_cleanup_tasks()
     app.state.session_store = SessionStore()
     # Initialize kernel and enter its async context so plugins can use
     # ``self.kernel.http`` for the lifetime of the app.
-    kernel = await create_default_kernel()
+    kernel = create_default_kernel()
     await kernel.__aenter__()
     app.state.kernel = kernel
     # Usar la factory con inyección de dependencias
@@ -141,107 +124,19 @@ async def shutdown_app_services(app: FastAPI) -> None:
 # === Dependency Injection Providers ===
 
 
-class DependencyProvider:
-    """
-    Provider centralizado para inyección de dependencias.
-    Facilita testing con mocks y cambio de implementaciones.
-    """
-
-    _repository: IDownloadJobRepository | None = None
-    _queue_service: IDownloadQueueService | None = None
-
-    @classmethod
-    def configure(
-        cls,
-        repository: IDownloadJobRepository | None = None,
-        queue_service: IDownloadQueueService | None = None,
-    ) -> None:
-        """Configura las dependencias (útil para testing)."""
-        cls._repository = repository
-        cls._queue_service = queue_service
-
-    @classmethod
-    def reset(cls) -> None:
-        """Resetea a defaults (útil entre tests)."""
-        cls._repository = None
-        cls._queue_service = None
-
-    @classmethod
-    def get_repository(cls) -> IDownloadJobRepository:
-        """Factory para el repository."""
-        if cls._repository is None:
-            cls._repository = DownloadJobRepository(
-                db_path=DOWNLOAD_QUEUE_DB,
-                terminal_job_retention=500,
-            )
-        return cls._repository
-
-    @classmethod
-    def get_queue_service(
-        cls, kernel_factory: Callable[[], Awaitable[Kernel]]
-    ) -> IDownloadQueueService:
-        """Factory para el queue service."""
-        if cls._queue_service is None:
-            cls._queue_service = DownloadQueueService(
-                kernel_factory=kernel_factory,
-                repository=cls.get_repository(),
-                error_log_dir=DOWNLOAD_ERROR_LOG_DIR,
-                poll_interval_seconds=QUEUE_POLL_INTERVAL_SECONDS,
-            )
-        return cls._queue_service
-
-
 def get_kernel(request: Request) -> Generator[Kernel, None, None]:
-    """Yield the app-scoped kernel with proper exception handling."""
-    kernel = request.app.state.kernel
-    try:
-        yield kernel
-    except (HTTPException, RequestValidationError):
-        raise
-    except Exception as exc:
-        logger.exception("Error in kernel dependency: %s", exc)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal server error in kernel service",
-        ) from exc
+    """Yield the app-scoped kernel."""
+    yield request.app.state.kernel
 
 
 def get_session_store(request: Request) -> Generator[SessionStore, None, None]:
-    """Yield the app-scoped SessionStore with proper exception handling."""
-    session_store = request.app.state.session_store
-    try:
-        yield session_store
-    except (HTTPException, RequestValidationError):
-        raise
-    except Exception as exc:
-        logger.exception("Error in session store dependency: %s", exc)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal server error in session service",
-        ) from exc
+    """Yield the app-scoped SessionStore."""
+    yield request.app.state.session_store
 
 
 def get_download_queue(request: Request) -> Generator[DownloadQueueService, None, None]:
-    """Yield the app-scoped DownloadQueueService with proper exception handling."""
-    download_queue = request.app.state.download_queue
-    try:
-        yield download_queue
-    except (HTTPException, RequestValidationError):
-        raise
-    except Exception as exc:
-        logger.exception("Error in download queue dependency: %s", exc)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal server error in download queue service",
-        ) from exc
-
-
-def get_repository() -> IDownloadJobRepository:
-    """
-    Dependency provider para IDownloadJobRepository.
-    Permite inyección del repository en endpoints.
-    """
-    return DependencyProvider.get_repository()
+    """Yield the app-scoped DownloadQueueService."""
+    yield request.app.state.download_queue
 
 
 def get_request_id(request: Request) -> str:
@@ -257,6 +152,15 @@ def _first_forwarded_value(value: str | None) -> str:
     if not value:
         return ""
     return value.split(",", 1)[0].strip()
+
+
+def _is_loopback_host(host: str) -> bool:
+    if not host or host.lower() in ("127.0.0.1", "localhost", "::1", "testclient"):
+        return True
+    try:
+        return ipaddress.ip_address(host.strip("[]")).is_loopback
+    except ValueError:
+        return False
 
 
 def _default_port_for_scheme(scheme: str) -> int | None:
@@ -290,14 +194,23 @@ def _is_same_origin(request: Request) -> bool:
         logger.warning("Blocked Origin header with invalid port: %r", origin)
         return False
 
-    request_host_header = (
-        _first_forwarded_value(request.headers.get("x-forwarded-host"))
-        or request.headers.get("host", "").strip()
+    client_host = request.client.host if request.client else ""
+    is_trusted_peer = (
+        _is_loopback_host(client_host) or config.SETTINGS.security.allow_unauthenticated_local_proxy
     )
-    request_scheme = (
-        _first_forwarded_value(request.headers.get("x-forwarded-proto"))
-        or request.url.scheme.lower()
-    )
+
+    if is_trusted_peer and request.headers.get("x-forwarded-host"):
+        request_host_header = _first_forwarded_value(request.headers.get("x-forwarded-host"))
+    else:
+        request_host_header = request.headers.get("host", "").strip()
+
+    if is_trusted_peer and request.headers.get("x-forwarded-proto"):
+        request_scheme = (
+            _first_forwarded_value(request.headers.get("x-forwarded-proto"))
+            or request.url.scheme.lower()
+        )
+    else:
+        request_scheme = request.url.scheme.lower()
     request_scheme = request_scheme.lower()
 
     if not request_host_header or not request_scheme:
@@ -311,7 +224,11 @@ def _is_same_origin(request: Request) -> bool:
         return False
 
     if request_port is None:
-        forwarded_port = _first_forwarded_value(request.headers.get("x-forwarded-port"))
+        forwarded_port = (
+            _first_forwarded_value(request.headers.get("x-forwarded-port"))
+            if is_trusted_peer
+            else ""
+        )
         if forwarded_port.isdigit():
             request_port = int(forwarded_port)
         else:
@@ -326,276 +243,6 @@ def _is_same_origin(request: Request) -> bool:
         and origin_host == request_host
         and origin_port == request_port
     )
-
-
-# === OWASP Input Validation Functions ===
-
-
-def validate_book_id_dependency(book_id: str) -> str:
-    """Validate book_id parameter for injection prevention (OWASP A03).
-
-    Args:
-        book_id: The book ID to validate
-
-    Returns:
-        Validated book ID
-
-    Raises:
-        HTTPException: If validation fails
-    """
-    try:
-        return validate_book_id(book_id)
-    except ValidationError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={
-                "error": str(exc),
-                "code": "invalid_book_id",
-                "field": exc.field,
-            },
-        ) from exc
-
-
-def validate_url_dependency(url: str, allowed_hosts: set[str] | None = None) -> str:
-    """Validate URL for SSRF prevention (OWASP A10).
-
-    Args:
-        url: The URL to validate
-        allowed_hosts: Optional whitelist of allowed hostnames
-
-    Returns:
-        Validated URL
-
-    Raises:
-        HTTPException: If validation fails
-    """
-    try:
-        return validate_url_sync(url, allowed_hosts)
-    except ValidationError as exc:
-        # Log security event for SSRF attempt
-        logger.warning("SSRF prevention: URL validation failed for %s: %s", url[:50], exc.reason)
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={
-                "error": "Invalid or unsafe URL",
-                "code": "invalid_url",
-            },
-        ) from exc
-
-
-def validate_path_dependency(
-    path: str, base_dir: str | None = None, must_exist: bool = False
-) -> str:
-    """Validate file path for path traversal prevention (OWASP A03).
-
-    Args:
-        path: The file path to validate
-        base_dir: Base directory that path must be under
-        must_exist: Whether file must exist
-
-    Returns:
-        Validated path string
-
-    Raises:
-        HTTPException: If validation fails
-    """
-    try:
-        from pathlib import Path
-
-        base = Path(base_dir) if base_dir else None
-        validated = validate_file_path(path, base, must_exist)
-        return str(validated)
-    except ValidationError as exc:
-        # Log security event for path traversal attempt
-        logger.warning(
-            "Path traversal prevention: validation failed for %s: %s",
-            path[:50],
-            exc.reason,
-        )
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={
-                "error": "Invalid file path",
-                "code": "invalid_path",
-            },
-        ) from exc
-
-
-def validate_input_dependency(text: str, allow_html: bool = False, max_length: int = 10000) -> str:
-    """Validate user input for XSS prevention (OWASP A03).
-
-    Args:
-        text: The user input to validate
-        allow_html: Whether to allow safe HTML
-        max_length: Maximum allowed length
-
-    Returns:
-        Validated and sanitized text
-
-    Raises:
-        HTTPException: If validation fails
-    """
-    try:
-        return validate_user_input(text, allow_html, max_length)
-    except ValidationError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={
-                "error": str(exc),
-                "code": "invalid_input",
-                "field": exc.field,
-            },
-        ) from exc
-
-
-class SSRFProtection:
-    """SSRF protection for outbound HTTP requests (OWASP A10)."""
-
-    # Blocked IP ranges (private, loopback, link-local)
-    _BLOCKED_NETWORKS = [
-        ipaddress.ip_network("127.0.0.0/8"),  # Loopback
-        ipaddress.ip_network("10.0.0.0/8"),  # Private
-        ipaddress.ip_network("172.16.0.0/12"),  # Private
-        ipaddress.ip_network("192.168.0.0/16"),  # Private
-        ipaddress.ip_network("169.254.0.0/16"),  # Link-local
-        ipaddress.ip_network("::1/128"),  # IPv6 loopback
-        ipaddress.ip_network("fc00::/7"),  # IPv6 private
-        ipaddress.ip_network("fe80::/10"),  # IPv6 link-local
-    ]
-
-    # Blocked hostnames
-    _BLOCKED_HOSTS = {
-        "localhost",
-        "127.0.0.1",
-        "0.0.0.0",  # nosec B104
-        "::1",
-        "[::1]",
-    }
-
-    @classmethod
-    def is_safe_url(cls, url: str) -> tuple[bool, str]:
-        """Check if a URL is safe from SSRF attacks.
-
-        Returns:
-            Tuple of (is_safe, reason)
-        """
-        try:
-            parsed = urlparse(url)
-        except ValueError as exc:
-            return False, f"Invalid URL format: {exc}"
-
-        hostname = parsed.hostname
-        if not hostname:
-            return False, "URL missing hostname"
-
-        # Check blocked hostnames
-        if hostname.lower() in cls._BLOCKED_HOSTS:
-            return False, f"Hostname '{hostname}' is blocked"
-
-        # Check if hostname is an IP in blocked ranges
-        try:
-            ip = ipaddress.ip_address(hostname)
-            for network in cls._BLOCKED_NETWORKS:
-                if ip in network:
-                    return False, f"IP {hostname} is in blocked range {network}"
-        except ValueError:
-            # Not an IP, continue
-            pass
-
-        # Check scheme
-        if parsed.scheme not in ("http", "https"):
-            return False, f"Scheme '{parsed.scheme}' not allowed"
-
-        return True, ""
-
-    @classmethod
-    def assert_safe_url(cls, url: str) -> None:
-        """Assert URL is safe, raise HTTPException if not."""
-        is_safe, reason = cls.is_safe_url(url)
-        if not is_safe:
-            logger.warning("SSRF protection blocked URL: %s - %s", url[:50], reason)
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail={
-                    "error": "URL not allowed for security reasons",
-                    "code": "ssrf_blocked",
-                },
-            )
-
-
-# CSRF Protection utilities
-class CSRFProtection:
-    """CSRF token generation and validation (OWASP A08)."""
-
-    def __init__(self, token_length: int = 32, ttl: int = 3600):
-        self._token_length = token_length
-        self._ttl = ttl
-        self._tokens: dict[str, tuple[str, float]] = {}  # session_id -> (token, expires)
-        self._lock = asyncio.Lock()
-
-    async def generate_token(self, session_id: str) -> str:
-        """Generate a new CSRF token for a session."""
-        import secrets
-        import time
-
-        token = secrets.token_urlsafe(self._token_length)
-        expires = time.time() + self._ttl
-
-        async with self._lock:
-            self._tokens[session_id] = (token, expires)
-
-        return token
-
-    async def validate_token(self, session_id: str, provided_token: str) -> bool:
-        """Validate a CSRF token."""
-        import time
-
-        async with self._lock:
-            if session_id not in self._tokens:
-                return False
-
-            stored_token, expires = self._tokens[session_id]
-
-            # Check expiration
-            if time.time() > expires:
-                del self._tokens[session_id]
-                return False
-
-            # Constant-time comparison
-            import hmac
-
-            is_valid = hmac.compare_digest(stored_token, provided_token)
-
-            # Rotate token after use (one-time use pattern)
-            if is_valid:
-                del self._tokens[session_id]
-
-            return is_valid
-
-    async def cleanup_expired(self) -> int:
-        """Clean up expired tokens. Returns count removed."""
-        import time
-
-        async with self._lock:
-            now = time.time()
-            expired = [sid for sid, (_, expires) in self._tokens.items() if now > expires]
-            for sid in expired:
-                del self._tokens[sid]
-            return len(expired)
-
-
-# Global CSRF protection instance
-_csrf_protection: CSRFProtection | None = None
-
-
-def get_csrf_protection() -> CSRFProtection:
-    """Get or create global CSRF protection instance."""
-    global _csrf_protection
-    if _csrf_protection is None:
-        token_length = getattr(config.SETTINGS, "csrf_token_length", 32)
-        ttl = getattr(config.SETTINGS, "csrf_token_ttl", 3600)
-        _csrf_protection = CSRFProtection(token_length, ttl)
-    return _csrf_protection
 
 
 def require_same_origin(operation: str) -> Callable[[Request], None]:

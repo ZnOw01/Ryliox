@@ -184,7 +184,7 @@ class AuditEntry:
             # HIGH-004: Use HMAC-SHA256 with secret key for integrity
             hash_input = json.dumps(hash_data, sort_keys=True, default=str)
             key = _get_audit_hmac_key()
-            calculated_hash = hmac.new(key, hash_input.encode(), hashlib.sha256).hexdigest()[:32]
+            calculated_hash = hmac.new(key, hash_input.encode(), hashlib.sha256).hexdigest()
             object.__setattr__(self, "integrity_hash", calculated_hash)
 
     def to_dict(self) -> dict[str, Any]:
@@ -488,44 +488,17 @@ class AuditLogger:
 
                 try:
                     data = json.loads(line)
-                    entry = AuditEntry(
-                        timestamp=datetime.fromisoformat(data["timestamp"]),
-                        event_type=data["event_type"],
-                        severity=data["severity"],
-                        request_id=data.get("request_id"),
-                        user_id=data.get("user_id"),
-                        source_ip=data.get("source_ip"),
-                        user_agent=data.get("user_agent"),
-                        action=data["action"],
-                        resource=data.get("resource"),
-                        details=data.get("details", {}),
-                        integrity_hash=data.get("integrity_hash", ""),
-                        entry_id=data.get("entry_id", ""),
-                        prev_hash=data.get("prev_hash", ""),
-                    )
+                    entry = _entry_from_dict(data)
 
-                    expected_hash = entry.integrity_hash
-                    actual_entry = AuditEntry(
-                        timestamp=entry.timestamp,
-                        event_type=entry.event_type,
-                        severity=entry.severity,
-                        request_id=entry.request_id,
-                        user_id=entry.user_id,
-                        source_ip=entry.source_ip,
-                        user_agent=entry.user_agent,
-                        action=entry.action,
-                        resource=entry.resource,
-                        details=entry.details,
-                        entry_id=entry.entry_id,
-                        prev_hash=entry.prev_hash,
-                    )
+                    actual_entry = _entry_from_dict(data, recompute_hash=True)
 
-                    if (
-                        actual_entry.integrity_hash != expected_hash
-                        or entry.prev_hash != expected_prev_hash
-                    ):
+                    hash_valid = actual_entry.integrity_hash == entry.integrity_hash or (
+                        len(entry.integrity_hash) == 32
+                        and actual_entry.integrity_hash[:32] == entry.integrity_hash
+                    )
+                    if not hash_valid or entry.prev_hash != expected_prev_hash:
                         suspicious.append(entry)
-                    expected_prev_hash = expected_hash
+                    expected_prev_hash = entry.integrity_hash
 
                 except (json.JSONDecodeError, KeyError, ValueError) as exc:
                     logger.error(
@@ -576,21 +549,7 @@ class AuditLogger:
                     if until and entry_time > until:
                         continue
 
-                    entry = AuditEntry(
-                        timestamp=entry_time,
-                        event_type=data["event_type"],
-                        severity=data["severity"],
-                        request_id=data.get("request_id"),
-                        user_id=data.get("user_id"),
-                        source_ip=data.get("source_ip"),
-                        user_agent=data.get("user_agent"),
-                        action=data["action"],
-                        resource=data.get("resource"),
-                        details=data.get("details", {}),
-                        integrity_hash=data.get("integrity_hash", ""),
-                        entry_id=data.get("entry_id", ""),
-                        prev_hash=data.get("prev_hash", ""),
-                    )
+                    entry = _entry_from_dict(data)
 
                     results.append(entry)
 
@@ -612,6 +571,30 @@ def get_audit_logger() -> AuditLogger:
     if _audit_logger is None:
         _audit_logger = AuditLogger()
     return _audit_logger
+
+
+def _entry_from_dict(data: dict[str, Any], *, recompute_hash: bool = False) -> AuditEntry:
+    """Rebuild an :class:`AuditEntry` from a stored JSON dict.
+
+    With ``recompute_hash=False`` (the default) the stored ``integrity_hash``
+    is preserved. With ``recompute_hash=True`` the hash is recomputed from the
+    entry fields, which is how integrity verification detects tampering.
+    """
+    return AuditEntry(
+        timestamp=datetime.fromisoformat(data["timestamp"]),
+        event_type=data["event_type"],
+        severity=data["severity"],
+        request_id=data.get("request_id"),
+        user_id=data.get("user_id"),
+        source_ip=data.get("source_ip"),
+        user_agent=data.get("user_agent"),
+        action=data["action"],
+        resource=data.get("resource"),
+        details=data.get("details", {}),
+        integrity_hash="" if recompute_hash else data.get("integrity_hash", ""),
+        entry_id=data.get("entry_id", ""),
+        prev_hash=data.get("prev_hash", ""),
+    )
 
 
 def _create_corrupt_entry(line_num: int, exc: Exception) -> AuditEntry:
@@ -660,56 +643,6 @@ def audit_log(
     )
 
 
-def audit_auth(
-    event_type: AuditEventType,
-    action: str,
-    request_id: str | None = None,
-    user_id: str | None = None,
-    source_ip: str | None = None,
-    success: bool = True,
-    details: dict[str, Any] | None = None,
-) -> AuditEntry | None:
-    """Log authentication-related events."""
-    severity = AuditSeverity.INFO if success else AuditSeverity.WARNING
-    if event_type in (AuditEventType.AUTH_FAILED, AuditEventType.AUTH_MFA_FAILED):
-        severity = AuditSeverity.WARNING
-
-    return audit_log(
-        event_type=event_type,
-        action=action,
-        severity=severity,
-        request_id=request_id,
-        user_id=user_id,
-        source_ip=source_ip,
-        details={**(details or {}), "success": success},
-    )
-
-
-def audit_access(
-    action: str,
-    resource: str,
-    granted: bool,
-    request_id: str | None = None,
-    user_id: str | None = None,
-    source_ip: str | None = None,
-    details: dict[str, Any] | None = None,
-) -> AuditEntry | None:
-    """Log access control events."""
-    event_type = AuditEventType.ACCESS_GRANTED if granted else AuditEventType.ACCESS_DENIED
-    severity = AuditSeverity.INFO if granted else AuditSeverity.WARNING
-
-    return audit_log(
-        event_type=event_type,
-        action=action,
-        severity=severity,
-        request_id=request_id,
-        user_id=user_id,
-        source_ip=source_ip,
-        resource=resource,
-        details={**(details or {}), "granted": granted},
-    )
-
-
 def audit_data(
     event_type: AuditEventType,
     action: str,
@@ -725,24 +658,6 @@ def audit_data(
         request_id=request_id,
         user_id=user_id,
         resource=resource,
-        details=details,
-    )
-
-
-def audit_security(
-    event_type: AuditEventType,
-    action: str,
-    request_id: str | None = None,
-    source_ip: str | None = None,
-    details: dict[str, Any] | None = None,
-) -> AuditEntry | None:
-    """Log security-related events (attacks, violations)."""
-    return audit_log(
-        event_type=event_type,
-        action=action,
-        severity=AuditSeverity.ERROR,
-        request_id=request_id,
-        source_ip=source_ip,
         details=details,
     )
 
@@ -782,11 +697,8 @@ __all__ = [
     "AuditEventType",
     "AuditLogger",
     "AuditSeverity",
-    "audit_access",
-    "audit_auth",
     "audit_data",
     "audit_download",
     "audit_log",
-    "audit_security",
     "get_audit_logger",
 ]

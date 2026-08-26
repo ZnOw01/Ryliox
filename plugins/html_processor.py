@@ -3,13 +3,31 @@ import re
 import shutil
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlsplit, urlunsplit
+from urllib.parse import urljoin, urlparse, urlsplit, urlunsplit
 
 from bs4 import BeautifulSoup, CData
 
 from .base import Plugin
 
 logger = logging.getLogger(__name__)
+
+# HTML5 void elements that must be self-closed for XHTML output.
+VOID_TAGS: tuple[str, ...] = (
+    "br",
+    "img",
+    "input",
+    "meta",
+    "link",
+    "hr",
+    "source",
+    "track",
+    "wbr",
+    "area",
+    "base",
+    "col",
+    "embed",
+    "param",
+)
 
 
 class HtmlProcessorPlugin(Plugin):
@@ -25,23 +43,7 @@ class HtmlProcessorPlugin(Plugin):
         Skips tags that are already self-closing (/>) to avoid producing
         invalid markup like '<img ... / />'.
         """
-        void_tags = (
-            "br",
-            "img",
-            "input",
-            "meta",
-            "link",
-            "hr",
-            "source",
-            "track",
-            "wbr",
-            "area",
-            "base",
-            "col",
-            "embed",
-            "param",
-        )
-        for tag in void_tags:
+        for tag in VOID_TAGS:
             # Match <tag ...> only when it does NOT already end with />
             html_str = re.sub(
                 rf"<{tag}\b([^>]*[^/])>(?!</{tag}>)",
@@ -132,8 +134,6 @@ class HtmlProcessorPlugin(Plugin):
         """
         if not url:
             return None
-        from urllib.parse import urlparse
-
         parsed = urlparse(url)
         path = parsed.path
         if not path or path == "/":
@@ -157,8 +157,6 @@ class HtmlProcessorPlugin(Plugin):
         """
         if not url:
             return "", url
-        from urllib.parse import urljoin
-
         absolute = urljoin(base_url, url) if base_url else url
         filename = HtmlProcessorPlugin.image_filename_from_url(absolute) or "image.bin"
         return f"Images/{filename}", absolute
@@ -197,8 +195,6 @@ class HtmlProcessorPlugin(Plugin):
         """
         if not url:
             return url
-        from urllib.parse import urlsplit, urlunsplit
-
         if url.startswith(("http://", "https://")):
             if book_id not in url:
                 return url
@@ -214,6 +210,9 @@ class HtmlProcessorPlugin(Plugin):
         return path
 
     def _rewrite_href_links(self, soup: Any, book_id: str) -> None:
+        # NOTE: deliberately not delegated to _rewrite_href: the loop form
+        # differs on the edges (it empties absolute URLs that end at the book
+        # id, and splits after the LAST occurrence of the book id).
         for a in soup.find_all("a", href=True):
             href = a["href"]
 

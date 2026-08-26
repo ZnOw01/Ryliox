@@ -34,6 +34,15 @@ class _ResponseModel(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
 
+def _reject_traversal(value: str, field_label: str) -> str:
+    """Reject traversal sequences, home-directory markers, and null bytes."""
+    if ".." in value or "~" in value:
+        raise ValueError(f"{field_label} contains invalid sequence")
+    if "\x00" in value:
+        raise ValueError(f"{field_label} contains null bytes")
+    return value
+
+
 class AckResponse(_ResponseModel):
     """Generic acknowledgement payload."""
 
@@ -223,13 +232,7 @@ class RevealRequest(_RequestModel):
         """Validate path for path traversal prevention."""
         if v is None:
             return v
-        # Check for path traversal attempts
-        if ".." in v or "~" in v:
-            raise ValueError("path contains invalid sequence")
-        # Check for null bytes
-        if "\x00" in v:
-            raise ValueError("path contains null bytes")
-        return v
+        return _reject_traversal(v, "path")
 
 
 class SetOutputDirResponse(_ResponseModel):
@@ -247,13 +250,7 @@ class OutputDirRequest(_RequestModel):
         """Validate output directory path."""
         if v is None:
             return v
-        # Check for path traversal
-        if ".." in v or "~" in v:
-            raise ValueError("path contains invalid sequence")
-        # Check for null bytes
-        if "\x00" in v:
-            raise ValueError("path contains null bytes")
-        return v
+        return _reject_traversal(v, "path")
 
 
 class DownloadRequest(_RequestModel):
@@ -310,12 +307,7 @@ class DownloadRequest(_RequestModel):
         """Validate output directory path."""
         if v is None:
             return v
-        # Check for path traversal
-        if ".." in v or "~" in v:
-            raise ValueError("output_dir contains invalid sequence")
-        if "\x00" in v:
-            raise ValueError("output_dir contains null bytes")
-        return v
+        return _reject_traversal(v, "output_dir")
 
     @model_validator(mode="after")
     def _validate_chapters(self) -> DownloadRequest:

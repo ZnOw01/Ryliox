@@ -84,7 +84,7 @@ class TestCreateDefaultKernel:
     @pytest.mark.asyncio
     async def test_creates_kernel_with_all_plugins(self):
         """Test that all expected plugins are registered."""
-        async with await create_default_kernel() as kernel:
+        async with create_default_kernel() as kernel:
             expected_plugins = [
                 "auth",
                 "book",
@@ -103,7 +103,7 @@ class TestCreateDefaultKernel:
     @pytest.mark.asyncio
     async def test_plugins_have_kernel_reference(self):
         """Test that all registered plugins have kernel reference."""
-        async with await create_default_kernel() as kernel:
+        async with create_default_kernel() as kernel:
             for plugin_name, plugin in kernel._plugins.items():
                 assert plugin.kernel is kernel, f"Plugin '{plugin_name}' missing kernel reference"
 
@@ -112,7 +112,7 @@ class TestCreateDefaultKernel:
         """Test that HTTP client is available inside the async context."""
         from core.http_client import HttpClient
 
-        async with await create_default_kernel() as kernel:
+        async with create_default_kernel() as kernel:
             assert isinstance(kernel.http, HttpClient)
 
 

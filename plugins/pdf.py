@@ -10,6 +10,7 @@ from urllib.parse import unquote, urlparse
 
 from utils.files import sanitize_filename
 
+from .assets import CSS_URL_RE
 from .base import Plugin
 
 
@@ -407,7 +408,7 @@ class PdfPlugin(Plugin):
                 return m.group(0)
             return f'url("{rel_path.as_posix()}")'
 
-        return re.sub(r'url\(["\']?([^)"\']+)["\']?\)', replacer, css_text)
+        return CSS_URL_RE.sub(replacer, css_text)
 
     def _get_print_css(self) -> str:
         """Return print-specific CSS for PDF generation."""

@@ -24,7 +24,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import uvicorn
-from fastapi import FastAPI, Request, status
+from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
@@ -71,11 +71,14 @@ _RATE_LIMITED_ENDPOINTS: frozenset[tuple[str, str]] = frozenset(
 
 
 class _RateLimiter:
-    """Small in-memory fixed-window limiter keyed by client IP and endpoint."""
+    """Small in-memory fixed-window limiter keyed by client IP and endpoint with bounded capacity."""
 
-    def __init__(self, max_requests: int, window_seconds: int) -> None:
+    def __init__(
+        self, max_requests: int, window_seconds: int, max_tracked_clients: int = 10_000
+    ) -> None:
         self.max_requests = max(1, int(max_requests))
         self.window_seconds = max(1, int(window_seconds))
+        self.max_tracked_clients = max(100, int(max_tracked_clients))
         self._requests: defaultdict[tuple[str, str], list[float]] = defaultdict(list)
         self._lock = threading.Lock()
         self._last_cleanup = time.monotonic()
@@ -86,9 +89,16 @@ class _RateLimiter:
         key = (client_ip, endpoint)
 
         with self._lock:
-            if now - self._last_cleanup >= self.window_seconds:
+            if (
+                now - self._last_cleanup >= self.window_seconds
+                or len(self._requests) >= self.max_tracked_clients
+            ):
                 self._clear_old_entries(cutoff)
                 self._last_cleanup = now
+            if len(self._requests) >= self.max_tracked_clients and key not in self._requests:
+                first_key = next(iter(self._requests), None)
+                if first_key is not None:
+                    self._requests.pop(first_key, None)
             timestamps = [ts for ts in self._requests[key] if ts > cutoff]
             if len(timestamps) >= self.max_requests:
                 self._requests[key] = timestamps
@@ -123,7 +133,7 @@ def _client_ip(request: Request) -> str:
 
 
 def _is_loopback_bind(host: str) -> bool:
-    if host.lower() == "localhost":
+    if not host or host.lower() in ("localhost", "127.0.0.1", "::1", "testclient"):
         return True
     try:
         return ipaddress.ip_address(host.strip("[]")).is_loopback
@@ -197,23 +207,41 @@ def _rate_limit_middleware_factory(limiter: _RateLimiter) -> MiddlewareHandler:
 
 
 def _admin_auth_middleware_factory() -> MiddlewareHandler:
+    settings = config.SETTINGS
+    configured = settings.security.admin_token or ""
+    expected_session = _admin_session_value(configured) if configured else ""
+
     async def _middleware(request: Request, call_next: NextHandler) -> Response:
         if not request.url.path.startswith(("/api", "/metrics")):
             return await call_next(request)
         if request.url.path in {"/api/health", "/api/admin/session"}:
             return await call_next(request)
-        if (
-            _is_loopback_bind(config.SETTINGS.server.host)
-            or config.SETTINGS.security.allow_unauthenticated_local_proxy
-        ):
+        client_ip = _client_ip(request)
+        is_client_loopback = _is_loopback_bind(client_ip)
+        local_bypass = settings.security.allow_unauthenticated_local_proxy or (
+            _is_loopback_bind(settings.server.host) and is_client_loopback
+        )
+        if local_bypass:
             return await call_next(request)
-        configured = config.SETTINGS.security.admin_token or ""
+        if not configured:
+            return JSONResponse(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                content={
+                    "error": "Administrative authentication required",
+                    "code": "admin_auth_required",
+                },
+                headers={"WWW-Authenticate": "Bearer"},
+            )
         authorization = request.headers.get("authorization", "")
         scheme, _, provided = authorization.partition(" ")
-        bearer_valid = scheme.lower() == "bearer" and hmac.compare_digest(provided, configured)
-        session_valid = hmac.compare_digest(
+        bearer_valid = (
+            bool(configured)
+            and scheme.lower() == "bearer"
+            and hmac.compare_digest(provided, configured)
+        )
+        session_valid = bool(configured) and hmac.compare_digest(
             request.cookies.get("ryliox_admin_session", ""),
-            _admin_session_value(configured),
+            expected_session,
         )
         if not bearer_valid and not session_valid:
             return JSONResponse(
@@ -233,26 +261,33 @@ def _admin_auth_middleware_factory() -> MiddlewareHandler:
 
 
 def _security_headers_middleware_factory() -> MiddlewareHandler:
+    # The header set is derived entirely from immutable SETTINGS, so build it
+    # once at startup and apply it per request.
+    settings = config.SETTINGS
+    headers: dict[str, str] = {}
+    if settings.security.enable_security_headers:
+        headers = {
+            "X-Content-Type-Options": "nosniff",
+            "X-Frame-Options": "DENY",
+            "X-XSS-Protection": "1; mode=block",
+            "Referrer-Policy": "strict-origin-when-cross-origin",
+            "Permissions-Policy": "geolocation=(), microphone=()",
+            "Cross-Origin-Opener-Policy": "same-origin",
+            "Cross-Origin-Resource-Policy": "same-origin",
+        }
+        if settings.security.csp_policy:
+            headers["Content-Security-Policy"] = settings.security.csp_policy
+        if settings.security.enable_hsts:
+            headers["Strict-Transport-Security"] = (
+                f"max-age={settings.security.hsts_max_age}; includeSubDomains"
+            )
+
     async def _middleware(request: Request, call_next: NextHandler) -> Response:
-        if not config.SETTINGS.security.enable_security_headers:
+        if not headers:
             return await call_next(request)
         response = await call_next(request)
-        response.headers.setdefault("X-Content-Type-Options", "nosniff")
-        response.headers.setdefault("X-Frame-Options", "DENY")
-        response.headers.setdefault("X-XSS-Protection", "1; mode=block")
-        response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
-        response.headers.setdefault("Permissions-Policy", "geolocation=(), microphone=()")
-        response.headers.setdefault("Cross-Origin-Opener-Policy", "same-origin")
-        response.headers.setdefault("Cross-Origin-Resource-Policy", "same-origin")
-        if config.SETTINGS.security.csp_policy:
-            response.headers.setdefault(
-                "Content-Security-Policy", config.SETTINGS.security.csp_policy
-            )
-        if config.SETTINGS.security.enable_hsts:
-            response.headers.setdefault(
-                "Strict-Transport-Security",
-                f"max-age={config.SETTINGS.security.hsts_max_age}; includeSubDomains",
-            )
+        for name, value in headers.items():
+            response.headers.setdefault(name, value)
         return response
 
     return _middleware
@@ -330,9 +365,13 @@ class RequestBodyLimitMiddleware:
 def _timeout_and_metrics_middleware_factory(timeout_seconds: float) -> MiddlewareHandler:
     async def _middleware(request: Request, call_next: NextHandler) -> Response:
         started = time.monotonic()
+        is_streaming = request.url.path.endswith("/stream")
         try:
-            async with asyncio.timeout(timeout_seconds):
+            if is_streaming or timeout_seconds <= 0:
                 response = await call_next(request)
+            else:
+                async with asyncio.timeout(timeout_seconds):
+                    response = await call_next(request)
         except TimeoutError:
             response = JSONResponse(
                 status_code=status.HTTP_504_GATEWAY_TIMEOUT,
@@ -409,16 +448,16 @@ def create_app() -> FastAPI:
             allow_headers=["*"],
         )
 
-    app.middleware("http")(_security_headers_middleware_factory())
+    app.middleware("http")(_rate_limit_middleware_factory(app.state.rate_limiter))
+    app.middleware("http")(_admin_auth_middleware_factory())
+    app.middleware("http")(
+        _timeout_and_metrics_middleware_factory(settings.http.request_timeout_seconds)
+    )
     app.add_middleware(
         RequestBodyLimitMiddleware,
         max_bytes=settings.security.max_request_size_mb * 1024 * 1024,
     )
-    app.middleware("http")(
-        _timeout_and_metrics_middleware_factory(settings.http.request_timeout_seconds)
-    )
-    app.middleware("http")(_admin_auth_middleware_factory())
-    app.middleware("http")(_rate_limit_middleware_factory(app.state.rate_limiter))
+    app.middleware("http")(_security_headers_middleware_factory())
     app.middleware("http")(_request_id_middleware_factory())
 
     @app.post("/api/admin/session", include_in_schema=False)
@@ -470,6 +509,36 @@ def create_app() -> FastAPI:
             status.HTTP_422_UNPROCESSABLE_CONTENT,
             code=ErrorCode.BAD_REQUEST,
             details={"errors": errors},
+        )
+
+    @app.exception_handler(HTTPException)
+    async def _http_exception_handler(request: Request, exc: HTTPException) -> JSONResponse:
+        detail = exc.detail
+        if isinstance(detail, dict):
+            error_msg = detail.get("error", "HTTP error")
+            code = detail.get("code", ErrorCode.BAD_REQUEST)
+            raw_details = detail.get("details")
+            details = (
+                {"detail": raw_details}
+                if isinstance(raw_details, str)
+                else raw_details
+                if isinstance(raw_details, dict)
+                else None
+            )
+            return error_response(
+                error_msg,
+                exc.status_code,
+                code=code,
+                details=details,
+                headers=exc.headers,
+            )
+        error_msg = str(detail) if detail else "HTTP error"
+        code = ErrorCode.BAD_REQUEST if exc.status_code < 500 else ErrorCode.INTERNAL_ERROR
+        return error_response(
+            error_msg,
+            exc.status_code,
+            code=code,
+            headers=exc.headers,
         )
 
     @app.exception_handler(ForbiddenOriginError)

@@ -18,26 +18,55 @@ import base64
 import json
 import logging
 import re
+import threading
 import time
+from collections.abc import Iterable
 from http.cookiejar import Cookie
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from urllib.parse import urlparse
 
 import httpx
 
 import config
 
+if TYPE_CHECKING:
+    from core.session_store import SessionStore
+
 logger = logging.getLogger(__name__)
 
 
-# Hosts (and their subdomains) that the client is allowed to talk to.
-# Anything else raises ``ValueError("Blocked unsafe request URL: ...")``.
-_DEFAULT_ALLOWED_HOSTS: tuple[str, ...] = (
+# Core O'Reilly hosts that are always allowed, regardless of configuration.
+_CORE_ALLOWED_HOSTS: tuple[str, ...] = (
     "oreilly.com",
     "oreillystatic.com",
     "oreil.ly",
 )
+
+
+def _build_default_allowlist() -> tuple[str, ...]:
+    """Union the core O'Reilly hosts with the hosts implied by ``config.BASE_URL``."""
+    base = urlparse(config.BASE_URL).hostname or "oreilly.com"
+    hosts: set[str] = set(_CORE_ALLOWED_HOSTS)
+    hosts.add(base)
+    hosts.add("www." + base if not base.startswith("www.") else base)
+    hosts.add("cdn." + base if not base.startswith("cdn.") else base)
+    return tuple(sorted(hosts))
+
+
+# Hosts (and their subdomains) that the client is allowed to talk to.
+# Anything else raises ``ValueError("Blocked unsafe request URL: ...")``.
+DEFAULT_ALLOWED_HOSTS: tuple[str, ...] = _build_default_allowlist()
+
+
+def _host_matches_any(host: str, allowed_hosts: Iterable[str]) -> bool:
+    """Suffix-match ``host`` against ``allowed_hosts`` (exact or subdomain)."""
+    return any(host == h or host.endswith("." + h) for h in allowed_hosts)
+
+
+def host_is_allowed(host: str) -> bool:
+    """Return True when ``host`` is an allowed host or one of its subdomains."""
+    return _host_matches_any((host or "").lower(), DEFAULT_ALLOWED_HOSTS)
 
 
 class HttpClient:
@@ -57,16 +86,19 @@ class HttpClient:
         self._auth_cookie_records: list[dict[str, Any]] = []
         self._client: httpx.AsyncClient | None = None
         self._owns_client: bool = False
+        self._session_store: SessionStore | None = None
+        self._rate_lock = threading.Lock()
         self.last_request_time: float = 0.0
 
     @staticmethod
     def _resolve_default_hosts() -> tuple[str, ...]:
+        """Extend the default allowlist with the hosts implied by ``BASE_URL``."""
         base = urlparse(config.BASE_URL).hostname or "oreilly.com"
-        hosts: set[str] = set(_DEFAULT_ALLOWED_HOSTS)
+        hosts: set[str] = set(DEFAULT_ALLOWED_HOSTS)
         hosts.add(base)
         hosts.add("www." + base if not base.startswith("www.") else base)
         hosts.add("cdn." + base if not base.startswith("cdn.") else base)
-        return tuple(hosts)
+        return tuple(sorted(hosts))
 
     @staticmethod
     def _resolve_url(url: str) -> str:
@@ -113,15 +145,26 @@ class HttpClient:
 
     # ---- cookies ---------------------------------------------------------
 
+    def _get_session_store(self) -> SessionStore:
+        """Return a lazily-created, instance-cached :class:`SessionStore`.
+
+        Each construction opens the SQLite database, creates tables/indexes,
+        scans for unencrypted rows, and chmods the file — so the instance is
+        built once per client instead of once per persisted response.
+        """
+        if self._session_store is None:
+            from core.session_store import SessionStore
+
+            self._session_store = SessionStore(
+                db_path=config.SESSION_DB_FILE,
+                legacy_cookies_file=config.COOKIES_FILE,
+            )
+        return self._session_store
+
     def _load_cookies(self, path: Path) -> None:
         if Path(path) == Path(config.COOKIES_FILE):
             try:
-                from core.session_store import SessionStore
-
-                records = SessionStore(
-                    db_path=config.SESSION_DB_FILE,
-                    legacy_cookies_file=config.COOKIES_FILE,
-                ).load_cookie_records(migrate_legacy=True)
+                records = self._get_session_store().load_cookie_records(migrate_legacy=True)
                 if records:
                     self._auth_cookie_records = [
                         dict(record)
@@ -204,6 +247,54 @@ class HttpClient:
             "same_site": rest.get("SameSite") or rest.get("samesite"),
         }
 
+    @staticmethod
+    def _persist_would_change(
+        captured: list[dict[str, Any]],
+        expired_names: set[str],
+        merged: dict[tuple[str, str, str], dict[str, Any]],
+    ) -> bool:
+        """Whether merging ``captured`` into ``merged`` would alter any record.
+
+        Mirrors the merge applied by :meth:`_capture_response_cookies` so an
+        all-no-op capture can skip rewriting the store entirely. Deliberately
+        conservative: any uncertainty returns True (i.e. persist as before).
+        """
+        seen_names: set[str] = set()
+        for record in captured:
+            name = str(record["name"])
+            domain = str(record.get("domain") or "")
+            path = str(record.get("path") or "/")
+            key = (name, domain, path)
+            # Multiple captures for one name interact; take the safe path.
+            if name in seen_names:
+                return True
+            seen_names.add(name)
+            # A domain-less record replaces every scope of the same name; a
+            # domain-scoped one also evicts the wildcard-domain entry.
+            if not domain:
+                if any(existing_key[0] == name and existing_key != key for existing_key in merged):
+                    return True
+            elif (name, "", path) in merged:
+                return True
+            if name in expired_names:
+                if key in merged:
+                    return True  # the stale entry would be dropped
+                continue
+            existing = merged.get(key)
+            if existing is None:
+                return True
+            if (
+                str(existing.get("value")) != str(record.get("value"))
+                or str(existing.get("domain") or "") != domain
+                or str(existing.get("path") or "/") != path
+                or bool(existing.get("secure")) != bool(record.get("secure"))
+                or bool(existing.get("http_only")) != bool(record.get("http_only"))
+                or existing.get("expires") != record.get("expires")
+                or (existing.get("same_site") or None) != (record.get("same_site") or None)
+            ):
+                return True
+        return False
+
     def _capture_response_cookies(self, response: httpx.Response) -> None:
         """Persist cookies refreshed by the upstream service via Set-Cookie."""
         captured = [
@@ -236,12 +327,7 @@ class HttpClient:
             return
 
         try:
-            from core.session_store import SessionStore
-
-            store = SessionStore(
-                db_path=config.SESSION_DB_FILE,
-                legacy_cookies_file=config.COOKIES_FILE,
-            )
+            store = self._get_session_store()
             merged = {
                 (
                     str(record["name"]),
@@ -250,6 +336,8 @@ class HttpClient:
                 ): record
                 for record in store.get_cookie_records()
             }
+            if not self._persist_would_change(captured, expired_names, merged):
+                return
             for record in captured:
                 key = (
                     str(record["name"]),
@@ -307,9 +395,9 @@ class HttpClient:
         host = (urlparse(url).hostname or "").lower()
         if not host:
             return False
-        if host in self._allowed_hosts:
-            return True
-        return any(host.endswith("." + h) for h in self._allowed_hosts)
+        # The shared allowlist plus any instance-specific hosts (custom
+        # ``allowed_hosts`` overrides); both use the same suffix match.
+        return host_is_allowed(host) or _host_matches_any(host, self._allowed_hosts)
 
     def _validate_request_url(self, url: str) -> None:
         if not self._is_host_allowed(url):
@@ -318,11 +406,15 @@ class HttpClient:
     # ---- public request API ---------------------------------------------
 
     async def _rate_limit_async(self) -> None:
-        elapsed = time.time() - self.last_request_time
-        delay = config.REQUEST_DELAY - elapsed
+        # Reserve the next slot atomically so concurrent callers cannot all
+        # observe the same stale timestamp and fire simultaneously; only the
+        # (non-awaiting) read-modify-write happens under the lock.
+        with self._rate_lock:
+            elapsed = time.time() - self.last_request_time
+            delay = config.REQUEST_DELAY - elapsed
+            self.last_request_time = time.time() + max(delay, 0.0)
         if delay > 0:
             await asyncio.sleep(delay)
-        self.last_request_time = time.time()
 
     async def get(self, url: str, **kwargs: Any) -> httpx.Response:
         """Issue a GET request with retry, URL safety, and manual redirect handling.
@@ -437,8 +529,4 @@ class HttpClient:
 def _is_unsafe_redirect_target(text: str) -> bool:
     """Best-effort: scan a response body for absolute URLs to disallowed hosts."""
     pattern = re.compile(r"https?://([\w.\-]+)")
-    for match in pattern.finditer(text):
-        host = match.group(1).lower()
-        if not any(host == h or host.endswith("." + h) for h in _DEFAULT_ALLOWED_HOSTS):
-            return True
-    return False
+    return any(not host_is_allowed(match.group(1)) for match in pattern.finditer(text))

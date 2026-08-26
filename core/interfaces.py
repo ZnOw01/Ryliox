@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Literal, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Protocol
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from core.dto import (
         DownloadErrorDTO,
         DownloadJobDTO,
@@ -13,9 +15,13 @@ if TYPE_CHECKING:
     )
 
 
-@runtime_checkable
 class IDownloadJobRepository(Protocol):
     """Protocol for DownloadJob persistence operations."""
+
+    # Repositories without a path cannot participate in the process singleton
+    # lock used by the queue service; those adapters remain compatibility-only.
+    @property
+    def db_path(self) -> Path: ...
 
     def get_by_id(self, job_id: str) -> dict[str, Any] | None: ...
 
@@ -28,6 +34,16 @@ class IDownloadJobRepository(Protocol):
     ) -> list[dict[str, Any]]: ...
 
     def save(self, job_dto: DownloadJobDTO) -> dict[str, Any]: ...
+
+    def enqueue_if_capacity(
+        self, job_dto: DownloadJobDTO, max_queued_jobs: int
+    ) -> dict[str, Any] | None: ...
+
+    def count_queued(self) -> int: ...
+
+    def count_active(self) -> int: ...
+
+    def has_queued_jobs(self) -> bool: ...
 
     def update(self, job_id: str, updates: dict[str, Any]) -> dict[str, Any] | None: ...
 
@@ -57,52 +73,6 @@ class IDownloadJobRepository(Protocol):
     def close(self) -> None: ...
 
 
-@runtime_checkable
-class IUnitOfWork(Protocol):
-    """Protocol for atomic transactions."""
-
-    def __enter__(self) -> IUnitOfWork:
-        """Enter the runtime context."""
-        ...
-
-    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> Literal[False]:
-        """Exit the runtime context."""
-        ...
-
-    def commit(self) -> None: ...
-
-    def rollback(self) -> None: ...
-
-
-@runtime_checkable
-class IProgressTracker(Protocol):
-    """Protocol for decoupled progress tracking."""
-
-    def update_progress(self, job_id: str, progress: Any) -> None: ...
-
-    def mark_completed(self, job_id: str, result: Any) -> None: ...
-
-    def mark_failed(
-        self,
-        job_id: str,
-        status: str,
-        error: str,
-        code: str,
-        details: dict[str, Any] | None = None,
-        trace_log: str | None = None,
-    ) -> None: ...
-
-
-@runtime_checkable
-class IJobMapper(Protocol):
-    """Protocol for DTO <-> DB mapping."""
-
-    def to_entity(self, row: Any) -> dict[str, Any]: ...
-
-    def to_db(self, entity: dict[str, Any]) -> dict[str, Any]: ...
-
-
-@runtime_checkable
 class IDownloadQueueService(Protocol):
     """Protocol for download queue service."""
 

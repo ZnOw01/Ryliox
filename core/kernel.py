@@ -98,10 +98,10 @@ class Kernel:
         return iter(self._plugins)
 
 
-async def create_default_kernel() -> Kernel:
+def create_default_kernel() -> Kernel:
     """Create a kernel with all standard plugins registered.
 
-    Returns a :class:`Kernel` ready to be used as ``async with await
+    Returns a :class:`Kernel` ready to be used as ``async with
     create_default_kernel() as kernel:``. The kernel is not yet entered,
     so calling ``kernel.http`` outside the context raises.
     """

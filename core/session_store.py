@@ -148,18 +148,7 @@ def _cookies_from_dict(raw: Mapping[str, Any]) -> list[CookieRecord]:
             continue
         if isinstance(value, dict | list | tuple | set):
             continue
-        cookies.append(
-            {
-                "name": cookie_name,
-                "value": _normalize_cookie_value(value),
-                "domain": None,
-                "path": "/",
-                "secure": False,
-                "http_only": False,
-                "expires": None,
-                "same_site": None,
-            }
-        )
+        cookies.append(_default_cookie_record(cookie_name, _normalize_cookie_value(value)))
     return cookies
 
 
@@ -188,19 +177,28 @@ def _cookies_from_cookie_header(raw: str) -> list[CookieRecord]:
         cookie_name = _normalize_cookie_name(name)
         if not cookie_name:
             continue
-        cookies.append(
-            {
-                "name": cookie_name,
-                "value": cookie_value.strip(),
-                "domain": None,
-                "path": "/",
-                "secure": False,
-                "http_only": False,
-                "expires": None,
-                "same_site": None,
-            }
-        )
+        cookies.append(_default_cookie_record(cookie_name, cookie_value.strip()))
     return cookies
+
+
+def _default_cookie_record(cookie_name: str, cookie_value: str) -> CookieRecord:
+    """Build a record with default attributes for a bare name/value pair."""
+    record = _normalize_cookie_record({"name": cookie_name, "value": cookie_value})
+    assert record is not None  # name is non-empty by construction
+    return record
+
+
+def _records_from_name_value_rows(rows: Any) -> list[CookieRecord]:
+    """Normalize ``(name, value)`` rows from a legacy ``session_cookies`` table."""
+    records: list[CookieRecord] = []
+    for name, value in rows:
+        record = _normalize_cookie_record(
+            {"name": name, "value": value},
+            default_domain=None,
+        )
+        if record is not None:
+            records.append(record)
+    return records
 
 
 def _dedupe_cookie_records(records: list[CookieRecord]) -> list[CookieRecord]:
@@ -373,15 +371,7 @@ class SessionStore:
                 rows = conn.execute("SELECT name, value FROM session_cookies").fetchall()
         except sqlite3.Error:
             return []
-        records: list[CookieRecord] = []
-        for name, value in rows:
-            record = _normalize_cookie_record(
-                {"name": name, "value": value},
-                default_domain=None,
-            )
-            if record is not None:
-                records.append(record)
-        return records
+        return _records_from_name_value_rows(rows)
 
     def _read_legacy_table_in_current_db(self) -> list[CookieRecord]:
         """Read cookies from a ``session_cookies`` table inside ``self.db_path``."""
@@ -390,15 +380,7 @@ class SessionStore:
                 rows = conn.execute("SELECT name, value FROM session_cookies").fetchall()
         except sqlite3.Error:
             return []
-        records: list[CookieRecord] = []
-        for name, value in rows:
-            record = _normalize_cookie_record(
-                {"name": name, "value": value},
-                default_domain=None,
-            )
-            if record is not None:
-                records.append(record)
-        return records
+        return _records_from_name_value_rows(rows)
 
     def save_cookies(self, payload: Any) -> int:
         """Replace the current cookie set with the provided payload.
@@ -483,10 +465,7 @@ class SessionStore:
         ]
 
     def get_cookies(self) -> dict[str, str]:
-        cookies: dict[str, str] = {}
-        for record in self.get_cookie_records():
-            cookies[str(record["name"])] = str(record["value"])
-        return cookies
+        return {str(r["name"]): str(r["value"]) for r in self.get_cookie_records()}
 
     def count_stored_cookies(self) -> int:
         row: sqlite3.Row | None = None
@@ -567,11 +546,10 @@ class SessionStore:
         return self.get_cookie_records()
 
     def load_cookies(self, migrate_legacy: bool = True) -> dict[str, str]:
-        records = self.load_cookie_records(migrate_legacy=migrate_legacy)
-        cookies: dict[str, str] = {}
-        for record in records:
-            cookies[str(record["name"])] = str(record["value"])
-        return cookies
+        return {
+            str(r["name"]): str(r["value"])
+            for r in self.load_cookie_records(migrate_legacy=migrate_legacy)
+        }
 
     def has_cookies(self, allow_legacy_fallback: bool = True) -> bool:
         if self.count_stored_cookies() > 0:

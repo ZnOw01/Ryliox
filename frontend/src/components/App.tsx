@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useState, useEffect, lazy, Suspense } from 'react';
 import { I18nextProvider } from 'react-i18next';
 import { motion, AnimatePresence } from 'framer-motion';
+import { HelpCircle } from 'lucide-react';
 
 import { AuthStatusCard } from './AuthStatusCard';
 import { DownloadProgressCard } from './DownloadProgressCard';
@@ -12,7 +13,6 @@ import { BeautifulToastContainer } from './ui/BeautifulToast';
 import { KeyboardShortcutsModal, useKeyboardShortcuts } from './ui/KeyboardNavigation';
 import { SkipLink } from './SkipLink';
 import i18n from '../i18n/config';
-import { isEnabled } from '../lib/feature-flags';
 import { authenticateAdmin } from '../lib/api';
 import { useTranslation } from 'react-i18next';
 import { useBookStore } from '../store/book-store';
@@ -22,50 +22,72 @@ import {
   StaggeredLayoutItem,
 } from './motion/LayoutAnimations';
 
+import { AriaLiveRegion } from './AriaLiveRegion';
+
 // Lazy load non-critical components
-const AriaLiveRegion = lazy(() =>
-  import('./AriaLiveRegion').then(m => ({ default: m.AriaLiveRegion }))
-);
 const MobileNav = lazy(() => import('./MobileNav').then(m => ({ default: m.MobileNav })));
 
-function AppHeader() {
+function AppHeader({ onOpenShortcuts }: { onOpenShortcuts: () => void }) {
   const { t } = useTranslation();
 
   return (
     <header className="safe-area-top relative py-4 sm:py-6">
       <div className="flex min-w-0 items-center justify-between gap-3 sm:gap-4">
-        <div className="flex min-w-0 items-center gap-2.5 sm:gap-4">
+        <div className="flex min-w-0 items-center gap-3 sm:gap-4">
           <div className="relative flex-none">
-            <div className="grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-br from-primary to-primary-foreground text-xl font-heading font-extrabold tracking-tight text-primary-foreground shadow-md select-none sm:h-12 sm:w-12 sm:rounded-2xl sm:text-2xl">
+            <div className="grid h-11 w-11 place-items-center rounded-2xl bg-gradient-to-br from-primary via-primary/90 to-primary-foreground/20 text-2xl font-heading font-black tracking-tighter text-primary-foreground shadow-md shadow-primary/20 select-none sm:h-12 sm:w-12 sm:rounded-2xl sm:text-2xl">
               R
             </div>
             <span
-              className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-emerald-400 shadow-sm sse-pulse sm:h-3 sm:w-3"
+              className="absolute -right-0.5 -top-0.5 h-3 w-3 rounded-full border-2 border-background bg-emerald-500 shadow-xs sse-pulse"
               aria-hidden="true"
             ></span>
             <span className="sr-only">{t('app.status.active')}</span>
           </div>
           <div className="min-w-0">
-            <h1 className="font-heading truncate text-lg font-bold leading-tight tracking-tight text-foreground sm:text-2xl md:text-3xl">
-              {t('app.title')}
-            </h1>
-            <p className="mt-0.5 truncate text-[10px] leading-tight text-muted-foreground sm:text-xs sm:mt-1">
+            <div className="flex items-center gap-2">
+              <h1 className="font-heading truncate text-lg font-bold leading-tight tracking-tight text-foreground sm:text-2xl md:text-3xl">
+                {t('app.title')}
+              </h1>
+              <span className="hidden sm:inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary font-mono">
+                v2.0
+              </span>
+            </div>
+            <p className="mt-0.5 truncate text-xs leading-tight text-muted-foreground">
               {t('app.subtitle')}
             </p>
           </div>
         </div>
-        <div className="flex shrink-0 items-center gap-1.5 sm:gap-3">
-          {isEnabled('enable_i18n') && <LanguageSwitcher />}
-          {isEnabled('enable_dark_mode') && <ThemeToggle />}
+
+        <div className="flex shrink-0 items-center gap-1.5 sm:gap-2.5">
+          <button
+            type="button"
+            onClick={onOpenShortcuts}
+            className="hidden sm:flex h-8 items-center gap-1.5 rounded-xl border border-border bg-card/80 px-2.5 text-xs font-medium text-muted-foreground shadow-2xs transition hover:border-primary/40 hover:bg-accent hover:text-foreground active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            title={t('keyboard_shortcuts.title') || 'Keyboard shortcuts'}
+            aria-label={t('keyboard_shortcuts.title') || 'Keyboard shortcuts'}
+          >
+            <HelpCircle className="h-3.5 w-3.5" />
+            <kbd className="font-mono text-[10px] bg-muted px-1 rounded border border-border">
+              ?
+            </kbd>
+          </button>
+          <LanguageSwitcher />
+          <ThemeToggle />
         </div>
       </div>
     </header>
   );
 }
 
-function AppContent() {
+function AppContent({
+  shortcutsModalOpen,
+  setShortcutsModalOpen,
+}: {
+  shortcutsModalOpen: boolean;
+  setShortcutsModalOpen: (open: boolean) => void;
+}) {
   const { t } = useTranslation();
-  const [shortcutsModalOpen, setShortcutsModalOpen] = useState(false);
 
   // Keyboard shortcuts
   useKeyboardShortcuts([
@@ -74,6 +96,35 @@ function AppContent() {
       action: () => setShortcutsModalOpen(true),
       scope: 'global',
       description: t('keyboard_shortcuts.shortcuts.toggle_help'),
+    },
+    {
+      key: '/',
+      modifier: 'ctrl',
+      action: () => setShortcutsModalOpen(true),
+      scope: 'global',
+      description: t('keyboard_shortcuts.shortcuts.toggle_help'),
+    },
+    {
+      key: 'k',
+      modifier: 'ctrl',
+      action: () => {
+        const input = document.getElementById('search-input') as HTMLInputElement | null;
+        if (input) {
+          input.focus();
+          input.select();
+        }
+      },
+      scope: 'global',
+      description: t('keyboard_shortcuts.shortcuts.quick_search'),
+    },
+    {
+      key: 't',
+      modifier: 'alt',
+      action: () => {
+        window.dispatchEvent(new CustomEvent('ryliox-toggle-theme'));
+      },
+      scope: 'global',
+      description: t('keyboard_shortcuts.shortcuts.toggle_theme'),
     },
     {
       key: 'Escape',
@@ -86,8 +137,8 @@ function AppContent() {
   return (
     <>
       <AnimatedLayoutGroup>
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(320px,1fr)_minmax(0,1.25fr)] lg:items-start lg:gap-6">
-          <StaggeredLayoutContainer className="flex min-w-0 flex-col gap-4">
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(320px,1fr)_minmax(0,1.25fr)] lg:items-start lg:gap-6">
+          <StaggeredLayoutContainer className="flex min-w-0 flex-col gap-5">
             <StaggeredLayoutItem className="flex-shrink-0">
               <div id="auth-section" className="scroll-mt-28">
                 <AuthStatusCard />
@@ -122,6 +173,8 @@ function AppContent() {
 export default function App() {
   const { t } = useTranslation();
   const selectedBook = useBookStore(state => state.selectedBook);
+  const [shortcutsModalOpen, setShortcutsModalOpen] = useState(false);
+
   // Use lazy initialization to preserve QueryClient across HMR reloads
   const [queryClient] = useState(
     () =>
@@ -174,24 +227,27 @@ export default function App() {
         <AnimatePresence mode="wait">
           <motion.div
             key="app"
-            className="safe-area-x bottom-nav-safe min-h-screen pb-6 sm:pb-8"
+            className="safe-area-x bottom-nav-safe min-h-screen pb-8"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.3 }}
           >
-            <AppHeader />
-            <main id="main-content" tabIndex={-1} className="mt-6 sm:mt-8 @container">
-              <AppContent />
+            <AppHeader onOpenShortcuts={() => setShortcutsModalOpen(true)} />
+            <main id="main-content" tabIndex={-1} className="mt-4 sm:mt-6 @container">
+              <AppContent
+                shortcutsModalOpen={shortcutsModalOpen}
+                setShortcutsModalOpen={setShortcutsModalOpen}
+              />
             </main>
-            <footer className="pb-2 pt-8 text-center text-xs text-gray-400">
-              {t('app.footer')}
+            <footer className="pb-4 pt-10 text-center text-xs text-muted-foreground/70">
+              <p>{t('app.footer')}</p>
             </footer>
           </motion.div>
         </AnimatePresence>
-        {isEnabled('enable_toast_notifications') && <BeautifulToastContainer />}
+        <BeautifulToastContainer />
+        <AriaLiveRegion />
         <Suspense fallback={null}>
-          <AriaLiveRegion />
           <MobileNav />
         </Suspense>
       </QueryClientProvider>

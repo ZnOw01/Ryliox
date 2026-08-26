@@ -17,7 +17,6 @@ Or run locust directly:
 from __future__ import annotations
 
 import concurrent.futures
-import random
 import statistics
 import time
 from typing import Any
@@ -301,100 +300,6 @@ class TestDatabasePerformance:
         if successful_times:
             avg_time = statistics.mean(successful_times)
             assert avg_time < 0.3, f"Session save average {avg_time}s exceeds 300ms"
-
-
-# ============================================================================
-# Locust Load Testing Class (for use with locust command)
-# ============================================================================
-
-# This section is only used when running with `locust` command directly
-try:
-    from locust import HttpUser, TaskSet, between, task
-
-    class UserBehavior(TaskSet):
-        """Locust task set simulating typical user behavior."""
-
-        def on_start(self):
-            """Called when a Locust user starts."""
-            # Check status
-            self.client.get("/api/status")
-
-        @task(10)
-        def check_status(self):
-            """Task: Check authentication status."""
-            with self.client.get("/api/status", catch_response=True) as response:
-                if response.status_code == 200:
-                    response.success()
-                else:
-                    response.failure(f"Unexpected status: {response.status_code}")
-
-        @task(5)
-        def search_books(self):
-            """Task: Search for books."""
-            queries = ["python", "javascript", "rust", "golang", "machine learning"]
-            query = random.choice(queries)
-
-            with self.client.get(f"/api/search?q={query}", catch_response=True) as response:
-                if response.status_code in [
-                    200,
-                    500,
-                ]:  # 500 is acceptable if service unavailable
-                    response.success()
-                else:
-                    response.failure(f"Unexpected status: {response.status_code}")
-
-        @task(3)
-        def check_progress(self):
-            """Task: Check download progress."""
-            with self.client.get("/api/progress", catch_response=True) as response:
-                if response.status_code == 200:
-                    response.success()
-                else:
-                    response.failure(f"Unexpected status: {response.status_code}")
-
-        @task(1)
-        def download_book(self):
-            """Task: Queue a download (rate limited)."""
-            book_id = f"load-test-{random.randint(1, 1000)}"
-
-            with self.client.post(
-                "/api/download",
-                json={"book_id": book_id, "format": ["epub"]},
-                headers={"Origin": self.client.base_url},
-                catch_response=True,
-            ) as response:
-                if response.status_code in [200, 429]:  # 200 or rate limited
-                    response.success()
-                else:
-                    response.failure(f"Unexpected status: {response.status_code}")
-
-        @task(2)
-        def get_book_chapters(self):
-            """Task: Get book chapters."""
-            book_ids = ["9780134685991", "9781491946008", "9780135404675"]
-            book_id = random.choice(book_ids)
-
-            with self.client.get(f"/api/book/{book_id}/chapters", catch_response=True) as response:
-                if response.status_code in [200, 400, 404, 500]:
-                    response.success()
-                else:
-                    response.failure(f"Unexpected status: {response.status_code}")
-
-    class WebsiteUser(HttpUser):
-        """Main Locust user class."""
-
-        tasks = [UserBehavior]
-        wait_time = between(1, 5)  # Wait 1-5 seconds between tasks
-
-        def __init__(self, *args, **kwargs):
-            super().__init__(*args, **kwargs)
-            # Ensure base_url doesn't have trailing slash issues
-            if self.host and self.host.endswith("/"):
-                self.host = self.host[:-1]
-
-except Exception:
-    # Locust not installed, skip load testing classes
-    pass
 
 
 # ============================================================================

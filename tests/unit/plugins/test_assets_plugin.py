@@ -55,19 +55,6 @@ async def test_download_all_images_records_canonical_returned_path(tmp_path: Pat
     assert result["https://example.com/assets/cover.bin"].is_file()
 
 
-def test_ensure_safe_asset_url_blocks_external_hosts():
-    plugin = AssetsPlugin()
-
-    with pytest.raises(ValueError, match="Blocked asset host outside allowed hosts"):
-        plugin._ensure_safe_asset_url("https://example.com/assets/cover.png")
-
-
-def test_ensure_safe_asset_url_allows_base_host():
-    plugin = AssetsPlugin()
-
-    plugin._ensure_safe_asset_url(f"{config.BASE_URL}/assets/cover.png")
-
-
 @pytest.mark.asyncio
 async def test_download_cover_image_uses_real_media_type_for_extension(tmp_path: Path):
     plugin = AssetsPlugin()

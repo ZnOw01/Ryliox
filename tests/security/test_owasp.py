@@ -49,10 +49,6 @@ from core.validators import (
     validate_url,
     validate_user_input,
 )
-from web.dependencies import (
-    CSRFProtection,
-    SSRFProtection,
-)
 
 # =============================================================================
 # A01: Broken Access Control Tests
@@ -246,19 +242,6 @@ class TestInsecureDesign:
         # Different IP should still work
         assert limiter.is_allowed("192.168.1.1", "/api/test")
 
-    def test_csrf_token_rotation(self):
-        """Test CSRF token rotation (one-time use)."""
-        csrf = CSRFProtection(token_length=32, ttl=3600)
-
-        # Generate token
-        token = asyncio.run(csrf.generate_token("session-123"))
-
-        # First validation should succeed
-        assert asyncio.run(csrf.validate_token("session-123", token))
-
-        # Second validation should fail (token consumed)
-        assert not asyncio.run(csrf.validate_token("session-123", token))
-
 
 # =============================================================================
 # A05: Security Misconfiguration Tests
@@ -435,29 +418,6 @@ class TestLoggingFailures:
 
 class TestSSRF:
     """Tests for OWASP A10: Server-Side Request Forgery."""
-
-    def test_ssrf_blocked_urls(self):
-        """Test that SSRF-prone URLs are blocked."""
-        # Localhost should be blocked
-        assert not SSRFProtection.is_safe_url("http://localhost/api")[0]
-        assert not SSRFProtection.is_safe_url("http://127.0.0.1/admin")[0]
-        assert not SSRFProtection.is_safe_url("http://0.0.0.0/server")[0]
-
-        # Private IP ranges should be blocked
-        assert not SSRFProtection.is_safe_url("http://10.0.0.1/internal")[0]
-        assert not SSRFProtection.is_safe_url("http://192.168.1.1/config")[0]
-        assert not SSRFProtection.is_safe_url("http://172.16.0.1/api")[0]
-
-        # Non-HTTP schemes should be blocked
-        assert not SSRFProtection.is_safe_url("file:///etc/passwd")[0]
-        assert not SSRFProtection.is_safe_url("ftp://internal.server")[0]
-        assert not SSRFProtection.is_safe_url("gopher://localhost")[0]
-
-    def test_ssrf_allowed_urls(self):
-        """Test that valid URLs are allowed."""
-        # Public URLs should be allowed
-        assert SSRFProtection.is_safe_url("https://learning.oreilly.com/api")[0]
-        assert SSRFProtection.is_safe_url("http://example.com/resource")[0]
 
     def test_url_validation_with_whitelist(self):
         """Test URL validation with host whitelist."""

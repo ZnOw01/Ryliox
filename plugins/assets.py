@@ -9,13 +9,12 @@ from collections.abc import Callable
 from pathlib import Path
 from urllib.parse import urlparse
 
+import config
+
 from .base import Plugin
 
-_ALLOWED_ASSET_HOSTS: tuple[str, ...] = (
-    "oreilly.com",
-    "oreillystatic.com",
-    "oreil.ly",
-)
+# Matches url(...) references inside stylesheets; shared with pdf.py.
+CSS_URL_RE = re.compile(r'url\(["\']?([^)"\']+)["\']?\)')
 
 _CONTENT_TYPE_TO_EXT: dict[str, str] = {
     "image/jpeg": ".jpg",
@@ -118,7 +117,7 @@ class AssetsPlugin(Plugin):
                 continue
 
             css_text = css_path.read_text(encoding="utf-8")
-            for match in re.finditer(r'url\(["\']?([^)"\']+)["\']?\)', css_text):
+            for match in CSS_URL_RE.finditer(css_text):
                 ref = match.group(1)
                 ref_path = Path(ref)
                 if (
@@ -169,18 +168,7 @@ class AssetsPlugin(Plugin):
         return cover_path
 
     def get_cover_url(self, book_id: str) -> str:
-        return f"https://learning.oreilly.com/library/cover/{book_id}/"
-
-    @staticmethod
-    def _ensure_safe_asset_url(url: str) -> None:
-        """Raise ``ValueError`` if ``url`` is not in an allowed host."""
-        if not url or not url.startswith("http"):
-            return
-        host = (urlparse(url).hostname or "").lower()
-        for allowed in _ALLOWED_ASSET_HOSTS:
-            if host == allowed or host.endswith("." + allowed):
-                return
-        raise ValueError(f"Blocked asset host outside allowed hosts: {url}")
+        return f"{config.BASE_URL}/library/cover/{book_id}/"
 
     @staticmethod
     def _filename_from_url(url: str, default: str = "asset.bin") -> str:

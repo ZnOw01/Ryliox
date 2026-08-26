@@ -164,15 +164,15 @@ export function useDownloadManager() {
     }
   }, []);
 
+  const isProgressActive = isDownloadActive(progressQuery.data);
+
   useEffect(() => {
-    const progress = progressQuery.data;
-    if (!activeJobId || !isDownloadActive(progress)) {
+    if (!activeJobId || !isProgressActive) {
       clearReconnectTimer();
       reconnectAttemptRef.current = 0;
       setSseStatus('disconnected');
       return;
     }
-
     const subscribedJobId = activeJobId;
     const subscribedQueryKey = queryKeys.progress.byJob(subscribedJobId);
     let closed = false;
@@ -246,7 +246,7 @@ export function useDownloadManager() {
       clearReconnectTimer();
       closeConnection();
     };
-  }, [activeJobId, clearReconnectTimer, progressQuery.data?.status, queryClient, reconnectToken]);
+  }, [activeJobId, clearReconnectTimer, isProgressActive, queryClient, reconnectToken]);
 
   const forceReconnect = useCallback(() => {
     clearReconnectTimer();

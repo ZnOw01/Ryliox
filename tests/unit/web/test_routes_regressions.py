@@ -63,7 +63,9 @@ def _build_client(
 
     monkeypatch.setattr("web.server.initialize_app_services", fake_initialize)
     monkeypatch.setattr("web.server.shutdown_app_services", fake_shutdown)
-    return TestClient(create_app())
+    # Match the conftest ``test_client`` fixture: unhandled errors surface as
+    # the app's 500 error envelope instead of being re-raised into the client.
+    return TestClient(create_app(), raise_server_exceptions=False)
 
 
 def test_api_404_uses_stable_error_envelope(monkeypatch: pytest.MonkeyPatch):

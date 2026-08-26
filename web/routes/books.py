@@ -128,8 +128,18 @@ async def book_chapters(
     session_store: SessionStore = Depends(get_session_store),
 ) -> BookChaptersResponse:
     """Retorna la lista de capítulos de un libro."""
+    book_id = book_id.strip()
+    if not book_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"error": "Book ID cannot be empty", "code": ErrorCode.BOOK_ID_REQUIRED},
+        )
+    if len(book_id) > 200:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"error": "Book ID too long", "code": ErrorCode.INVALID_BOOK_ID},
+        )
     _require_cookies(session_store, "Chapters fetch", book_id=book_id)
-
     cache = get_chapter_list_cache()
     cache_key = f"chapters:{book_id}"
     cached_chapters = await cache.get(cache_key)
@@ -211,8 +221,18 @@ async def book_info(
     session_store: SessionStore = Depends(get_session_store),
 ) -> BookInfoResponse:
     """Retorna los metadatos de un libro por su ID."""
+    book_id = book_id.strip()
+    if not book_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"error": "Book ID cannot be empty", "code": ErrorCode.BOOK_ID_REQUIRED},
+        )
+    if len(book_id) > 200:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"error": "Book ID too long", "code": ErrorCode.INVALID_BOOK_ID},
+        )
     _require_cookies(session_store, "Book info fetch", book_id=book_id)
-
     cache = get_book_metadata_cache()
     cache_key = f"book:{book_id}"
     cached_book = await cache.get(cache_key)

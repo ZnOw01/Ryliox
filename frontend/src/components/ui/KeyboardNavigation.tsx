@@ -253,7 +253,7 @@ const shortcutsList = [
   {
     categoryKey: 'keyboard_shortcuts.general',
     items: [
-      { keys: ['Ctrl', 'T'], descriptionKey: 'keyboard_shortcuts.shortcuts.toggle_theme' },
+      { keys: ['Alt', 'T'], descriptionKey: 'keyboard_shortcuts.shortcuts.toggle_theme' },
       { keys: ['?'], descriptionKey: 'keyboard_shortcuts.shortcuts.toggle_help' },
       { keys: ['Ctrl', '/'], descriptionKey: 'keyboard_shortcuts.shortcuts.this_menu' },
     ],

@@ -4,15 +4,21 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import errno
 import logging
 import threading
 import time
 import traceback
-from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+try:
+    import fcntl
+except ImportError:  # pragma: no cover - fcntl is available on Linux deployments
+    fcntl = None  # type: ignore[assignment]
+
 from core.audit import AuditEventType, audit_download
+from core.contracts import DownloadCancelledError
 from core.dto import (
     DownloadErrorDTO,
     DownloadJobDTO,
@@ -20,7 +26,11 @@ from core.dto import (
     DownloadResultDTO,
 )
 from core.metrics import metrics
-from core.repository import DownloadJobRepository
+from core.repository import (
+    DEFAULT_TERMINAL_JOB_RETENTION,
+    TERMINAL_STATES,
+    DownloadJobRepository,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
@@ -32,28 +42,90 @@ logger = logging.getLogger(__name__)
 
 # Constants
 DEFAULT_QUEUE_POLL_INTERVAL_SECONDS = 0.5
-DEFAULT_TERMINAL_JOB_RETENTION = 500
 MIN_QUEUE_POLL_INTERVAL_SECONDS = 0.1
 WORKER_ERROR_LOG_COOLDOWN_SECONDS = 60.0
-
-TERMINAL_STATES = frozenset(["completed", "error", "cancelled"])
 
 
 class QueueCapacityError(RuntimeError):
     """Raised when the configured pending-job bound has been reached."""
 
 
-@dataclass(frozen=True)
-class JobExecutionContext:
-    """Immutable context for job execution."""
+class _ProcessWorkerLock:
+    """Non-blocking process lock held for the lifetime of a queue worker."""
 
-    job_id: str
-    cancel_event: threading.Event
-    error_log_dir: Path
+    def __init__(self, db_path: Path):
+        self._db_path = db_path
+        self._handle: Any | None = None
+
+    def acquire(self) -> None:
+        if self._handle is not None:
+            return
+        if fcntl is None:
+            raise RuntimeError("Cannot verify the download worker singleton: fcntl is unavailable")
+
+        try:
+            handle = self._db_path.open("a+")
+        except OSError as exc:
+            raise RuntimeError(f"Cannot open the download worker lock for {self._db_path}") from exc
+
+        try:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError as exc:
+            with contextlib.suppress(OSError):
+                handle.close()
+            raise RuntimeError(
+                f"A download queue worker is already active for {self._db_path}"
+            ) from exc
+        except OSError as exc:
+            with contextlib.suppress(OSError):
+                handle.close()
+            if exc.errno in {errno.EACCES, errno.EAGAIN}:
+                raise RuntimeError(
+                    f"A download queue worker is already active for {self._db_path}"
+                ) from exc
+            raise RuntimeError(
+                f"Cannot acquire the download worker lock for {self._db_path}"
+            ) from exc
+
+        self._handle = handle
+
+    def release(self) -> None:
+        handle = self._handle
+        self._handle = None
+        if handle is None:
+            return
+
+        try:
+            if fcntl is not None:
+                fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+        except OSError:
+            logger.warning("Failed to explicitly release the worker lock", exc_info=True)
+        finally:
+            with contextlib.suppress(OSError):
+                handle.close()
+
+
+def _repository_db_path(repository: object) -> Path | None:
+    """Return a concrete repository path, if the adapter exposes one."""
+    try:
+        value = getattr(repository, "db_path", None)
+    except Exception:
+        return None
+    if value is None or isinstance(value, bool):
+        return None
+    try:
+        return Path(value).resolve()
+    except (OSError, TypeError, ValueError):
+        return None
 
 
 class DownloadQueueService:
-    """Service for managing download queue."""
+    """Service for managing the download queue.
+
+    Repositories exposing ``db_path`` are protected by a process-wide worker
+    lock. Compatibility repositories without that attribute remain usable, but
+    their singleton worker cannot be verified.
+    """
 
     def __init__(
         self,
@@ -73,7 +145,9 @@ class DownloadQueueService:
         self._poll_interval_seconds = max(
             MIN_QUEUE_POLL_INTERVAL_SECONDS, float(poll_interval_seconds)
         )
-        self._max_queued_jobs = max(1, int(max_queued_jobs))
+        self._max_queued_jobs = int(max_queued_jobs)
+        if self._max_queued_jobs <= 0:
+            raise ValueError("max_queued_jobs must be greater than zero")
         self._download_timeout_seconds = max(1.0, float(download_timeout_seconds))
 
         # Repository
@@ -100,14 +174,22 @@ class DownloadQueueService:
         self._active_cancel_event: threading.Event | None = None
         self._worker: threading.Thread | None = None
         self._last_progress_log: dict[str, tuple[str, int, str]] = {}
+        repository_db_path = _repository_db_path(self._repository)
+        self._worker_lock = (
+            _ProcessWorkerLock(repository_db_path) if repository_db_path is not None else None
+        )
+        if self._worker_lock is None:
+            logger.warning(
+                "Repository does not expose db_path; the download worker singleton "
+                "cannot be verified for this service"
+            )
 
         # Error deduplication
         self._last_worker_error_signature: str | None = None
         self._last_worker_error_logged_at: float = 0.0
         self._worker_error_log_cooldown_seconds = WORKER_ERROR_LOG_COOLDOWN_SECONDS
 
-        # Requeue jobs on startup
-        self._repository.requeue_inflight()
+        self._sync_metrics()
 
     @property
     def repository(self) -> IDownloadJobRepository:
@@ -121,13 +203,27 @@ class DownloadQueueService:
                 logger.debug("Worker already running, skipping start")
                 return
 
-            self._stop_event.clear()
-            self._worker = threading.Thread(
-                target=self._worker_loop,
-                name="download-queue-worker",
-                daemon=True,
-            )
-            self._worker.start()
+            try:
+                if self._worker_lock is not None:
+                    self._worker_lock.acquire()
+
+                requeue_inflight = getattr(self._repository, "requeue_inflight", None)
+                if callable(requeue_inflight):
+                    requeue_inflight()
+
+                self._stop_event.clear()
+                self._worker = threading.Thread(
+                    target=self._worker_loop,
+                    name="download-queue-worker",
+                    daemon=True,
+                )
+                self._worker.start()
+            except Exception:
+                self._stop_event.set()
+                self._worker = None
+                if self._worker_lock is not None:
+                    self._worker_lock.release()
+                raise
             logger.info("Download queue worker started")
 
     def stop(self, timeout_seconds: float = 5.0) -> bool:
@@ -154,10 +250,14 @@ class DownloadQueueService:
                 "Download queue worker did not stop before timeout; repository left open"
             )
             return False
-        with contextlib.suppress(Exception):
-            self._repository.close()
-        with self._state_lock:
-            self._worker = None
+        try:
+            with contextlib.suppress(Exception):
+                self._repository.close()
+        finally:
+            if self._worker_lock is not None:
+                self._worker_lock.release()
+            with self._state_lock:
+                self._worker = None
         logger.info("Download queue worker stopped")
         return True
 
@@ -171,9 +271,6 @@ class DownloadQueueService:
         skip_images: bool,
     ) -> dict[str, Any]:
         """Enqueue a new download job."""
-        queued_count = getattr(self._repository, "count_queued", lambda: 0)()
-        if queued_count >= self._max_queued_jobs:
-            raise QueueCapacityError("Download queue is full")
         job_dto = DownloadJobDTO.create(
             book_id=book_id,
             output_dir=output_dir,
@@ -182,14 +279,45 @@ class DownloadQueueService:
             skip_images=skip_images,
         )
 
-        snapshot = self._repository.save(job_dto)
+        snapshot = self._enqueue_if_capacity(job_dto)
+        if snapshot is None:
+            self._sync_metrics()
+            raise QueueCapacityError("Download queue is full")
+
+        metrics.record_download_started(",".join(job_dto.formats))
         self._wake_event.set()
         self._notify_progress_change()
 
         logger.info("Enqueued job %s for book %s", job_dto.job_id[:8], book_id)
-        metrics.set_queue_size(queued_count + 1)
+        self._sync_metrics()
         audit_download(AuditEventType.DOWNLOAD_STARTED, book_id, job_dto.job_id)
         return snapshot
+
+    def _enqueue_if_capacity(self, job_dto: DownloadJobDTO) -> dict[str, Any] | None:
+        """Admit the job atomically; return its snapshot or None when full."""
+        return self._repository.enqueue_if_capacity(job_dto, self._max_queued_jobs)
+
+    def _repository_count(self, method_name: str) -> int | None:
+        method = getattr(self._repository, method_name, None)
+        if not callable(method):
+            return None
+        try:
+            value = method()
+        except Exception:
+            logger.debug("Repository does not support %s", method_name, exc_info=True)
+            return None
+        if isinstance(value, int) and not isinstance(value, bool) and value >= 0:
+            return value
+        return None
+
+    def _sync_metrics(self) -> None:
+        """Synchronize queue gauges with durable repository state."""
+        queued_count = self._repository_count("count_queued")
+        active_count = self._repository_count("count_active")
+        if queued_count is not None:
+            metrics.set_queue_size(queued_count)
+        if active_count is not None:
+            metrics.set_active_downloads(active_count)
 
     def get_progress(self, job_id: str | None = None) -> dict[str, Any]:
         """Get progress for a specific job or the most recent one."""
@@ -202,31 +330,38 @@ class DownloadQueueService:
 
     def cancel(self, job_id: str | None = None) -> tuple[bool, str]:
         """Cancel a download job."""
-        target_job_id = job_id or self._repository.get_latest_cancellable()
-        if not target_job_id:
-            return False, "No active download"
+        try:
+            target_job_id = job_id or self._repository.get_latest_cancellable()
+            if not target_job_id:
+                return False, "No active download"
 
-        with self._state_lock:
-            is_active = self._active_job_id == target_job_id
-            cancel_event = self._active_cancel_event
+            with self._state_lock:
+                is_active = self._active_job_id == target_job_id
+                cancel_event = self._active_cancel_event
 
-        outcome, _ = self._repository.request_cancel(target_job_id)
+            outcome, _ = self._repository.request_cancel(target_job_id)
 
-        if outcome == "not_found":
-            return False, "Job not found"
+            if outcome == "not_found":
+                return False, "Job not found"
 
-        if outcome == "already_terminal":
-            return False, "No active download"
+            if outcome == "already_terminal":
+                return False, "No active download"
 
-        if outcome == "cancelled":
+            if outcome == "too_late":
+                return False, "Download is finalizing"
+
+            if outcome == "cancelled":
+                metrics.record_download_cancelled()
+                self._notify_progress_change()
+                return True, "Download cancelled"
+
+            if is_active and cancel_event is not None:
+                cancel_event.set()
+
             self._notify_progress_change()
-            return True, "Download cancelled"
-
-        if is_active and cancel_event is not None:
-            cancel_event.set()
-
-        self._notify_progress_change()
-        return True, "Cancel requested"
+            return True, "Cancel requested"
+        finally:
+            self._sync_metrics()
 
     def get_progress_version(self) -> int:
         """Return monotonic progress version for SSE waiters."""
@@ -277,7 +412,12 @@ class DownloadQueueService:
             job_dto: DownloadJobDTO | None = None
 
             try:
-                job_dto = self._repository.claim_next_queued()
+                # Cheap read-only pre-check: skip the write transaction and
+                # prune in claim_next_queued while the queue is empty. The
+                # wake event makes enqueues visible immediately.
+                if self._repository.has_queued_jobs():
+                    job_dto = self._repository.claim_next_queued()
+                    self._sync_metrics()
 
                 if job_dto is None:
                     self._wake_event.wait(self._poll_interval_seconds)
@@ -320,18 +460,22 @@ class DownloadQueueService:
                     details=None,
                     trace_log=trace_log,
                 )
-                self._repository.mark_failed(
+                marked = self._repository.mark_failed(
                     job_dto.job_id,
                     error_dto,
                     status="error",
                 )
+                if marked:
+                    metrics.record_download_failed(",".join(job_dto.formats), type(exc).__name__)
                 self._notify_progress_change()
             except Exception:
                 logger.exception("Failed to mark job as failed")
+        self._sync_metrics()
 
     def _run_job(self, job: DownloadJobDTO) -> None:
         """Execute a download job with proper event loop handling."""
         cancel_event = threading.Event()
+        started_at = time.monotonic()
 
         with self._state_lock:
             self._active_job_id = job.job_id
@@ -342,6 +486,9 @@ class DownloadQueueService:
 
         def report_progress(progress: DownloadProgress) -> None:
             """Update progress in repository."""
+            if self._check_and_signal_cancel(job.job_id, cancel_event):
+                raise DownloadCancelledError("Download cancelled by user")
+
             self._log_progress_event(job.job_id, progress)
             progress_dto = DownloadProgressDTO(
                 status=progress.status,
@@ -377,6 +524,7 @@ class DownloadQueueService:
                         cancel_check=lambda: self._check_and_signal_cancel(
                             job.job_id, cancel_event
                         ),
+                        job_id=job.job_id,
                     )
                 finally:
                     if entered_kernel:
@@ -384,19 +532,19 @@ class DownloadQueueService:
                             await kernel.__aexit__(None, None, None)
 
             with runner:
-                # ponytail: no overall timeout — individual HTTP requests have
-                # their own timeout (30s) and the user can cancel via the UI.
+                # The whole pipeline runs under one overall timeout
+                # (self._download_timeout_seconds); individual HTTP requests
+                # have shorter timeouts and the user can also cancel via the
+                # UI. On expiry asyncio.TimeoutError propagates and the job
+                # is marked failed.
                 result = runner.run(
                     asyncio.wait_for(run_download(), timeout=self._download_timeout_seconds)
                 )
 
             if self._check_and_signal_cancel(job.job_id, cancel_event):
-                raise RuntimeError("Download cancelled by user")
+                raise DownloadCancelledError("Download cancelled by user")
 
-            if result.files.get("pdf"):
-                pdf_paths = result.files["pdf"]
-            else:
-                pdf_paths = None
+            pdf_paths = result.files.get("pdf")
 
             result_dto = DownloadResultDTO(
                 book_id=result.book_id,
@@ -407,10 +555,16 @@ class DownloadQueueService:
             )
 
             if not self._repository.mark_completed(job.job_id, result_dto):
+                if self._is_terminal_job(job.job_id):
+                    logger.info(
+                        "Job %s reached a terminal state before completion was persisted",
+                        job.job_id[:8],
+                    )
+                    return
                 raise RuntimeError("Download job could not transition to completed")
+            metrics.record_download_completed(",".join(job.formats), time.monotonic() - started_at)
             self._notify_progress_change()
             logger.info("Job %s completed successfully", job.job_id[:8])
-            metrics.set_active_downloads(0)
             audit_download(AuditEventType.DOWNLOAD_COMPLETED, job.book_id, job.job_id)
 
         except Exception as exc:
@@ -426,6 +580,7 @@ class DownloadQueueService:
                 logger.debug("Failed to clear active job state: %s", cleanup_exc)
             with contextlib.suppress(Exception):
                 self._wake_event.set()
+            self._sync_metrics()
 
     def _log_progress_event(self, job_id: str, progress: DownloadProgress) -> None:
         percent = max(0, min(100, int(progress.percentage or 0)))
@@ -456,22 +611,24 @@ class DownloadQueueService:
         message = str(exc)
         trace_text = traceback.format_exc()
         trace_log = self._write_error_trace(trace_text, job.job_id)
+        already_terminal = self._is_terminal_job(job.job_id)
+        cancelled = isinstance(exc, DownloadCancelledError)
 
-        if (
-            self._check_and_signal_cancel(job.job_id, cancel_event)
-            or "cancelled" in message.lower()
-        ):
+        if already_terminal:
+            logger.info("Job %s is already terminal; preserving its state", job.job_id[:8])
+        elif cancelled or self._check_and_signal_cancel(job.job_id, cancel_event):
             error_dto = DownloadErrorDTO(
                 error=message or "Download cancelled by user",
                 code="download_cancelled",
                 details=None,
                 trace_log=trace_log,
             )
-            self._repository.mark_failed(
+            if self._repository.mark_failed(
                 job.job_id,
                 error_dto,
                 status="cancelled",
-            )
+            ):
+                metrics.record_download_cancelled()
             logger.info("Job %s cancelled by user", job.job_id[:8])
         else:
             error_dto = DownloadErrorDTO(
@@ -480,22 +637,32 @@ class DownloadQueueService:
                 details={"trace_log": trace_log} if trace_log else None,
                 trace_log=trace_log,
             )
-            self._repository.mark_failed(
+            if self._repository.mark_failed(
                 job.job_id,
                 error_dto,
                 status="error",
-            )
+            ):
+                metrics.record_download_failed(",".join(job.formats), type(exc).__name__)
             logger.error("Job %s failed: %s", job.job_id[:8], message)
 
-        metrics.set_active_downloads(0)
         event_type = (
             AuditEventType.DOWNLOAD_CANCELLED
-            if cancel_event.is_set() or "cancelled" in message.lower()
+            if cancel_event.is_set() or cancelled
             else AuditEventType.DOWNLOAD_FAILED
         )
         audit_download(event_type, job.book_id, job.job_id, success=False)
 
         self._notify_progress_change()
+        self._sync_metrics()
+
+    def _is_terminal_job(self, job_id: str) -> bool:
+        """Check terminal state before applying a competing failure transition."""
+        try:
+            snapshot = self._repository.get_by_id(job_id)
+        except Exception:
+            logger.debug("Could not inspect job %s terminal state", job_id, exc_info=True)
+            return False
+        return snapshot is not None and snapshot.get("status") in TERMINAL_STATES
 
     def _check_and_signal_cancel(self, job_id: str, cancel_event: threading.Event) -> bool:
         """Check if cancellation was requested via any mechanism."""

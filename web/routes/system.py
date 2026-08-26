@@ -10,6 +10,7 @@ import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+import httpx
 from fastapi import APIRouter, Body, Depends, HTTPException, Request, status
 from pydantic import BaseModel
 
@@ -17,6 +18,7 @@ import config
 from core.audit import AuditEventType, audit_data
 from core.feature_flags import feature_flags
 from core.metrics import metrics
+from core.validators import ValidationError, validate_file_path, validate_url
 from plugins.downloader import DownloaderPlugin
 from web.api_utils import ErrorCode, error_response
 from web.dependencies import get_kernel, require_same_origin
@@ -49,17 +51,22 @@ def _app_version(request: Request) -> str:
     return str(getattr(request.app.state, "app_version", "dev"))
 
 
-@router.get("/health", response_model=HealthResponse)
-def health(
-    request: Request,
-    kernel: Kernel = Depends(get_kernel),
-) -> HealthResponse:
+def _component_checks(request: Request, kernel: Kernel) -> dict[str, dict[str, Any]]:
+    """Probe the auth plugin, download queue repository, and session store.
+
+    Returns raw per-component results carrying an ``ok`` flag plus component
+    specific detail (``message`` on success, ``error`` on failure); each
+    health endpoint maps these onto its own response shape.
+    """
     checks: dict[str, dict[str, Any]] = {}
 
     # Check 1: Auth plugin accessible
     try:
         auth_plugin = kernel.get("auth")
-        checks["auth"] = {"ok": auth_plugin is not None, "error": None}
+        if auth_plugin is not None:
+            checks["auth"] = {"ok": True, "message": "Auth plugin accessible"}
+        else:
+            checks["auth"] = {"ok": False, "error": "Auth plugin not available"}
     except Exception as e:
         checks["auth"] = {"ok": False, "error": str(e)}
         logger.warning(f"Health check - auth plugin failed: {e}")
@@ -67,59 +74,65 @@ def health(
     # Check 2: Download queue database connectivity
     try:
         download_queue = getattr(request.app.state, "download_queue", None)
-        if download_queue is not None:
-            # Verify SQLite connectivity by checking repository's database
-            repository = getattr(download_queue, "repository", None)
-            if repository is not None:
-                # Attempt a simple query through the repository
-                repository.get_latest()
-                checks["download_queue"] = {"ok": True, "error": None}
-            else:
-                checks["download_queue"] = {
-                    "ok": False,
-                    "error": "Repository not available",
-                }
+        repository = getattr(download_queue, "repository", None) if download_queue else None
+        if repository is not None:
+            # Attempt a simple query through the repository
+            latest = repository.get_latest()
+            checks["download_queue"] = {
+                "ok": True,
+                "message": "Database accessible",
+                "latest_job_id": latest.get("job_id") if latest else None,
+            }
         else:
-            checks["download_queue"] = {"ok": False, "error": "Queue not initialized"}
+            error = (
+                "Queue not initialized" if download_queue is None else "Repository not available"
+            )
+            checks["download_queue"] = {"ok": False, "error": error}
     except Exception as e:
         checks["download_queue"] = {"ok": False, "error": str(e)}
         logger.warning(f"Health check - download_queue failed: {e}")
 
     # Check 3: Session store (SQLite) connectivity
     try:
-        from core.session_store import SessionStore
-
-        session_store = SessionStore(
-            db_path=config.SESSION_DB_FILE,
-            legacy_cookies_file=config.COOKIES_FILE,
-        )
-        # Verify by attempting to count cookies
+        session_store = request.app.state.session_store
         cookie_count = session_store.count_stored_cookies()
         checks["session_store"] = {
             "ok": True,
-            "error": None,
+            "message": "Session store accessible",
             "cookie_count": cookie_count,
         }
     except Exception as e:
         checks["session_store"] = {"ok": False, "error": str(e)}
         logger.warning(f"Health check - session_store failed: {e}")
 
+    return checks
+
+
+@router.get("/health", response_model=HealthResponse)
+def health(
+    request: Request,
+    kernel: Kernel = Depends(get_kernel),
+) -> HealthResponse:
+    checks = _component_checks(request, kernel)
+
     # Determine overall status
     failed = [name for name, check in checks.items() if not check.get("ok")]
     if not failed:
-        status = "ok"
+        overall_status = "ok"
     elif len(failed) < len(checks):
-        status = "degraded"
+        overall_status = "degraded"
     else:
-        status = "error"
+        overall_status = "error"
 
     # Log detailed status for debugging
-    if status != "ok":
+    if overall_status != "ok":
         failed_details = {name: checks[name].get("error") for name in failed}
-        logger.warning(f"Health check status '{status}' - failed components: {failed_details}")
+        logger.warning(
+            f"Health check status '{overall_status}' - failed components: {failed_details}"
+        )
 
     return HealthResponse(
-        status=status,
+        status=overall_status,
         uptime_seconds=_uptime(request),
         version=_app_version(request),
     )
@@ -153,7 +166,6 @@ class ExternalAPIHealth(BaseModel):
 
 class SQLiteConnectionsInfo(BaseModel):
     download_queue_connections: int
-    session_store_connections: int
     healthy: bool
 
 
@@ -185,63 +197,29 @@ async def health_detailed(
     - SQLite connection status
     - Metrics collection status
     """
-    checks: dict[str, Any] = {}
     timestamp = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
 
-    # Check 1: Auth plugin
-    try:
-        kernel.get("auth")
-        checks["auth"] = {"status": "ok", "message": "Auth plugin accessible"}
-    except Exception as e:
-        checks["auth"] = {"status": "error", "message": str(e)}
+    # Component probes hit SQLite synchronously; run them off the event loop.
+    component_results = await asyncio.to_thread(_component_checks, request, kernel)
 
-    # Check 2: Download queue
-    try:
-        download_queue = getattr(request.app.state, "download_queue", None)
-        if download_queue is not None:
-            repository = getattr(download_queue, "repository", None)
-            if repository is not None:
-                latest = repository.get_latest()
-                checks["download_queue"] = {
-                    "status": "ok",
-                    "message": "Database accessible",
-                    "latest_job": latest.get("job_id") if latest else None,
-                }
-            else:
-                checks["download_queue"] = {
-                    "status": "error",
-                    "message": "Repository not available",
-                }
-        else:
-            checks["download_queue"] = {
-                "status": "error",
-                "message": "Queue not initialized",
-            }
-    except Exception as e:
-        checks["download_queue"] = {"status": "error", "message": str(e)}
-
-    # Check 3: Session store
-    try:
-        from core.session_store import SessionStore
-
-        session_store = SessionStore(
-            db_path=config.SESSION_DB_FILE,
-            legacy_cookies_file=config.COOKIES_FILE,
-        )
-        cookie_count = session_store.count_stored_cookies()
-        checks["session_store"] = {
-            "status": "ok",
-            "message": "Session store accessible",
-            "cookie_count": cookie_count,
+    # Map the shared probe results onto the detailed response shape.
+    checks: dict[str, Any] = {}
+    for name, result in component_results.items():
+        entry: dict[str, Any] = {
+            "status": "ok" if result["ok"] else "error",
+            "message": result.get("message") or result.get("error"),
         }
-    except Exception as e:
-        checks["session_store"] = {"status": "error", "message": str(e)}
+        if "latest_job_id" in result:
+            entry["latest_job"] = result["latest_job_id"]
+        if "cookie_count" in result:
+            entry["cookie_count"] = result["cookie_count"]
+        checks[name] = entry
 
-    # Check 4: Disk usage
-    disk_info = _check_disk_health()
+    # Check 4: Disk usage (blocking syscall)
+    disk_info = await asyncio.to_thread(_check_disk_health)
 
-    # Check 5: Memory usage
-    memory_info = _check_memory_health()
+    # Check 5: Memory usage (blocking syscall)
+    memory_info = await asyncio.to_thread(_check_memory_health)
 
     # Check 6: External APIs
     external_apis = await _check_external_apis()
@@ -325,79 +303,100 @@ def _check_memory_health() -> MemoryHealthInfo:
         return MemoryHealthInfo(available=False)
 
 
+_EXTERNAL_API_TIMEOUT_SECONDS = 10.0
+_EXTERNAL_API_CACHE_TTL_SECONDS = 60.0
+_external_api_probes_lock = threading.Lock()
+_external_api_cache: tuple[float, list[ExternalAPIHealth]] | None = None
+_external_http_client: httpx.AsyncClient | None = None
+_external_http_client_loop: asyncio.AbstractEventLoop | None = None
+
+
+def _get_external_http_client() -> httpx.AsyncClient:
+    """Return the shared probe client, rebound when the event loop changes."""
+    global _external_http_client, _external_http_client_loop
+    loop = asyncio.get_running_loop()
+    if (
+        _external_http_client is None
+        or _external_http_client.is_closed
+        or _external_http_client_loop is not loop
+    ):
+        _external_http_client = httpx.AsyncClient(timeout=_EXTERNAL_API_TIMEOUT_SECONDS)
+        _external_http_client_loop = loop
+    return _external_http_client
+
+
 async def _check_external_apis() -> list[ExternalAPIHealth]:
-    """Check response time of external APIs."""
-    import httpx
+    """Check response time of external APIs (cached for one minute)."""
+    global _external_api_cache
+
+    with _external_api_probes_lock:
+        cached = _external_api_cache
+    if cached is not None and time.monotonic() - cached[0] < _EXTERNAL_API_CACHE_TTL_SECONDS:
+        return cached[1]
 
     apis_to_check = [
         {"name": "base_site", "url": config.BASE_URL},
     ]
 
+    client = _get_external_http_client()
     results = []
     for api in apis_to_check:
-        start = time.time()
+        start = time.monotonic()
         try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                response = await client.get(api["url"])
-                response_time = (time.time() - start) * 1000
+            validated_url = await validate_url(api["url"])
+            response = await client.get(validated_url)
+            response_time_ms = (time.monotonic() - start) * 1000
+            if response.status_code < 500:
+                probe_status, error = "ok", None
+            else:
+                probe_status, error = "degraded", f"HTTP {response.status_code}"
 
-                if response.status_code < 500:
-                    status = "ok"
-                    error = None
-                else:
-                    status = "degraded"
-                    error = f"HTTP {response.status_code}"
-
-                results.append(
-                    ExternalAPIHealth(
-                        name=api["name"],
-                        url=api["url"],
-                        status=status,
-                        response_time_ms=round(response_time, 2),
-                        error=error,
-                    )
+            results.append(
+                ExternalAPIHealth(
+                    name=api["name"],
+                    url=api["url"],
+                    status=probe_status,
+                    response_time_ms=round(response_time_ms, 2),
+                    error=error,
                 )
+            )
         except Exception as e:
-            response_time = (time.time() - start) * 1000
+            response_time_ms = (time.monotonic() - start) * 1000
             results.append(
                 ExternalAPIHealth(
                     name=api["name"],
                     url=api["url"],
                     status="error",
-                    response_time_ms=round(response_time, 2),
+                    response_time_ms=round(response_time_ms, 2),
                     error=str(e),
                 )
             )
 
+    with _external_api_probes_lock:
+        _external_api_cache = (time.monotonic(), results)
     return results
 
 
 def _check_sqlite_connections(request: Request) -> SQLiteConnectionsInfo:
-    """Check active SQLite connections."""
+    """Check the download queue repository's persistent SQLite connection.
+
+    ``SessionStore`` opens per-operation connections and therefore exposes no
+    persistent handle to inspect.
+    """
     download_queue_conn = 0
-    session_store_conn = 0
 
     try:
         download_queue = getattr(request.app.state, "download_queue", None)
-        if download_queue and hasattr(download_queue, "repository"):
+        if download_queue is not None and hasattr(download_queue, "repository"):
             # Connection is active if repository exists and has _conn
             repository = download_queue.repository
             download_queue_conn = 1 if getattr(repository, "_conn", None) else 0
     except Exception as exc:
         logger.debug("Failed to inspect download queue SQLite connection: %s", exc)
 
-    try:
-        from core.session_store import SessionStore
-
-        session_store = SessionStore()
-        session_store_conn = 1 if getattr(session_store, "_conn", None) else 0
-    except Exception as exc:
-        logger.debug("Failed to inspect session store SQLite connection: %s", exc)
-
     return SQLiteConnectionsInfo(
         download_queue_connections=download_queue_conn,
-        session_store_connections=session_store_conn,
-        healthy=download_queue_conn > 0 or session_store_conn > 0,
+        healthy=download_queue_conn > 0,
     )
 
 
@@ -427,18 +426,17 @@ async def reveal_file(
             detail={"error": "Path is required", "code": ErrorCode.PATH_REQUIRED},
         )
 
-    path = Path(data.path).resolve()
     allowed_base = Path(config.OUTPUT_DIR).resolve()
     try:
-        path.relative_to(allowed_base)
-    except ValueError:
+        path = validate_file_path(data.path, base_dir=allowed_base)
+    except ValidationError as exc:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail={
                 "error": "Path outside output directory",
                 "code": ErrorCode.PATH_OUTSIDE_OUTPUT_DIR,
             },
-        )
+        ) from exc
     if not path.exists():
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

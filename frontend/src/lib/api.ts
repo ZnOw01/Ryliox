@@ -181,6 +181,9 @@ export async function authenticateAdmin(token: string): Promise<void> {
 }
 
 function combineSignals(...signals: AbortSignal[]): AbortSignal {
+  if (typeof AbortSignal.any === 'function') {
+    return AbortSignal.any(signals);
+  }
   const controller = new AbortController();
   for (const signal of signals) {
     if (signal.aborted) {

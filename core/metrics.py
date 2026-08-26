@@ -2,17 +2,7 @@
 
 from __future__ import annotations
 
-import asyncio
-import logging
 import os
-import time
-from contextlib import contextmanager
-from typing import TYPE_CHECKING, Any
-
-if TYPE_CHECKING:
-    from collections.abc import Iterator
-
-logger = logging.getLogger(__name__)
 
 try:
     from prometheus_client import (
@@ -107,14 +97,6 @@ class MetricsManager:
             registry=self._registry,
         )
 
-        # Error metrics
-        self.errors_total: Counter = Counter(
-            "errors_total",
-            "Total errors by type",
-            ["error_type", "component"],
-            registry=self._registry,
-        )
-
         # Rate limiting metrics
         self.rate_limit_hits: Counter = Counter(
             "rate_limit_hits_total",
@@ -133,27 +115,6 @@ class MetricsManager:
         self.active_downloads: Gauge = Gauge(
             "active_downloads",
             "Number of currently active downloads",
-            registry=self._registry,
-        )
-
-        # System metrics
-        self.sqlite_connections: Gauge = Gauge(
-            "sqlite_connections_active",
-            "Number of active SQLite connections",
-            registry=self._registry,
-        )
-
-        self.disk_usage_bytes: Gauge = Gauge(
-            "disk_usage_bytes",
-            "Current disk usage in bytes",
-            ["path"],
-            registry=self._registry,
-        )
-
-        self.disk_free_bytes: Gauge = Gauge(
-            "disk_free_bytes",
-            "Available disk space in bytes",
-            ["path"],
             registry=self._registry,
         )
 
@@ -207,11 +168,6 @@ class MetricsManager:
                 duration_seconds
             )
 
-    def record_error(self, error_type: str, component: str) -> None:
-        """Record an error."""
-        if self._enabled:
-            self.errors_total.labels(error_type=error_type, component=component).inc()
-
     def record_rate_limit_hit(self, endpoint: str) -> None:
         """Record a rate limit hit."""
         if self._enabled:
@@ -227,25 +183,6 @@ class MetricsManager:
         if self._enabled:
             self.active_downloads.set(count)
 
-    def set_sqlite_connections(self, count: int) -> None:
-        """Set the number of active SQLite connections."""
-        if self._enabled:
-            self.sqlite_connections.set(count)
-
-    def update_disk_usage(self, path: str) -> None:
-        """Update disk usage metrics for a path."""
-        if not self._enabled:
-            return
-
-        try:
-            import shutil
-
-            usage = shutil.disk_usage(path)
-            self.disk_usage_bytes.labels(path=path).set(usage.used)
-            self.disk_free_bytes.labels(path=path).set(usage.free)
-        except Exception as exc:
-            logger.debug("Failed to update disk usage metrics for %s: %s", path, exc)
-
     def generate_metrics(self) -> tuple[bytes, str]:
         """Generate Prometheus metrics output."""
         if not self._enabled:
@@ -256,52 +193,3 @@ class MetricsManager:
 
 # Global metrics manager instance
 metrics = MetricsManager()
-
-
-@contextmanager
-def timed_download(fmt: str) -> Iterator[None]:
-    """Context manager for timing downloads."""
-    start_time = time.time()
-    metrics.record_download_started(fmt)
-    try:
-        yield
-        duration = time.time() - start_time
-        metrics.record_download_completed(fmt, duration)
-    except asyncio.CancelledError:
-        metrics.record_download_cancelled()
-        raise
-    except Exception as e:
-        duration = time.time() - start_time
-        error_type = type(e).__name__
-        metrics.record_download_failed(fmt, error_type)
-        raise
-
-
-class AsyncTimedDownload:
-    """Async context manager for timing downloads."""
-
-    def __init__(self, fmt: str):
-        self.fmt = fmt
-        self.start_time: float = 0
-
-    async def __aenter__(self) -> AsyncTimedDownload:
-        """Enter the async context."""
-        self.start_time = time.time()
-        metrics.record_download_started(self.fmt)
-        return self
-
-    async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
-        """Exit the async context."""
-        if exc_type is None:
-            duration = time.time() - self.start_time
-            metrics.record_download_completed(self.fmt, duration)
-        elif exc_type is asyncio.CancelledError:
-            metrics.record_download_cancelled()
-        else:
-            error_type = exc_type.__name__ if exc_type else "Unknown"
-            metrics.record_download_failed(self.fmt, error_type)
-
-
-def async_timed_download(fmt: str) -> AsyncTimedDownload:
-    """Create an async timed download context manager."""
-    return AsyncTimedDownload(fmt)

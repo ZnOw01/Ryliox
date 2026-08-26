@@ -11,6 +11,8 @@ Tests cover:
 
 from __future__ import annotations
 
+import os
+import time
 from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -243,6 +245,65 @@ class TestDownloadQueue:
         )
 
         assert response.status_code == 422  # Validation error
+
+
+@pytest.mark.integration
+class TestDownloadNoUnmanagedCleanup:
+    """The download endpoint must never schedule global file cleanup.
+
+    Queuing a download must not delete PDFs/EPUBs placed in the output
+    directory by the user, a manual export or another application.
+    """
+
+    def _queue_download(self, test_client, mock_kernel, temp_dir):
+        mock_kernel._plugins["output"].validate_dir = MagicMock(
+            return_value=(True, None, str(temp_dir))
+        )
+        mock_kernel._plugins["downloader"].parse_formats = MagicMock(return_value=["epub"])
+
+        return test_client.post(
+            "/api/download",
+            json={
+                "book_id": "urn:orm:book:a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6",
+                "format": ["epub"],
+                "output_dir": str(temp_dir),
+            },
+            headers={"Origin": "http://testserver"},
+        )
+
+    def test_download_preserves_old_unmanaged_files(
+        self, test_client: TestClient, mock_kernel, mock_download_queue, temp_dir
+    ):
+        """Old unmanaged PDF/EPUB files in output_dir must survive a download request."""
+        old_pdf = temp_dir / "unrelated-old.pdf"
+        old_epub = temp_dir / "unrelated-old.epub"
+        old_pdf.write_text("old pdf")
+        old_epub.write_text("old epub")
+        old_time = time.time() - 25 * 3600
+        os.utime(old_pdf, (old_time, old_time))
+        os.utime(old_epub, (old_time, old_time))
+
+        response = self._queue_download(test_client, mock_kernel, temp_dir)
+
+        assert response.status_code == 200
+        mock_kernel._plugins["output"].validate_dir.assert_called_once_with(str(temp_dir))
+        assert old_pdf.exists(), "download endpoint deleted an unmanaged old PDF"
+        assert old_epub.exists(), "download endpoint deleted an unmanaged old EPUB"
+
+    def test_download_does_not_schedule_cleanup_old_files_task(
+        self,
+        test_client: TestClient,
+        mock_kernel,
+        mock_download_queue,
+        temp_dir,
+    ):
+        """The retired global cleanup helper must not remain reachable."""
+        from web.routes import downloads as downloads_routes
+
+        response = self._queue_download(test_client, mock_kernel, temp_dir)
+
+        assert response.status_code == 200
+        assert not hasattr(downloads_routes, "cleanup_old_files_task")
 
 
 @pytest.mark.integration

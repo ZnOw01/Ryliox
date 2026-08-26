@@ -3,41 +3,32 @@
 from __future__ import annotations
 
 import asyncio
-import hashlib
 import logging
-import threading
 import time
 from collections import OrderedDict
 from dataclasses import dataclass, field
-from functools import wraps
-from typing import TYPE_CHECKING, Any, Generic, TypeVar
+from typing import Any, Generic, TypeVar
 
-if TYPE_CHECKING:
-    from collections.abc import Callable
+import config
 
 logger = logging.getLogger(__name__)
 
-T = TypeVar("T")
 K = TypeVar("K")
 V = TypeVar("V")
 
 
 @dataclass
-class CacheEntry(Generic[T]):
+class CacheEntry(Generic[V]):
     """Cache entry with TTL support."""
 
-    value: T
+    value: V
     created_at: float = field(default_factory=time.monotonic)
     expires_at: float | None = None
-    access_count: int = 0
 
     def is_expired(self) -> bool:
         if self.expires_at is None:
             return False
         return time.monotonic() > self.expires_at
-
-    def touch(self) -> None:
-        self.access_count += 1
 
 
 class LRUCache(Generic[K, V]):
@@ -75,7 +66,6 @@ class LRUCache(Generic[K, V]):
                 return None
 
             self._cache.move_to_end(key)
-            entry.touch()
             self._hits += 1
             return entry.value
 
@@ -204,168 +194,22 @@ class LRUCache(Generic[K, V]):
         return True
 
 
-class SimpleSyncLRUCache(Generic[K, V]):
-    """Synchronous LRU cache for use in sync contexts."""
-
-    def __init__(self, maxsize: int = 128, default_ttl: float | None = None):
-        if not isinstance(maxsize, int) or maxsize < 1:
-            raise ValueError(f"maxsize must be a positive integer, got {maxsize!r}")
-        self.maxsize = maxsize
-        self.default_ttl = default_ttl
-        self._cache: OrderedDict[K, CacheEntry[V]] = OrderedDict()
-        self._lock = threading.Lock()
-        self._hits = 0
-        self._misses = 0
-
-    def get(self, key: K) -> V | None:
-        """Get value from cache."""
-        with self._lock:
-            entry = self._cache.get(key)
-            if entry is None:
-                self._misses += 1
-                return None
-
-            if entry.is_expired():
-                del self._cache[key]
-                self._misses += 1
-                return None
-
-            self._cache.move_to_end(key)
-            entry.touch()
-            self._hits += 1
-            return entry.value
-
-    def set(self, key: K, value: V, ttl: float | None = None, allow_update: bool = True) -> None:
-        """Set value in cache."""
-        with self._lock:
-            if key in self._cache and not allow_update:
-                return
-
-            expires_at = None
-            if ttl is not None:
-                expires_at = time.monotonic() + ttl
-            elif self.default_ttl is not None:
-                expires_at = time.monotonic() + self.default_ttl
-
-            entry = CacheEntry(value=value, expires_at=expires_at)
-
-            if key in self._cache:
-                del self._cache[key]
-
-            self._cache[key] = entry
-
-            while len(self._cache) > self.maxsize:
-                self._cache.popitem(last=False)
-
-    def delete(self, key: K) -> bool:
-        """Delete key from cache."""
-        with self._lock:
-            if key in self._cache:
-                del self._cache[key]
-                return True
-            return False
-
-    def clear(self) -> None:
-        """Clear cache."""
-        with self._lock:
-            self._cache.clear()
-            self._hits = 0
-            self._misses = 0
-
-    def cleanup_expired(self) -> int:
-        """Clean expired entries."""
-        with self._lock:
-            expired_keys = [k for k, v in self._cache.items() if v.is_expired()]
-            for k in expired_keys:
-                del self._cache[k]
-            return len(expired_keys)
-
-    def get_stats(self) -> dict[str, Any]:
-        """Get cache stats."""
-        with self._lock:
-            total = self._hits + self._misses
-            hit_rate = self._hits / total if total > 0 else 0.0
-            return {
-                "size": len(self._cache),
-                "maxsize": self.maxsize,
-                "hits": self._hits,
-                "misses": self._misses,
-                "hit_rate": round(hit_rate, 4),
-            }
-
-
-def cached(
-    cache_instance: LRUCache[Any, Any],
-    key_func: Callable[..., str] | None = None,
-    ttl: float | None = None,
-) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
-    """Decorator to cache async function results."""
-    _key_delim = "\x00"
-
-    def _make_key(func_name: str, args: tuple[Any, ...], kwargs: dict[str, Any]) -> str:
-        key_parts: list[str] = [func_name]
-        key_parts.extend(str(arg) for arg in args)
-        key_parts.extend(f"{k}={v}" for k, v in sorted(kwargs.items()))
-        return hashlib.sha256(_key_delim.join(key_parts).encode()).hexdigest()[:32]
-
-    def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
-        if not asyncio.iscoroutinefunction(func):
-            raise TypeError(
-                f"@cached decorator only supports async functions. '{func.__name__}' is not a coroutine function."
-            )
-
-        @wraps(func)
-        async def wrapper(*args: Any, **kwargs: Any) -> Any:
-            if key_func:
-                cache_key = key_func(*args, **kwargs)
-            else:
-                cache_key = _make_key(func.__name__, args, kwargs)
-
-            cached_value = await cache_instance.get(cache_key)
-            if cached_value is not None:
-                logger.debug("Cache hit for %s (key=%s)", func.__name__, cache_key)
-                return cached_value
-
-            result = await func(*args, **kwargs)
-            await cache_instance.set(cache_key, result, ttl=ttl)
-            logger.debug("Cache miss for %s (key=%s)", func.__name__, cache_key)
-
-            return result
-
-        wrapped: Any = wrapper
-        wrapped.cache = cache_instance
-        wrapped.cache_key = lambda *a, **kw: (
-            key_func(*a, **kw) if key_func else _make_key(func.__name__, a, kw)
-        )
-
-        return wrapped
-
-    return decorator
-
-
-def make_cache_key(*args: Any, **kwargs: Any) -> str:
-    """Generate a deterministic cache key from arguments."""
-    _key_delim = "\x00"
-    key_parts: list[str] = []
-    key_parts.extend(str(arg) for arg in args)
-    key_parts.extend(f"{k}={v}" for k, v in sorted(kwargs.items()))
-    return hashlib.sha256(_key_delim.join(key_parts).encode()).hexdigest()[:32]
-
-
-# Global cache instances
+# Global cache instances — sized/TTLed from config.CacheSettings so
+# RYLIOX_CACHE__* environment overrides apply.
+_cache_settings = config.SETTINGS.cache
 _book_metadata_cache: LRUCache[str, dict] = LRUCache(
-    maxsize=256,
-    default_ttl=3600.0,
+    maxsize=_cache_settings.books_maxsize,
+    default_ttl=float(_cache_settings.books_ttl),
     name="book_metadata",
 )
 _chapter_list_cache: LRUCache[str, list] = LRUCache(
-    maxsize=128,
-    default_ttl=1800.0,
+    maxsize=_cache_settings.chapters_maxsize,
+    default_ttl=float(_cache_settings.chapters_ttl),
     name="chapter_list",
 )
 _search_results_cache: LRUCache[str, list] = LRUCache(
-    maxsize=64,
-    default_ttl=300.0,
+    maxsize=_cache_settings.search_maxsize,
+    default_ttl=float(_cache_settings.search_ttl),
     name="search_results",
 )
 
@@ -385,29 +229,11 @@ def get_search_results_cache() -> LRUCache[str, list]:
     return _search_results_cache
 
 
-async def invalidate_book_cache(book_id: str) -> int:
-    """Invalidate all cached data for a specific book."""
-    book_cache = get_book_metadata_cache()
-    chapter_cache = get_chapter_list_cache()
-
-    book_deleted = await book_cache.delete(f"book:{book_id}")
-    book_prefix = await book_cache.invalidate_by_prefix(f"book:{book_id}:")
-    chapters_deleted = await chapter_cache.delete(f"chapters:{book_id}")
-    chapter_prefix = await chapter_cache.invalidate_by_prefix(f"chapters:{book_id}:")
-
-    total = book_deleted + book_prefix + chapters_deleted + chapter_prefix
-    if total > 0:
-        logger.info("Invalidated %d cache entries for book %s", total, book_id)
-    return total
-
-
-async def get_cache_stats() -> dict[str, Any]:
-    """Get statistics for all global caches."""
-    return {
-        "book_metadata": await get_book_metadata_cache().get_stats(),
-        "chapter_list": await get_chapter_list_cache().get_stats(),
-        "search_results": await get_search_results_cache().get_stats(),
-    }
+async def clear_all_caches() -> None:
+    """Clear all global caches (books, chapters, search)."""
+    await get_book_metadata_cache().clear()
+    await get_chapter_list_cache().clear()
+    await get_search_results_cache().clear()
 
 
 async def start_all_cleanup_tasks(interval: float = 60.0) -> None:

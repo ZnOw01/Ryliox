@@ -120,18 +120,6 @@ class DownloadProgressMapper(JSONMapperMixin):
 
         return data
 
-    def to_dto(self, row: DbRow) -> DownloadProgressDTO:
-        """Convert DB row to DTO."""
-        return DownloadProgressDTO(
-            status=str(row.get("status", "queued")),
-            percentage=int(row.get("percentage", 0) or 0),
-            message=str(row.get("message", "") or ""),
-            eta_seconds=row.get("eta_seconds"),
-            current_chapter=int(row.get("current_chapter", 0) or 0),
-            total_chapters=int(row.get("total_chapters", 0) or 0),
-            chapter_title=str(row.get("chapter_title", "") or ""),
-        )
-
 
 class DownloadResultMapper(JSONMapperMixin):
     """Mapper for DownloadResultDTO <-> SQLite row."""
@@ -157,20 +145,6 @@ class DownloadResultMapper(JSONMapperMixin):
             "updated_at": time.time(),
         }
 
-    def to_dto(self, row: DbRow) -> DownloadResultDTO:
-        """Convert DB row to DTO."""
-        pdf_value = self._json_loads(row.get("pdf_json"), "pdf_json")
-        if pdf_value is None and row.get("pdf_json") is not None:
-            pdf_value = row["pdf_json"]
-
-        return DownloadResultDTO(
-            book_id=str(row.get("book_id", "")),
-            title=str(row.get("title", "")),
-            epub_path=row.get("epub"),
-            pdf_paths=pdf_value,
-            chapters_count=int(row.get("total_chapters", 0) or 0),
-        )
-
 
 class DownloadErrorMapper(JSONMapperMixin):
     """Mapper for DownloadErrorDTO <-> SQLite row."""
@@ -188,26 +162,9 @@ class DownloadErrorMapper(JSONMapperMixin):
             "message": None,
         }
 
-    def to_dto(self, row: DbRow) -> DownloadErrorDTO:
-        """Convert DB row to DTO."""
-        details = self._json_loads(row.get("details_json"), "details_json")
-
-        return DownloadErrorDTO(
-            error=str(row.get("error", "")),
-            code=str(row.get("code", "unknown_error")),
-            details=details,
-            trace_log=row.get("trace_log"),
-        )
-
 
 class JobSnapshotMapper(JSONMapperMixin):
-    """Mapper for JobSnapshotDTO <-> SQLite row."""
-
-    def __init__(self):
-        self.job_mapper = DownloadJobMapper()
-        self.progress_mapper = DownloadProgressMapper()
-        self.result_mapper = DownloadResultMapper()
-        self.error_mapper = DownloadErrorMapper()
+    """Mapper for JobSnapshotDTO <-> SQLite row (API response shape)."""
 
     def to_dto(
         self,
@@ -249,14 +206,3 @@ class JobSnapshotMapper(JSONMapperMixin):
         """Convert DB row directly to dict (API response)."""
         snapshot = self.to_dto(row, queue_position)
         return snapshot.to_dict()
-
-
-def get_mappers() -> dict[str, Any]:
-    """Return dict with all mapper instances."""
-    return {
-        "job": DownloadJobMapper(),
-        "progress": DownloadProgressMapper(),
-        "result": DownloadResultMapper(),
-        "error": DownloadErrorMapper(),
-        "snapshot": JobSnapshotMapper(),
-    }

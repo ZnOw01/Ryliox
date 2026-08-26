@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import re
 from urllib.parse import quote
@@ -16,8 +17,13 @@ _HIGH_RES_COVER_WIDTH = "1200w"
 logger = logging.getLogger(__name__)
 
 
-def _book_urn(book_id: str) -> str:
+def book_urn(book_id: str) -> str:
     return book_id if book_id.startswith("urn:orm:book:") else f"urn:orm:book:{book_id}"
+
+
+def _cover_url(book_id: str) -> str:
+    """Canonical library cover URL for a book id."""
+    return f"{config.BASE_URL}/library/cover/{book_id}/"
 
 
 def _upgrade_cover_url(url: str) -> str:
@@ -35,8 +41,11 @@ def _upgrade_cover_url(url: str) -> str:
 
 class BookPlugin(Plugin):
     async def fetch(self, book_id: str) -> dict:
-        search_data = await self._fetch_search(book_id)
-        epub_data = await self._fetch_epub(book_id)
+        # The search and EPUB endpoints are independent; fetch both through
+        # the rate-limited client concurrently.
+        search_data, epub_data = await asyncio.gather(
+            self._fetch_search(book_id), self._fetch_epub(book_id)
+        )
 
         authors = list(search_data.get("authors", []))
         publishers = list(search_data.get("publishers", []))
@@ -55,7 +64,7 @@ class BookPlugin(Plugin):
                 cover_url = file_cover
 
         if not cover_url and book_id:
-            cover_url = f"https://learning.oreilly.com/library/cover/{book_id}/"
+            cover_url = _cover_url(book_id)
         if cover_url:
             cover_url = _upgrade_cover_url(cover_url)
 
@@ -79,39 +88,43 @@ class BookPlugin(Plugin):
 
     async def _extract_epub_metadata(self, book_id: str) -> tuple[list[str], list[str], str | None]:
         """Scrape sparse metadata from the EPUB's static HTML files."""
+        fetched = await asyncio.gather(
+            self._fetch_epub_file(book_id, "titlepage01.html"),
+            self._fetch_epub_file(book_id, "copyright-page01.html"),
+            self._fetch_epub_file(book_id, "cover.html"),
+            return_exceptions=True,
+        )
+        pages: list[str] = []
+        for label, result in zip(("title-page", "copyright", "cover"), fetched):
+            if isinstance(result, BaseException):
+                logger.debug("Could not extract %s metadata for %s: %s", label, book_id, result)
+                pages.append("")
+            else:
+                pages.append(result)
+        title_html, copyright_html, cover_html = pages
+
         authors: list[str] = []
-        publishers: list[str] = []
+        for match in re.finditer(r'<p class="author">([^<]+)</p>', title_html):
+            raw = match.group(1).strip()
+            # Split on the Spanish/English " y " conjunction, then split
+            # any remaining "Last, First" pairs on commas.
+            authors = []
+            for chunk in re.split(r"\s+y\s+", raw):
+                for sub in chunk.split(","):
+                    sub = sub.strip()
+                    if sub:
+                        authors.append(sub)
+
+        publisher_names = re.findall(r'<span class="publishername">([^<]+)</span>', copyright_html)
+        publishers = [publisher_names[-1].strip()] if publisher_names else []
+
         cover_url: str | None = None
-        try:
-            title_html = await self._fetch_epub_file(book_id, "titlepage01.html")
-            for match in re.finditer(r'<p class="author">([^<]+)</p>', title_html):
-                raw = match.group(1).strip()
-                # Split on the Spanish/English " y " conjunction, then split
-                # any remaining "Last, First" pairs on commas.
-                authors = []
-                for chunk in re.split(r"\s+y\s+", raw):
-                    for sub in chunk.split(","):
-                        sub = sub.strip()
-                        if sub:
-                            authors.append(sub)
-        except Exception as exc:
-            logger.debug("Could not extract title-page metadata for %s: %s", book_id, exc)
-        try:
-            copyright_html = await self._fetch_epub_file(book_id, "copyright-page01.html")
-            for match in re.finditer(r'<span class="publishername">([^<]+)</span>', copyright_html):
-                publishers = [match.group(1).strip()]
-        except Exception as exc:
-            logger.debug("Could not extract copyright metadata for %s: %s", book_id, exc)
-        try:
-            cover_html = await self._fetch_epub_file(book_id, "cover.html")
-            for match in re.finditer(r'<img\s+src="([^"]+)"', cover_html):
-                src = match.group(1)
-                if not src.startswith("http"):
-                    src = f"https://learning.oreilly.com{src}"
-                cover_url = src
-                break
-        except Exception as exc:
-            logger.debug("Could not extract cover metadata for %s: %s", book_id, exc)
+        for match in re.finditer(r'<img\s+src="([^"]+)"', cover_html):
+            src = match.group(1)
+            if not src.startswith("http"):
+                src = f"{config.BASE_URL}{src}"
+            cover_url = src
+            break
         return authors, publishers, cover_url
 
     async def _fetch_search(self, book_id: str) -> dict:
@@ -129,7 +142,7 @@ class BookPlugin(Plugin):
                         "archive_id": book_id,
                         "title": epub_data.get("title"),
                         "authors": epub_data.get("authors", []),
-                        "cover_url": f"https://learning.oreilly.com/library/cover/{book_id}/",
+                        "cover_url": _cover_url(book_id),
                         "publishers": epub_data.get("publishers", []),
                         "content_format": epub_data.get("content_format", "book"),
                     }
@@ -138,11 +151,11 @@ class BookPlugin(Plugin):
         return {}
 
     async def _fetch_epub(self, book_id: str) -> dict:
-        url = f"{config.API_V2}/epubs/{quote(_book_urn(book_id), safe=':')}/"
+        url = f"{config.API_V2}/epubs/{quote(book_urn(book_id), safe=':')}/"
         return await self.http.get_json(url)
 
     async def _fetch_epub_file(self, book_id: str, relative_path: str) -> str:
-        url = f"{config.API_V2}/epubs/{quote(_book_urn(book_id), safe=':')}/files/{quote(relative_path, safe='/')}"
+        url = f"{config.API_V2}/epubs/{quote(book_urn(book_id), safe=':')}/files/{quote(relative_path, safe='/')}"
         return await self.http.get_text(url)
 
     async def search(self, query: str, limit: int = 10) -> list[dict]:
@@ -177,7 +190,7 @@ class BookPlugin(Plugin):
                             "id": query,
                             "title": epub_data.get("title"),
                             "authors": epub_data.get("authors", []),
-                            "cover_url": f"https://learning.oreilly.com/library/cover/{query}/",
+                            "cover_url": _cover_url(query),
                             "publishers": epub_data.get("publishers", []),
                         }
                     )

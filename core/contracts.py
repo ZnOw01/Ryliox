@@ -8,6 +8,10 @@ data exchange regardless of the client.
 from typing import TypedDict
 
 
+class DownloadCancelledError(Exception):
+    """Raised when a download job is cancelled by user request."""
+
+
 class ChapterInfo(TypedDict):
     """Full chapter metadata returned by ChaptersPlugin.fetch_list()."""
 
