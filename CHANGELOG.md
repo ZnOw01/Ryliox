@@ -6,6 +6,23 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Security
+- **Same-Origin header spoofing protection**: validated that `X-Forwarded-*` headers are only respected when originating from an authorized local proxy or loopback host.
+- **Admin authentication hardening**: dynamic per-request loopback checks and strict validation preventing empty bearer token bypass.
+- **Cryptographic audit log integrity**: upgraded HMAC integrity digest to full 64-character SHA-256 (256-bit).
+- **DoS defense**: bounded in-memory rate limiter capacity with LRU eviction.
+- **SSRF protection**: enforced URL validation on external API health check probes.
+
+### Added
+- **Standalone Locust load testing**: created `tests/performance/locustfile.py` for isolated CLI benchmarking without polluting pytest test discovery.
+- **Environment variable aliases**: supported flat standard UNIX variables (`PORT`, `HOST`, `LOG_LEVEL`, `OUTPUT_DIR`, etc.) via Pydantic `AliasChoices`.
+- **CI Python matrix**: added test matrix for Python 3.11, 3.12, and 3.13.
+
+### Fixed
+- **Test suite stability**: isolated `gevent` from pytest collection, eliminating test suite timeouts and hangs.
+- **Launcher environment verification**: aligned `_ALLOWED_RUNTIME_PACKAGES` with `pyproject.toml` runtime dependencies, resolving infinite virtual environment re-creation loops.
+- **Frontend accessibility & dark mode**: eliminated hardcoded gray styles in `Button.tsx` and `Badge.tsx`, added WAI-ARIA arrow key navigation to `FormatSelector.tsx`, and message cycling in `AriaLiveRegion.tsx`.
+- **SSE streaming optimization**: eliminated unnecessary stream tear-down on status transitions in `useDownloadManager.ts`.
 ### Changed
 - **Unified architecture**: replaced the stdlib `http.server` implementation in
   `web/server.py` with a single FastAPI application. All routes from
