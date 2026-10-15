@@ -1,41 +1,30 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen } from '@testing-library/react';
 
-import { SearchBooksCard } from '../SearchBooksCard';
+import { queryKeys } from '../../lib/query-keys';
 import { useBookStore } from '../../store/book-store';
+import { SearchBooksCard } from '../SearchBooksCard';
 
-vi.mock('../../lib/use-debounced-value', () => ({
-  useDebouncedValue: <T,>(value: T) => value,
-}));
-
-vi.mock('@tanstack/react-query', async () => {
-  const actual =
-    await vi.importActual<typeof import('@tanstack/react-query')>('@tanstack/react-query');
-  return {
-    ...actual,
-    useQueryClient: vi.fn(() => ({
-      invalidateQueries: vi.fn(),
-      removeQueries: vi.fn(),
-      setQueryData: vi.fn(),
-    })),
-    useQuery: vi.fn((options: { enabled?: boolean }) => ({
-      data: options.enabled
-        ? {
-            results: [
-              {
-                id: '9781',
-                title: 'Python limpio',
-                authors: ['Autor Demo'],
-                publishers: ["O'Reilly"],
-              },
-            ],
-          }
-        : undefined,
-      error: null,
-      isPending: false,
-      isFetching: false,
-    })),
-  };
-});
+function renderSearchCard() {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { gcTime: Infinity, retry: false } },
+  });
+  queryClient.setQueryData(queryKeys.search.byQuery('python'), {
+    results: [
+      {
+        id: '9781',
+        title: 'Python limpio',
+        authors: ['Autor Demo'],
+        publishers: ["O'Reilly"],
+      },
+    ],
+  });
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <SearchBooksCard />
+    </QueryClientProvider>
+  );
+}
 
 describe('SearchBooksCard', () => {
   beforeEach(() => {
@@ -44,7 +33,7 @@ describe('SearchBooksCard', () => {
   });
 
   it('renders an accessible search box and listbox options', async () => {
-    render(<SearchBooksCard />);
+    renderSearchCard();
 
     const input = screen.getByRole('combobox', { name: /buscar libros/i });
     fireEvent.change(input, { target: { value: 'python' } });
@@ -55,7 +44,7 @@ describe('SearchBooksCard', () => {
   });
 
   it('marks the selected option with aria-selected', () => {
-    render(<SearchBooksCard />);
+    renderSearchCard();
 
     const input = screen.getByRole('combobox', { name: /buscar libros/i });
     fireEvent.change(input, { target: { value: 'python' } });

@@ -1,5 +1,6 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import type { QueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { motion } from 'framer-motion';
 import {
@@ -20,7 +21,7 @@ import {
 import { parseApiError } from '../lib/api-error';
 import { getBookChapters, getBookInfo, getFormats, searchBooks } from '../lib/api';
 import { queryKeys } from '../lib/query-keys';
-import type { SearchBook } from '../lib/types';
+import type { SearchBook, SearchResponse } from '../lib/types';
 import { useDebouncedValue } from '../lib/use-debounced-value';
 import { useBookStore } from '../store/book-store';
 import { cn } from '../lib/cn';
@@ -79,6 +80,59 @@ type SearchScope = 'all' | 'title' | 'author' | 'publisher';
 const SEARCH_DEBOUNCE_MS = 350;
 const SEARCH_STALE_TIME_MS = 30000;
 const PREFETCH_STALE_TIME_MS = 2 * 60 * 1000;
+
+function hasSearchResponseShape(value: unknown): boolean {
+  if (
+    typeof value !== 'object' ||
+    value === null ||
+    Array.isArray(value) ||
+    !('results' in value)
+  ) {
+    return false;
+  }
+
+  const results = value.results;
+  if (!Array.isArray(results)) return false;
+
+  return results.every((entry: unknown) => {
+    if (typeof entry !== 'object' || entry === null || Array.isArray(entry)) return false;
+
+    if (
+      !('id' in entry) ||
+      typeof entry.id !== 'string' ||
+      !('title' in entry) ||
+      typeof entry.title !== 'string'
+    ) {
+      return false;
+    }
+
+    const authors = 'authors' in entry ? entry.authors : undefined;
+    const publishers = 'publishers' in entry ? entry.publishers : undefined;
+    const hasValidAuthors =
+      authors === undefined ||
+      authors === null ||
+      (Array.isArray(authors) && authors.every((author: unknown) => typeof author === 'string'));
+    const hasValidPublishers =
+      publishers === undefined ||
+      publishers === null ||
+      (Array.isArray(publishers) &&
+        publishers.every((publisher: unknown) => typeof publisher === 'string'));
+
+    return hasValidAuthors && hasValidPublishers;
+  });
+}
+
+function getFreshCachedSearchQuery(query: string, queryClient: QueryClient): string | null {
+  if (!query) return null;
+
+  const state = queryClient.getQueryState<SearchResponse>(queryKeys.search.byQuery(query));
+  if (state?.status !== 'success' || state.isInvalidated || !hasSearchResponseShape(state.data)) {
+    return null;
+  }
+
+  const ageMs = Date.now() - state.dataUpdatedAt;
+  return ageMs >= 0 && ageMs < SEARCH_STALE_TIME_MS ? query : null;
+}
 
 /**
  * Detect if the query is a direct book reference:
@@ -176,6 +230,7 @@ export function SearchBooksCard() {
 
   const normalizedQuery = queryInput.trim();
   const debouncedQuery = useDebouncedValue(normalizedQuery, SEARCH_DEBOUNCE_MS);
+  const searchQueryTerm = getFreshCachedSearchQuery(normalizedQuery, queryClient) ?? debouncedQuery;
 
   // Keyboard shortcut to focus search
   useEffect(() => {
@@ -228,9 +283,9 @@ export function SearchBooksCard() {
   );
 
   const searchQuery = useQuery({
-    queryKey: queryKeys.search.byQuery(debouncedQuery),
-    queryFn: () => searchBooks(debouncedQuery),
-    enabled: debouncedQuery.length > 0,
+    queryKey: queryKeys.search.byQuery(searchQueryTerm),
+    queryFn: () => searchBooks(searchQueryTerm),
+    enabled: searchQueryTerm.length > 0,
     placeholderData: previousData => previousData,
     staleTime: SEARCH_STALE_TIME_MS,
   });
@@ -258,8 +313,8 @@ export function SearchBooksCard() {
     }
 
     const params = new URLSearchParams(window.location.search);
-    if (debouncedQuery) {
-      params.set('q', debouncedQuery);
+    if (searchQueryTerm) {
+      params.set('q', searchQueryTerm);
     } else {
       params.delete('q');
     }
@@ -282,7 +337,7 @@ export function SearchBooksCard() {
 
     const nextUrl = `${window.location.pathname}${search ? `?${search}` : ''}`;
     window.history.replaceState(null, '', nextUrl);
-  }, [debouncedQuery, scope]);
+  }, [searchQueryTerm, scope]);
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -366,12 +421,13 @@ export function SearchBooksCard() {
     return filtered;
   }, [normalizedQuery, scope, searchQuery.data?.results, directRef, bookInfoQuery.data]);
 
-  const parsedError = debouncedQuery && searchQuery.error ? parseApiError(searchQuery.error) : null;
+  const parsedError =
+    searchQueryTerm && searchQuery.error ? parseApiError(searchQuery.error) : null;
   const isSearching = Boolean(normalizedQuery) && (searchQuery.isPending || searchQuery.isFetching);
   const visibleResults = filteredResults;
   const resultCount = filteredResults.length;
   const hasStaleResults =
-    Boolean(normalizedQuery) && normalizedQuery !== debouncedQuery && visibleResults.length > 0;
+    Boolean(normalizedQuery) && normalizedQuery !== searchQueryTerm && visibleResults.length > 0;
 
   const handleSelectBook = (book: SearchBook) => {
     setSelectedBook(book);
@@ -913,14 +969,14 @@ export function SearchBooksCard() {
             </div>
           ) : null}
 
-          {debouncedQuery && !isSearching && !parsedError && visibleResults.length === 0 ? (
+          {searchQueryTerm && !isSearching && !parsedError && visibleResults.length === 0 ? (
             <EnhancedEmptyState
               type="generic"
               icon={Search}
               title={t('search.no_results_title', {
                 defaultValue: 'No results found',
               })}
-              description={t('search.no_results', { query: debouncedQuery })}
+              description={t('search.no_results', { query: searchQueryTerm })}
               variant="compact"
               action={{
                 label: t('search.clear'),
