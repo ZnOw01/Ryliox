@@ -8,12 +8,33 @@ Tests cover:
 - CORS (Cross-Origin Resource Sharing)
 - Authentication bypass
 - Input validation
+
+Run against a live server: ``TEST_BASE_URL=http://127.0.0.1:<port> pytest
+--run-security tests/security``. Start that server with
+``RATE_LIMIT_MAX_REQUESTS`` raised. The default limit (5 requests a minute on
+mutating endpoints) answers most of these requests with 429 before the check
+under test runs. A server without cookies answers the book routes with 401
+``auth_required``, which these tests accept.
 """
 
 from __future__ import annotations
 
+import http.client
+from urllib.parse import urlsplit
+
 import pytest
 import requests
+
+
+def _get_verbatim(base_url: str, path: str) -> int:
+    """GET ``path`` exactly as written. requests resolves ``..`` segments before sending."""
+    parts = urlsplit(base_url)
+    conn = http.client.HTTPConnection(parts.hostname, parts.port, timeout=10)
+    try:
+        conn.request("GET", path)
+        return conn.getresponse().status
+    finally:
+        conn.close()
 
 
 @pytest.mark.security
@@ -60,11 +81,10 @@ class TestPathTraversal:
         ]
 
         for book_id in traversal_ids:
-            response = requests.get(f"{base_url}/api/book/{book_id}")
+            status_code = _get_verbatim(base_url, f"/api/book/{book_id}")
 
-            # Should not succeed with 200 (might return 404 or error)
-            assert response.status_code in [400, 404, 422, 500], (
-                f"Book ID traversal attempt should not succeed, got {response.status_code}"
+            assert status_code in [400, 401, 404, 422], (
+                f"Book ID traversal attempt should not succeed, got {status_code}"
             )
 
 
@@ -90,7 +110,7 @@ class TestXSS:
             response = requests.get(f"{base_url}/api/search", params={"q": payload})
 
             # Request should be processed safely (200 or 400)
-            assert response.status_code in [200, 400, 422], (
+            assert response.status_code in [200, 400, 401, 422], (
                 f"XSS payload caused unexpected error: {response.status_code}"
             )
 
@@ -112,8 +132,8 @@ class TestXSS:
             f"{base_url}/api/cookies", json=xss_cookies, headers={"Origin": base_url}
         )
 
-        # Should handle gracefully
-        assert response.status_code in [200, 400, 422, 429]
+        # 401: the cookies were stored but O'Reilly rejected the session.
+        assert response.status_code in [200, 400, 401, 422, 429]
 
     def test_book_info_xss_injection(self, base_url: str):
         """Test that book metadata containing XSS is sanitized."""
@@ -153,8 +173,8 @@ class TestSQLInjection:
             response = requests.get(f"{base_url}/api/search", params={"q": payload})
 
             # Should handle gracefully without exposing database errors
-            assert response.status_code in [200, 400, 500], (
-                "SQL injection payload caused unexpected behavior"
+            assert response.status_code in [200, 400, 401], (
+                f"SQL injection payload caused unexpected behavior: {response.status_code}"
             )
 
             # Response should not contain SQL error messages
@@ -174,8 +194,7 @@ class TestSQLInjection:
         for book_id in sql_book_ids:
             response = requests.get(f"{base_url}/api/book/{book_id}")
 
-            # Should handle gracefully
-            assert response.status_code in [200, 400, 404, 500]
+            assert response.status_code in [200, 400, 401, 404]
 
             # Should not expose SQL errors
             response_text = response.text.lower()
@@ -193,8 +212,8 @@ class TestSQLInjection:
         for job_id in sql_job_ids:
             response = requests.get(f"{base_url}/api/progress?job_id={job_id}")
 
-            # Should handle gracefully
-            assert response.status_code in [200, 400]
+            # 404: no such job. The id is a lookup key, never interpolated into SQL.
+            assert response.status_code in [200, 400, 404]
 
 
 @pytest.mark.security
@@ -416,8 +435,7 @@ class TestInputValidation:
 
         for special in special_strings:
             response = requests.get(f"{base_url}/api/search?q={special}")
-            # Should handle gracefully
-            assert response.status_code in [200, 400, 500]
+            assert response.status_code in [200, 400, 401]
 
     def test_unicode_normalization(self, base_url: str):
         """Test handling of Unicode edge cases."""
@@ -431,7 +449,7 @@ class TestInputValidation:
 
         for unicode_str in unicode_strings:
             response = requests.get(f"{base_url}/api/search?q={unicode_str}")
-            assert response.status_code in [200, 400]
+            assert response.status_code in [200, 400, 401]
 
     def test_json_injection(self, base_url: str):
         """Test JSON injection attempts."""
@@ -500,13 +518,13 @@ class TestErrorHandlingSecurity:
 
         for method, endpoint in test_cases:
             if method == "GET":
-                response = requests.get(f"{base_url}{endpoint}")
+                status_code = _get_verbatim(base_url, endpoint)
             else:
-                response = requests.post(f"{base_url}{endpoint}")
+                status_code = requests.post(f"{base_url}{endpoint}").status_code
 
             # Should not return 200 for clearly invalid requests
             if endpoint.endswith("/") or ".." in endpoint:
-                assert response.status_code != 200, f"Invalid request to {endpoint} returned 200"
+                assert status_code != 200, f"Invalid request to {endpoint} returned 200"
 
 
 @pytest.mark.security
