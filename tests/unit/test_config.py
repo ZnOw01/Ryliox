@@ -177,3 +177,10 @@ def test_env_example_names_only_variables_that_have_an_effect():
 
 def test_env_example_matches_the_defaults():
     assert config.Settings(_env_file=ENV_EXAMPLE) == config.Settings(_env_file=None)
+
+
+def test_paths_expand_the_home_directory(monkeypatch, tmp_path):
+    # ``OUTPUT_DIR=~/Books`` in .env means the user's home, not a "~" folder in the repo.
+    monkeypatch.setenv("HOME", str(tmp_path))
+
+    assert config._resolve(Path("~/Books")) == (tmp_path / "Books").resolve()

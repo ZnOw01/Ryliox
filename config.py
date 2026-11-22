@@ -309,7 +309,7 @@ def request_headers(http: HttpSettings) -> dict[str, str]:
 
 
 def _resolve(path: Path) -> Path:
-    return (REPO_ROOT / path).resolve()
+    return (REPO_ROOT / path.expanduser()).resolve()
 
 
 SETTINGS: Settings = Settings()
