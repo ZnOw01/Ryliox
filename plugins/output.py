@@ -331,6 +331,18 @@ class OutputPlugin(Plugin):
         """Open the authorized root, verifying it still matches the cached identity."""
         try:
             st = self._authorized_root.stat()
+        except FileNotFoundError:
+            # The root is the user's own configured output directory; on a fresh
+            # install it does not exist yet, so create it instead of failing.
+            try:
+                self._authorized_root.mkdir(parents=True, exist_ok=True)
+                st = self._authorized_root.stat()
+            except OSError as exc:
+                raise ValueError(
+                    f"Authorized root is not accessible: {self._authorized_root}"
+                ) from exc
+            if self._root_identity is None:
+                self._root_identity = (st.st_dev, st.st_ino)
         except OSError as exc:
             raise ValueError(f"Authorized root is not accessible: {self._authorized_root}") from exc
         identity = (st.st_dev, st.st_ino)

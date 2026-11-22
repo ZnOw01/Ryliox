@@ -488,3 +488,17 @@ def test_cleanup_staging_does_not_delete_outside_on_concurrent_symlink_swap(
 
     assert (outside / "keep.txt").read_text(encoding="utf-8") == "keep"
     assert staging.is_symlink()
+
+
+def test_missing_authorized_root_is_created_on_first_use(tmp_path: Path):
+    # Fresh install: the configured output directory does not exist yet.
+    root = tmp_path / "fresh" / "output"
+    plugin = OutputPlugin(authorized_root=root)
+
+    valid, _message, resolved = plugin.validate_dir(root)
+    staging = plugin.create_staging_dir(output_dir=root, job_id="job-1")
+
+    assert valid is True
+    assert resolved == root
+    assert staging == root / ".ryliox-staging" / "job-1"
+    assert staging.is_dir()
