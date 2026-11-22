@@ -28,7 +28,7 @@ Sistema de diseño moderno y coherente para Ryliox, construido con los principio
 | `--brand-300` | `oklch(86% 0.09 20)` | Scrollbar |
 | `--brand-400` | `oklch(78% 0.14 20)` | Accent hover |
 | `--brand-500` | `oklch(68% 0.18 20)` | **Primary brand** |
-| `--brand-600` | `oklch(58% 0.20 20)` | Primary button |
+| `--brand-600` | `oklch(58% 0.2 20)` | Primary button |
 | `--brand-700` | `oklch(48% 0.18 20)` | Primary hover |
 | `--brand-800` | `oklch(40% 0.15 20)` | Text brand |
 | `--brand-900` | `oklch(32% 0.12 20)` | Deep brand |
@@ -38,53 +38,57 @@ Sistema de diseño moderno y coherente para Ryliox, construido con los principio
 
 **Success (Emerald)**
 - `--success-500`: `oklch(62% 0.21 150)` - Indicadores de éxito
-- `--success-600`: `oklch(52% 0.20 150)` - Botones success
+- `--success-600`: `oklch(52% 0.2 150)` - Botones success
 
 **Warning (Amber)**
 - `--warning-500`: `oklch(65% 0.21 80)` - Alertas
-- `--warning-600`: `oklch(55% 0.20 80)` - Botones warning
+- `--warning-600`: `oklch(55% 0.2 80)` - Botones warning
 
 **Error (Crimson)**
-- `--error-500`: `oklch(58% 0.21 25)` - Errores críticos
-- `--error-600`: `oklch(48% 0.20 25)` - Botones danger
+- `--error-500`: `oklch(54% 0.24 358)` - Errores críticos
+- `--error-600`: `oklch(45% 0.23 358)` - Botones danger
 
 **Info (Ocean)**
 - `--info-500`: `oklch(62% 0.16 250)` - Información
 - `--info-600`: `oklch(52% 0.15 250)` - Links informativos
 
-### Neutral Scale (Slate)
+### Neutral Scale
 
-| Token | Light | Dark | Usage |
-|-------|-------|------|-------|
-| `--neutral-50` | 99% L | 12% L | Background base |
-| `--neutral-100` | 97% L | 18% L | Surfaces hover |
-| `--neutral-200` | 92% L | 22% L | Borders subtle |
-| `--neutral-300` | 85% L | 30% L | Borders default |
-| `--neutral-400` | 72% L | 40% L | Text muted |
-| `--neutral-500` | 60% L | 50% L | Text tertiary |
-| `--neutral-600` | 48% L | 65% L | Text secondary |
-| `--neutral-700` | 38% L | 80% L | - |
-| `--neutral-800` | 28% L | 92% L | - |
-| `--neutral-900` | 20% L | 98% L | Text primary |
-| `--neutral-950` | 12% L | - | Deep neutral |
+Warm grey (hue 75) for the lightest steps, cool slate (hue 260) from 300 up.
+The scale is the same in both themes; dark mode swaps the surface and text
+tokens instead.
+
+| Token | Value | Usage |
+|-------|-------|-------|
+| `--neutral-50` | `oklch(98.5% 0.006 75)` | Page background |
+| `--neutral-100` | `oklch(97% 0.008 75)` | Muted surfaces, inputs |
+| `--neutral-200` | `oklch(92% 0.01 75)` | Subtle borders, active state |
+| `--neutral-300` | `oklch(85% 0.04 260)` | Default borders |
+| `--neutral-400` | `oklch(72% 0.06 260)` | Muted text |
+| `--neutral-500` | `oklch(60% 0.07 260)` | Tertiary text |
+| `--neutral-600` | `oklch(48% 0.06 260)` | Secondary text |
+| `--neutral-700` | `oklch(38% 0.05 260)` | - |
+| `--neutral-800` | `oklch(28% 0.04 260)` | - |
+| `--neutral-900` | `oklch(20% 0.03 260)` | Primary text |
+| `--neutral-950` | `oklch(12% 0.02 260)` | Deep neutral |
 
 ### Surface Colors
 
 **Light Mode:**
-- `--surface-base`: `#fffdfd` - Fondo de página
-- `--surface-elevated`: `#ffffff` - Cards elevadas
-- `--surface-card`: `#ffffff` - Cards base
-- `--surface-input`: `var(--neutral-100)` - Inputs
-- `--surface-hover`: `var(--neutral-100)` - Estados hover
-- `--surface-active`: `var(--neutral-200)` - Estados active
+- `--surface-base`: `var(--neutral-50)`
+- `--surface-elevated`: `#fffdfd`
+- `--surface-card`: `#ffffff`
+- `--surface-input`: `var(--neutral-100)`
+- `--surface-hover`: `var(--neutral-100)`
+- `--surface-active`: `var(--neutral-200)`
 
 **Dark Mode:**
-- `--surface-base`: `oklch(18% 0.03 260)`
-- `--surface-elevated`: `oklch(22% 0.04 260)`
-- `--surface-card`: `oklch(26% 0.05 260)`
-- `--surface-input`: `oklch(30% 0.05 260)`
-- `--surface-hover`: `oklch(30% 0.05 260)`
-- `--surface-active`: `oklch(35% 0.06 260)`
+- `--surface-base`: `oklch(17% 0.015 75)`
+- `--surface-elevated`: `oklch(21% 0.018 75)`
+- `--surface-card`: `oklch(24% 0.02 75)`
+- `--surface-input`: `oklch(27% 0.02 75)`
+- `--surface-hover`: `oklch(27% 0.02 75)`
+- `--surface-active`: `oklch(32% 0.022 75)`
 
 ---
 
@@ -93,9 +97,12 @@ Sistema de diseño moderno y coherente para Ryliox, construido con los principio
 ### Font Stack
 
 ```css
---font-sans: "IBM Plex Sans", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
---font-mono: "IBM Plex Mono", "SF Mono", Consolas, Monaco, monospace;
+--font-sans: var(--font-jakarta), system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+--font-mono: var(--font-jetbrains), ui-monospace, SFMono-Regular, monospace;
 ```
+
+Plus Jakarta Sans and JetBrains Mono are declared in `astro.config.mjs` and
+served from the app's own origin, as the Content-Security-Policy requires.
 
 ### Type Scale
 
@@ -113,36 +120,14 @@ Sistema de diseño moderno y coherente para Ryliox, construido con los principio
 
 ---
 
-## Spacing Scale
-
-| Token | Value | Usage |
-|-------|-------|-------|
-| `--space-0` | 0 | - |
-| `--space-1` | 0.25rem (4px) | Icon gaps |
-| `--space-2` | 0.5rem (8px) | Tight spacing |
-| `--space-3` | 0.75rem (12px) | Default gap |
-| `--space-4` | 1rem (16px) | Component padding |
-| `--space-5` | 1.25rem (20px) | Section gaps |
-| `--space-6` | 1.5rem (24px) | Card padding |
-| `--space-8` | 2rem (32px) | Major sections |
-| `--space-10` | 2.5rem (40px) | Large gaps |
-| `--space-12` | 3rem (48px) | Page sections |
-| `--space-16` | 4rem (64px) | Hero spacing |
-
----
-
 ## Border Radius Scale
 
 | Token | Value | Usage |
 |-------|-------|-------|
-| `--radius-0` | 0 | Sharp corners |
 | `--radius-sm` | 0.25rem (4px) | Tags, badges |
 | `--radius-md` | 0.375rem (6px) | Inputs, small buttons |
 | `--radius-lg` | 0.5rem (8px) | Cards, buttons |
 | `--radius-xl` | 0.75rem (12px) | Large cards |
-| `--radius-2xl` | 1rem (16px) | Modals, dialogs |
-| `--radius-3xl` | 1.5rem (24px) | Hero elements |
-| `--radius-full` | 9999px | Pills, avatars |
 
 ---
 
@@ -204,23 +189,6 @@ Sistema de diseño moderno y coherente para Ryliox, construido con los principio
 
 ---
 
-## Z-Index Scale
-
-| Token | Value | Usage |
-|-------|-------|-------|
-| `--z-base` | 0 | Default |
-| `--z-dropdown` | 100 | Dropdowns |
-| `--z-sticky` | 200 | Sticky headers |
-| `--z-fixed` | 300 | Fixed elements |
-| `--z-modal-backdrop` | 400 | Modal overlays |
-| `--z-modal` | 500 | Modals |
-| `--z-popover` | 600 | Popovers |
-| `--z-tooltip` | 700 | Tooltips |
-| `--z-toast` | 800 | Toasts |
-| `--z-skip-link` | 10000 | Skip links |
-
----
-
 ## Component Patterns
 
 ### Buttons
@@ -230,7 +198,7 @@ Sistema de diseño moderno y coherente para Ryliox, construido con los principio
 Background: var(--interactive-primary-bg)
 Background Hover: var(--interactive-primary-bg-hover)
 Text: var(--interactive-primary-text)
-Padding: var(--space-3) var(--space-4)
+Padding: 0.75rem 1rem (Tailwind `py-3 px-4`)
 Border Radius: var(--radius-lg)
 Shadow: var(--shadow-2)
 ```
@@ -249,7 +217,7 @@ Text: var(--interactive-secondary-text)
 Background: var(--surface-card)
 Border: 1px solid var(--border-subtle)
 Border Radius: var(--radius-xl)
-Padding: var(--space-6)
+Padding: 1.5rem (Tailwind `p-6`)
 Shadow: var(--shadow-2)
 ```
 
@@ -260,7 +228,7 @@ Shadow: var(--shadow-2)
 Background: var(--surface-input)
 Border: 1px solid var(--border-default)
 Border Radius: var(--radius-lg)
-Padding: var(--space-3) var(--space-4)
+Padding: 0.75rem 1rem (Tailwind `py-3 px-4`)
 Focus: border-color var(--border-focus), box-shadow var(--shadow-focus)
 ```
 
@@ -274,7 +242,9 @@ Focus: border-color var(--border-focus), box-shadow var(--shadow-focus)
 - **Large text**: 3:1 minimum
 - **UI components**: 3:1 minimum
 
-All tokens en OKLCH están calibrados para cumplir AA automáticamente.
+Text tokens meet AA on every surface they are used on. `--muted-foreground`
+was darkened to `#5f6672` for this: 4.56:1 on `--neutral-200`, the darkest
+light surface.
 
 ### Focus Indicators
 
@@ -291,45 +261,6 @@ All tokens en OKLCH están calibrados para cumplir AA automáticamente.
     transition-duration: 0.01ms !important;
   }
 }
-```
-
----
-
-## Implementation
-
-### Tailwind Config
-
-```javascript
-// tailwind.config.js
-theme: {
-  extend: {
-    colors: {
-      brand: {
-        50: 'oklch(97% 0.02 20)',
-        100: 'oklch(95% 0.03 20)',
-        // ... etc
-      }
-    },
-    boxShadow: {
-      '1': 'var(--shadow-1)',
-      '2': 'var(--shadow-2)',
-      // ... etc
-    }
-  }
-}
-```
-
-### CSS Import Order
-
-```css
-@import './oklch-palette.css';
-@import './design-tokens.css';
-@import './animations.css';
-@import './focus.css';
-@import './a11y.css';
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
 ```
 
 ---
