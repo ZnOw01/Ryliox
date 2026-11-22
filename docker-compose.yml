@@ -1,9 +1,9 @@
 # =============================================================================
 # Ryliox - Development Docker Compose
 # =============================================================================
-# Local dev: builds the image from ./Dockerfile and mounts the source tree.
-# Frontend is pre-built and the `frontend/dist` is bind-mounted; the source
-# tree under `frontend/` is NOT rebuilt by the container.
+# Local dev: builds the image from ./Dockerfile and mounts the backend source.
+# The frontend is built into the image; rebuild the image to pick up changes
+# under `frontend/`.
 # =============================================================================
 
 services:
