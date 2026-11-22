@@ -483,7 +483,3 @@ class OutputPlugin(Plugin):
     def get_images_dir(self, book_dir: Path) -> Path:
         """Get the Images directory for a book."""
         return book_dir / "OEBPS" / "Images"
-
-    def get_styles_dir(self, book_dir: Path) -> Path:
-        """Get the Styles directory for a book."""
-        return book_dir / "OEBPS" / "Styles"

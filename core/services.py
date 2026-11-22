@@ -164,7 +164,7 @@ class DownloadQueueService:
         # Synchronization
         self._state_lock = threading.Lock()
         self._wake_event = threading.Event()
-        self._progress_condition = threading.Condition()
+        self._progress_lock = threading.Lock()
         self._async_waiters: set[tuple[asyncio.AbstractEventLoop, asyncio.Event]] = set()
         self._progress_version = 0
         self._stop_event = threading.Event()
@@ -365,16 +365,7 @@ class DownloadQueueService:
 
     def get_progress_version(self) -> int:
         """Return monotonic progress version for SSE waiters."""
-        with self._progress_condition:
-            return self._progress_version
-
-    def wait_for_progress_change(self, previous_version: int, timeout_seconds: float) -> int:
-        """Block until progress changes or timeout expires."""
-        timeout = max(0.0, float(timeout_seconds))
-        with self._progress_condition:
-            if self._progress_version != previous_version:
-                return self._progress_version
-            self._progress_condition.wait(timeout=timeout)
+        with self._progress_lock:
             return self._progress_version
 
     async def wait_for_progress_change_async(
@@ -384,7 +375,7 @@ class DownloadQueueService:
         loop = asyncio.get_running_loop()
         event = asyncio.Event()
         waiter = (loop, event)
-        with self._progress_condition:
+        with self._progress_lock:
             if self._progress_version != previous_version:
                 return self._progress_version
             self._async_waiters.add(waiter)
@@ -392,15 +383,14 @@ class DownloadQueueService:
             with contextlib.suppress(TimeoutError):
                 await asyncio.wait_for(event.wait(), timeout=max(0.0, timeout_seconds))
         finally:
-            with self._progress_condition:
+            with self._progress_lock:
                 self._async_waiters.discard(waiter)
         return self.get_progress_version()
 
     def _notify_progress_change(self) -> None:
         """Notify all waiters of progress change."""
-        with self._progress_condition:
+        with self._progress_lock:
             self._progress_version += 1
-            self._progress_condition.notify_all()
             waiters = tuple(self._async_waiters)
         for loop, event in waiters:
             with contextlib.suppress(RuntimeError):

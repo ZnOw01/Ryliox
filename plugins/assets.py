@@ -3,29 +3,15 @@
 from __future__ import annotations
 
 import contextlib
-import mimetypes
 import re
 from collections.abc import Callable
 from pathlib import Path
 from urllib.parse import urlparse
 
-import config
-
 from .base import Plugin
 
 # Matches url(...) references inside stylesheets; shared with pdf.py.
 CSS_URL_RE = re.compile(r'url\(["\']?([^)"\']+)["\']?\)')
-
-_CONTENT_TYPE_TO_EXT: dict[str, str] = {
-    "image/jpeg": ".jpg",
-    "image/jpg": ".jpg",
-    "image/png": ".png",
-    "image/gif": ".gif",
-    "image/webp": ".webp",
-    "image/svg+xml": ".svg",
-    "image/avif": ".avif",
-}
-
 
 _IMAGE_MAGIC: dict[bytes, str] = {
     b"\x89PNG": ".png",
@@ -139,36 +125,6 @@ class AssetsPlugin(Plugin):
                 asset_url = f"{css_base}/{ref}"
                 with contextlib.suppress(Exception):
                     await self.download_image(asset_url, save_path)
-
-    async def download_cover_image(self, cover_url: str, output_dir: Path) -> Path | None:
-        """Download the cover image, picking an extension from the Content-Type.
-
-        The cover URL on O'Reilly ends in ``.bin``/no extension; we cannot trust
-        the URL suffix. We rely on the response's Content-Type header instead.
-        """
-        if not cover_url:
-            return None
-        response = await self.http.get(cover_url, allow_redirects=True)
-        getattr(response, "raise_for_status", lambda: None)()
-
-        content_type = (
-            (response.headers or {}).get("content-type", "").split(";")[0].strip().lower()
-        )
-        ext = (
-            _CONTENT_TYPE_TO_EXT.get(content_type)
-            or mimetypes.guess_extension(content_type)
-            or ".bin"
-        )
-        if ext == ".jpe":
-            ext = ".jpg"
-
-        output_dir.mkdir(parents=True, exist_ok=True)
-        cover_path = output_dir / f"cover{ext}"
-        cover_path.write_bytes(response.content)
-        return cover_path
-
-    def get_cover_url(self, book_id: str) -> str:
-        return f"{config.BASE_URL}/library/cover/{book_id}/"
 
     @staticmethod
     def _filename_from_url(url: str, default: str = "asset.bin") -> str:

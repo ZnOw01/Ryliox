@@ -145,7 +145,7 @@ class _ProgressBase(_ResponseModel):
 
 class IdleProgress(_ProgressBase):
     status: Literal["idle"] = "idle"
-    job_id: str = ""  # idle no tiene job activo; string vacío es válido aquí
+    job_id: str = ""  # no active job while idle
 
 
 class QueuedProgress(_ProgressBase):

@@ -22,55 +22,34 @@ classifiers = [
 ]
 
 dependencies = [
-    # ── HTTP & networking ──
-    "curl-cffi>=0.7.0",
+    # ── HTTP ──
     "httpx>=0.27.0",
-    "requests>=2.31.0",
-    "urllib3>=2.7.0",
-    "certifi>=2024.0",
-    "charset-normalizer>=3.3",
-    "idna>=3.15",
-    "fake-useragent>=2.0.0",
-    # ── HTML / scraping ──
-    "beautifulsoup4>=4.12",
+    # ── HTML processing (lxml is the parser BeautifulSoup is asked for) ──
+    "beautifulsoup4>=4.13",
     "lxml>=6.1.0",
-    "bleach>=6.4.0",
     # ── Web framework ──
     "fastapi>=0.115.0",
     "uvicorn[standard]>=0.32.0",
     "pydantic>=2.9.0",
     "pydantic-settings>=2.14.2",
-    "python-multipart>=0.0.31",
-    # ── Auth / crypto ──
+    # ── Cookie encryption ──
     "cryptography>=48.0.1",
-    "pyjwt>=2.8.0",
-    # ── Templating / output ──
-    "jinja2>=3.1.0",
-    "markdown>=3.6",
-    "pillow>=10.0",
+    # ── PDF output ──
     "weasyprint>=69.0,<70",
-    "ebooklib>=0.18",
-    # ── Metrics / observability ──
+    # ── Observability ──
     "prometheus-client>=0.21.0",
     "psutil>=6.0.0",
-    # ── Config / IO ──
-    "python-dotenv>=1.0.0",
+    # ── Key storage location ──
     "platformdirs>=4.0.0",
-    "watchfiles>=0.21.0",
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=8.3.0",
     "pytest-asyncio>=0.24.0",
-    "pytest-mock>=3.14.0",
-    "pytest-timeout>=2.3.0",
-    "pytest-xdist>=3.6.0",
+    "requests>=2.31.0",
     "ruff>=0.6.0",
     "mypy>=1.11.0",
-    "types-requests",
-    "types-beautifulsoup4",
-    "types-PyYAML",
 ]
 e2e = [
     "playwright>=1.48.0",
@@ -258,8 +237,6 @@ markers = [
 ]
 filterwarnings = [
     "error",
-    "ignore::DeprecationWarning:botocore.*",
-    "ignore::DeprecationWarning:curl_cffi.*",
     "ignore:Using `httpx` with `starlette.testclient` is deprecated.*:Warning",
     "ignore::PendingDeprecationWarning",
     "ignore::ResourceWarning",

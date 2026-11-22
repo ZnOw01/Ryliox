@@ -104,16 +104,6 @@ class DownloadJobDTO(BaseModel):
             skip_images=skip_images,
         )
 
-    # Backward compatibility aliases
-    def to_dict(self) -> dict[str, Any]:
-        """Deprecated: Use model_dump() instead."""
-        return self.model_dump()
-
-    @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> DownloadJobDTO:
-        """Deprecated: Use model_validate() instead."""
-        return cls.model_validate(data)
-
 
 class DownloadProgressDTO(BaseModel):
     """DTO for download progress."""
@@ -190,22 +180,6 @@ class DownloadProgressDTO(BaseModel):
             by_name=by_name,
         )
 
-    def with_updates(self, **kwargs: Any) -> DownloadProgressDTO:
-        """Create a copy with updates (immutable pattern)."""
-        current = self.model_dump()
-        current.update(kwargs)
-        return self.model_validate(current)
-
-    # Backward compatibility aliases
-    def to_dict(self) -> dict[str, Any]:
-        """Deprecated: Use model_dump() instead."""
-        return self.model_dump()
-
-    @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> DownloadProgressDTO:
-        """Deprecated: Use model_validate() instead."""
-        return cls.model_validate(data)
-
 
 class DownloadResultDTO(BaseModel):
     """DTO for completed download result."""
@@ -273,16 +247,6 @@ class DownloadResultDTO(BaseModel):
             by_name=by_name,
         )
 
-    # Backward compatibility aliases
-    def to_dict(self) -> dict[str, Any]:
-        """Deprecated: Use model_dump() instead."""
-        return self.model_dump()
-
-    @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> DownloadResultDTO:
-        """Deprecated: Use model_validate() instead."""
-        return cls.model_validate(data)
-
 
 class DownloadErrorDTO(BaseModel):
     """DTO for download errors."""
@@ -345,16 +309,6 @@ class DownloadErrorDTO(BaseModel):
             by_alias=by_alias,
             by_name=by_name,
         )
-
-    # Backward compatibility aliases
-    def to_dict(self) -> dict[str, Any]:
-        """Deprecated: Use model_dump() instead."""
-        return self.model_dump()
-
-    @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> DownloadErrorDTO:
-        """Deprecated: Use model_validate() instead."""
-        return cls.model_validate(data)
 
 
 class JobSnapshotDTO(BaseModel):
@@ -470,13 +424,3 @@ class JobSnapshotDTO(BaseModel):
             by_alias=by_alias,
             by_name=by_name,
         )
-
-    # Backward compatibility aliases
-    def to_dict(self) -> dict[str, Any]:
-        """Deprecated: Use model_dump() instead."""
-        return self.model_dump()
-
-    @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> JobSnapshotDTO:
-        """Deprecated: Use model_validate() instead."""
-        return cls.model_validate(data)

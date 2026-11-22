@@ -7,7 +7,7 @@ import logging
 import time
 from collections import OrderedDict
 from dataclasses import dataclass, field
-from typing import Any, Generic, TypeVar
+from typing import Generic, TypeVar
 
 import config
 
@@ -107,29 +107,6 @@ class LRUCache(Generic[K, V]):
             self._cache.clear()
             self._hits = 0
             self._misses = 0
-
-    async def invalidate_by_prefix(self, prefix: str) -> int:
-        """Invalidate all keys starting with prefix. Returns count deleted."""
-        async with self._lock:
-            keys_to_delete = [k for k in self._cache.keys() if str(k).startswith(prefix)]
-            for k in keys_to_delete:
-                del self._cache[k]
-            return len(keys_to_delete)
-
-    async def get_stats(self) -> dict[str, Any]:
-        """Get cache statistics."""
-        async with self._lock:
-            total = self._hits + self._misses
-            hit_rate = self._hits / total if total > 0 else 0.0
-            return {
-                "name": self.name,
-                "size": len(self._cache),
-                "maxsize": self.maxsize,
-                "hits": self._hits,
-                "misses": self._misses,
-                "hit_rate": round(hit_rate, 4),
-                "utilization": round(len(self._cache) / self.maxsize, 4),
-            }
 
     def _cleanup_expired_sync(self) -> int:
         """Synchronous cleanup of expired entries."""

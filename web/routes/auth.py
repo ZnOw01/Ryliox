@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import inspect
 import logging
 from typing import Any
@@ -24,17 +23,11 @@ _CookiesBody = dict | list | str | None
 
 
 async def _call_plugin_status(plugin: Any) -> dict:
-    """Call ``plugin.get_status()`` returning a dict, regardless of sync/async.
-
-    The :class:`AuthPlugin` performs blocking HTTP I/O via ``curl_cffi``, so the
-    real implementation is sync and we run it in a thread to keep the event
-    loop free. Tests, however, sometimes provide an ``AsyncMock``; we await
-    the coroutine in that case.
-    """
+    """Return ``plugin.get_status()``, awaiting it when the plugin is asynchronous."""
     result = plugin.get_status()
     if inspect.isawaitable(result):
         return await result
-    return await asyncio.to_thread(lambda: result)
+    return result
 
 
 @router.get("/status", response_model=StatusResponse)

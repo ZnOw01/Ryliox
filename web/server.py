@@ -108,12 +108,6 @@ class _RateLimiter:
             self._requests[key] = timestamps
             return True
 
-    def clear_old_entries(self) -> None:
-        cutoff = time.monotonic() - self.window_seconds
-        with self._lock:
-            self._clear_old_entries(cutoff)
-            self._last_cleanup = time.monotonic()
-
     def _clear_old_entries(self, cutoff: float) -> None:
         stale_keys = []
         for key, timestamps in self._requests.items():
@@ -565,45 +559,32 @@ def create_app() -> FastAPI:
 
 
 def _mount_static(app: FastAPI) -> None:
-    """Mount static asset directories, preferring the modern Astro build."""
+    """Serve the built frontend, when there is one, as a single-page app."""
     frontend_dist: Path = config.REPO_ROOT / "frontend" / "dist"
-    legacy_static: Path = config.REPO_ROOT / "web" / "static"
-
-    mounted: list[Path] = []
-    if frontend_dist.is_dir():
-        for directory_name in _FRONTEND_STATIC_DIRS:
-            directory = frontend_dist / directory_name
-            if directory.is_dir():
-                app.mount(
-                    f"/{directory_name}",
-                    StaticFiles(directory=directory, check_dir=False),
-                    name=f"frontend-{directory_name}",
-                )
-        mounted.append(frontend_dist)
-    if legacy_static.is_dir():
-        app.mount("/static", StaticFiles(directory=legacy_static), name="legacy-static")
-        mounted.append(legacy_static)
-
-    if not mounted:
+    if not frontend_dist.is_dir():
         return
+
+    for directory_name in _FRONTEND_STATIC_DIRS:
+        directory = frontend_dist / directory_name
+        if directory.is_dir():
+            app.mount(
+                f"/{directory_name}",
+                StaticFiles(directory=directory, check_dir=False),
+                name=f"frontend-{directory_name}",
+            )
 
     @app.get("/{path:path}", include_in_schema=False)
     async def _frontend_entry(path: str) -> object:
         if _is_reserved_frontend_path(path):
             return JSONResponse({"detail": "Not Found"}, status_code=status.HTTP_404_NOT_FOUND)
 
-        if frontend_dist.is_dir():
-            candidate = _safe_static_file(frontend_dist, path)
-            if candidate and candidate.is_file():
-                return FileResponse(candidate)
+        candidate = _safe_static_file(frontend_dist, path)
+        if candidate and candidate.is_file():
+            return FileResponse(candidate)
 
-            index = frontend_dist / "index.html"
-            if index.is_file():
-                return FileResponse(index)
-
-        legacy_index = legacy_static / "index.html"
-        if legacy_index.is_file():
-            return FileResponse(legacy_index)
+        index = frontend_dist / "index.html"
+        if index.is_file():
+            return FileResponse(index)
 
         return JSONResponse({"name": "Ryliox", "status": "running"})
 

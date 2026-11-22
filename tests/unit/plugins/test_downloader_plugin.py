@@ -296,9 +296,7 @@ def test_get_formats_info_hides_redundant_pdf_chapters_option_from_ui():
 
     assert formats_info["formats"] == ["epub", "pdf"]
     assert "pdf-chapters" in formats_info["descriptions"]
-    assert formats_info["descriptions"]["pdf"] == (
-        "Un solo PDF con el libro completo o con los capitulos seleccionados."
-    )
+    assert set(formats_info["descriptions"]) == {"epub", "pdf", "pdf-chapters"}
 
 
 @pytest.mark.asyncio

@@ -16,7 +16,6 @@ from pydantic import BaseModel
 
 import config
 from core.audit import AuditEventType, audit_data
-from core.feature_flags import feature_flags
 from core.metrics import metrics
 from core.validators import ValidationError, validate_file_path, validate_url
 from plugins.downloader import DownloaderPlugin
@@ -483,7 +482,6 @@ async def set_output_dir(
             )
         selected = await asyncio.to_thread(system_plugin.show_folder_picker, config.OUTPUT_DIR)
         if selected:
-            # Validar igual que path manual
             success, message, path = output_plugin.validate_dir(selected)
             if not success:
                 return error_response(
@@ -528,45 +526,3 @@ async def set_output_dir(
         details={"path": str(path)},
     )
     return SetOutputDirResponse(path=str(path))
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Feature Flags Endpoints
-# ─────────────────────────────────────────────────────────────────────────────
-
-
-class FeatureFlagsResponse(BaseModel):
-    """Response model for feature flags."""
-
-    flags: dict[str, bool]
-    config: dict[str, dict[str, Any]]
-
-
-class SingleFeatureFlagResponse(BaseModel):
-    """Response model for single feature flag."""
-
-    flag: str
-    enabled: bool
-
-
-@router.get("/feature-flags", response_model=FeatureFlagsResponse)
-async def get_feature_flags_api() -> FeatureFlagsResponse:
-    """Get all feature flags and their current states.
-
-    Returns:
-        Object containing all feature flags and their configurations.
-    """
-    return FeatureFlagsResponse(flags=feature_flags.get_all(), config=feature_flags.get_config())
-
-
-@router.get("/feature-flags/{flag_name}", response_model=SingleFeatureFlagResponse)
-async def get_single_feature_flag(flag_name: str) -> SingleFeatureFlagResponse:
-    """Get the state of a single feature flag.
-
-    Args:
-        flag_name: The name of the feature flag to check.
-
-    Returns:
-        Object with flag name and enabled state.
-    """
-    return SingleFeatureFlagResponse(flag=flag_name, enabled=feature_flags.is_enabled(flag_name))

@@ -91,8 +91,6 @@ _SCHEMA_COLUMNS: dict[str, str] = {
     "finished_at": "REAL",
 }
 
-ALLOWED_SCHEMA_FIELDS: frozenset[str] = frozenset(_SCHEMA_COLUMNS.keys())
-
 # Whitelist of columns allowed in UPDATE operations (security: prevent SQL injection)
 _ALLOWED_UPDATE_COLUMNS: frozenset[str] = frozenset(
     {
@@ -415,34 +413,6 @@ class DownloadJobRepository:
             ).fetchone()
             return row is not None
 
-    def list_all(
-        self, limit: int | None = None, status_filter: str | None = None
-    ) -> list[dict[str, Any]]:
-        with self._lock, self._connect() as conn:
-            query = "SELECT * FROM download_jobs"
-            params: list[Any] = []
-
-            if status_filter:
-                query += " WHERE status = ?"
-                params.append(status_filter)
-
-            query += " ORDER BY seq DESC"
-
-            if limit:
-                query += " LIMIT ?"
-                params.append(limit)
-
-            rows = conn.execute(query, params).fetchall()
-
-            results = []
-            for row in rows:
-                queue_position = None
-                if row["status"] == "queued":
-                    queue_position = self._get_queue_position_conn(conn, row["seq"])
-                results.append(self._snapshot_mapper.to_dict(row, queue_position))
-
-            return results
-
     def _insert_job_conn(self, conn: sqlite3.Connection, job_dto: DownloadJobDTO) -> None:
         """Insert a queued job using the caller's transaction."""
         db_data = self._job_mapper.to_db(job_dto)
@@ -546,16 +516,6 @@ class DownloadJobRepository:
             snapshot = self._get_by_id_conn(conn, job_id)
             conn.commit()
             return snapshot
-
-    @sqlite_retry()
-    def delete(self, job_id: str) -> bool:
-        with self._lock, self._connect() as conn:
-            cursor = conn.execute(
-                "DELETE FROM download_jobs WHERE job_id = ?",
-                (job_id,),
-            )
-            conn.commit()
-            return cursor.rowcount > 0
 
     @sqlite_retry()
     def claim_next_queued(self) -> DownloadJobDTO | None:
@@ -719,11 +679,6 @@ class DownloadJobRepository:
 
                 self._prune_terminal_jobs_conn(conn)
                 uow.commit()
-
-    def prune_terminal(self) -> None:
-        with self._lock, self._connect() as conn:
-            self._prune_terminal_jobs_conn(conn)
-            conn.commit()
 
     def _get_queue_position_conn(self, conn: sqlite3.Connection, seq: int) -> int:
         row = conn.execute(

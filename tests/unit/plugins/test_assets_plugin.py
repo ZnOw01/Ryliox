@@ -4,7 +4,6 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-import config
 from plugins.assets import AssetsPlugin
 
 if TYPE_CHECKING:
@@ -53,32 +52,6 @@ async def test_download_all_images_records_canonical_returned_path(tmp_path: Pat
 
     assert result["https://example.com/assets/cover.bin"] == tmp_path / "Images" / "cover.png"
     assert result["https://example.com/assets/cover.bin"].is_file()
-
-
-@pytest.mark.asyncio
-async def test_download_cover_image_uses_real_media_type_for_extension(tmp_path: Path):
-    plugin = AssetsPlugin()
-
-    class DummyHttp:
-        async def get(self, _url: str, **_kwargs):
-            class Response:
-                headers = {"content-type": "image/png"}
-                content = b"\x89PNG\r\n\x1a\nrest"
-
-                def raise_for_status(self):
-                    return None
-
-            return Response()
-
-    plugin.kernel = type("Kernel", (), {"http": DummyHttp()})()
-
-    result = await plugin.download_cover_image(
-        f"{config.BASE_URL}/assets/cover.bin",
-        tmp_path,
-    )
-
-    assert result.name == "cover.png"
-    assert result.read_bytes().startswith(b"\x89PNG")
 
 
 @pytest.mark.asyncio

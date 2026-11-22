@@ -346,11 +346,6 @@ class AuditLogger:
             },
         )
 
-    def _write_entry(self, entry: AuditEntry) -> None:
-        """Write entry to log file with thread safety and chaining."""
-        with self._file_lock:
-            self._write_entry_unlocked(entry)
-
     def _write_entry_unlocked(self, entry: AuditEntry) -> None:
         try:
             with self._log_file.open("a", encoding="utf-8") as f:

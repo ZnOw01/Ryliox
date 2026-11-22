@@ -173,7 +173,6 @@ class TestSSEDisconnection:
         mock_queue = MagicMock()
         mock_queue.get_progress.return_value = {"job_id": "test-job", "status": "idle"}
         mock_queue.get_progress_version.return_value = 1
-        mock_queue.wait_for_progress_change.return_value = 2
 
         response = await progress_stream(
             request=mock_request,

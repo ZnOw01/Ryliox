@@ -11,4 +11,3 @@ from .html_processor import HtmlProcessorPlugin
 from .output import OutputPlugin
 from .pdf import PdfPlugin
 from .system import SystemPlugin
-from .token import TokenPlugin

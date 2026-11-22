@@ -205,4 +205,4 @@ class JobSnapshotMapper(JSONMapperMixin):
     ) -> dict[str, Any]:
         """Convert DB row directly to dict (API response)."""
         snapshot = self.to_dto(row, queue_position)
-        return snapshot.to_dict()
+        return snapshot.model_dump()

@@ -6,9 +6,7 @@ The client is an :term:`async context manager`. Use it as::
         response = await client.get(url)
         data = await client.get_json(url)
 
-The underlying transport is :mod:`httpx`. For the (legacy) sync interface used
-by the original O'Reilly-specific scraping path, see
-:func:`get_sync_client`, which wraps the same client in ``asyncio.run``.
+The underlying transport is :mod:`httpx`.
 """
 
 from __future__ import annotations
@@ -17,14 +15,13 @@ import asyncio
 import base64
 import json
 import logging
-import re
 import threading
 import time
 from collections.abc import Iterable
 from http.cookiejar import Cookie
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
-from urllib.parse import urlparse
+from urllib.parse import urljoin, urlparse
 
 import httpx
 
@@ -81,7 +78,7 @@ class HttpClient:
         allowed_hosts: tuple[str, ...] | None = None,
     ) -> None:
         self._cookies_file = cookies_file or config.COOKIES_FILE
-        self._allowed_hosts = allowed_hosts or self._resolve_default_hosts()
+        self._allowed_hosts = allowed_hosts or DEFAULT_ALLOWED_HOSTS
         self._auth_cookies: dict[str, str] = {}
         self._auth_cookie_records: list[dict[str, Any]] = []
         self._client: httpx.AsyncClient | None = None
@@ -91,20 +88,8 @@ class HttpClient:
         self.last_request_time: float = 0.0
 
     @staticmethod
-    def _resolve_default_hosts() -> tuple[str, ...]:
-        """Extend the default allowlist with the hosts implied by ``BASE_URL``."""
-        base = urlparse(config.BASE_URL).hostname or "oreilly.com"
-        hosts: set[str] = set(DEFAULT_ALLOWED_HOSTS)
-        hosts.add(base)
-        hosts.add("www." + base if not base.startswith("www.") else base)
-        hosts.add("cdn." + base if not base.startswith("cdn.") else base)
-        return tuple(sorted(hosts))
-
-    @staticmethod
     def _resolve_url(url: str) -> str:
         """Resolve a (possibly relative) URL against ``config.BASE_URL``."""
-        from urllib.parse import urljoin
-
         parsed = urlparse(url)
         if parsed.scheme in ("http", "https"):
             return url
@@ -475,8 +460,6 @@ class HttpClient:
             if redirect_count > max_redirects:
                 raise ValueError(f"Redirect limit exceeded ({max_redirects})")
             if not location.startswith("http"):
-                from urllib.parse import urljoin
-
                 location = urljoin(current, location)
             current = location
 
@@ -518,15 +501,3 @@ class HttpClient:
             )
         if response.status_code >= 400:
             raise RuntimeError(f"HTTP {response.status_code} fetching {response.url}")
-
-
-# ---------------------------------------------------------------------------
-# Legacy sync shim — wraps the async client in ``asyncio.run`` for callers
-# that have not been converted yet (kept narrow on purpose).
-# ---------------------------------------------------------------------------
-
-
-def _is_unsafe_redirect_target(text: str) -> bool:
-    """Best-effort: scan a response body for absolute URLs to disallowed hosts."""
-    pattern = re.compile(r"https?://([\w.\-]+)")
-    return any(not host_is_allowed(match.group(1)) for match in pattern.finditer(text))

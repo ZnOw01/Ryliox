@@ -236,7 +236,7 @@ class DownloaderPlugin(Plugin):
         """Return format descriptions for CLI help or UI display."""
         return {
             "epub": "Standard EPUB format (default)",
-            "pdf": "Un solo PDF con el libro completo o con los capitulos seleccionados.",
+            "pdf": "Single PDF with the whole book or the selected chapters",
             "pdf-chapters": "Separate PDF per chapter",
         }
 

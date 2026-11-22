@@ -387,24 +387,3 @@ body{{margin:1em;background-color:transparent!important;}}
 
         if modified:
             xhtml_path.write_text(self._to_xhtml(str(soup)), encoding="utf-8")
-
-    def detect_cover_image(self, soup: Any) -> str | None:
-        for img in soup.find_all("img"):
-            src = img.get("src", "").lower()
-            alt = img.get("alt", "").lower()
-            img_id = img.get("id", "").lower()
-            img_class = " ".join(img.get("class", [])).lower()
-
-            if any("cover" in x for x in [src, alt, img_id, img_class]):
-                return img.get("src")
-
-        for div in soup.find_all("div"):
-            div_id = div.get("id", "").lower()
-            div_class = " ".join(div.get("class", [])).lower()
-
-            if "cover" in div_id or "cover" in div_class:
-                img = div.find("img")
-                if img:
-                    return img.get("src")
-
-        return None

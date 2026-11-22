@@ -14,7 +14,6 @@ from fastapi import FastAPI, Request
 import config
 import core.audit as audit_module
 from core.audit import AuditEventType, AuditLogger
-from core.secrets import SecretManager, SecretManagerError
 from core.services import DownloadQueueService, QueueCapacityError
 from core.session_store import SessionStore
 from plugins.pdf import restricted_url_fetcher
@@ -208,17 +207,3 @@ def test_audit_chain_restores_across_logger_restart(monkeypatch, tmp_path: Path)
 
     assert entries[-1].prev_hash == last_hash
     assert restored.verify_integrity()[0] is True
-
-
-def test_secret_manager_refuses_ephemeral_master_password(monkeypatch, tmp_path: Path) -> None:
-    monkeypatch.delenv("SECRET_MASTER_PASSWORD", raising=False)
-    monkeypatch.setattr(SecretManager, "_instance", None)
-    monkeypatch.setattr(SecretManager, "_initialized", False)
-    manager = SecretManager(
-        secrets_file=tmp_path / "secrets.enc",
-        master_key_file=tmp_path / "master.salt",
-    )
-
-    with pytest.raises(SecretManagerError, match="required"):
-        manager.set("example", "value")
-    assert not (tmp_path / "secrets.enc").exists()

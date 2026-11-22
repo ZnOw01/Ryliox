@@ -76,13 +76,13 @@ async def search(
     q: str = Query(
         default="",
         alias="q",
-        description="Término de búsqueda. También acepta el alias 'query'.",
+        description="Search term. The older 'query' parameter is accepted too.",
     ),
-    query: str = Query(default="", include_in_schema=False),  # alias legacy, oculto en docs
+    query: str = Query(default="", include_in_schema=False),
     kernel: Kernel = Depends(get_kernel),
     session_store: SessionStore = Depends(get_session_store),
 ) -> SearchResponse:
-    """Busca libros por título, autor o ISBN."""
+    """Search books by title, author or ISBN."""
     search_term = (q or query).strip()
     if not search_term:
         return SearchResponse(results=[])
@@ -127,7 +127,7 @@ async def book_chapters(
     kernel: Kernel = Depends(get_kernel),
     session_store: SessionStore = Depends(get_session_store),
 ) -> BookChaptersResponse:
-    """Retorna la lista de capítulos de un libro."""
+    """Return the chapter list of a book."""
     book_id = book_id.strip()
     if not book_id:
         raise HTTPException(
@@ -201,7 +201,7 @@ async def book_chapters(
                 )
             )
     except (TypeError, ValueError, ValidationError) as exc:
-        logger.warning("Datos de capítulo inválidos recibidos para %r: %s", book_id, exc)
+        logger.warning("Invalid chapter data received for %r: %s", book_id, exc)
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail={

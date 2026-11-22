@@ -20,13 +20,11 @@ class Kernel:
 
     The kernel itself is an async context manager that owns the underlying
     HTTP client. Accessing ``kernel.http`` before entering the context
-    raises :class:`RuntimeError`. Accessing ``kernel.http_client`` returns a
-    lightweight stub for environments that don't need real HTTP.
+    raises :class:`RuntimeError`.
     """
 
     def __init__(self, http: HttpClient | None = None) -> None:
         self._http: HttpClient | None = http
-        self._owns_http: bool = http is not None
         self._plugins: dict[str, Any] = {}
         self._entered: bool = False
 
@@ -35,7 +33,6 @@ class Kernel:
     async def __aenter__(self) -> Kernel:
         if self._http is None:
             self._http = HttpClient()
-            self._owns_http = True
         enter = getattr(self._http, "__aenter__", None)
         if callable(enter):
             result = enter()
@@ -47,7 +44,7 @@ class Kernel:
         return self
 
     async def __aexit__(self, *_exc: object) -> None:
-        if self._http is not None and self._owns_http:
+        if self._http is not None:
             close = getattr(self._http, "close", None)
             if callable(close):
                 result = close()
@@ -69,14 +66,6 @@ class Kernel:
             raise RuntimeError(
                 "Kernel HTTP client is not initialized — use 'async with create_default_kernel() as kernel'"
             )
-        return self._http
-
-    @property
-    def http_client(self) -> HttpClient | None:
-        """Return the HTTP client without raising, or ``None`` if not set up.
-
-        Useful for plugins that want to gracefully skip HTTP work in tests.
-        """
         return self._http
 
     # ---- plugin registry ------------------------------------------------
@@ -116,7 +105,6 @@ def create_default_kernel() -> Kernel:
         OutputPlugin,
         PdfPlugin,
         SystemPlugin,
-        TokenPlugin,
     )
 
     kernel = Kernel()
@@ -131,7 +119,6 @@ def create_default_kernel() -> Kernel:
     # Output format plugins
     kernel.register("epub", EpubPlugin())
     kernel.register("pdf", PdfPlugin())
-    kernel.register("token", TokenPlugin())
 
     # Orchestration & system plugins
     kernel.register("output", OutputPlugin())

@@ -54,7 +54,7 @@ _PROGRESS_ADAPTER: TypeAdapter[ProgressResponse] = TypeAdapter(ProgressResponse)
 
 
 def _coerce_str(value: Any) -> str | None:
-    """Convierte a str limpio o None si vacío."""
+    """Return the stripped text, or None when empty."""
     if value is None:
         return None
     text = str(value).strip()
@@ -62,7 +62,7 @@ def _coerce_str(value: Any) -> str | None:
 
 
 def _coerce_int(value: Any) -> int | None:
-    """Convierte a int o None si inválido."""
+    """Return the value as an int, or None when it is not one."""
     try:
         return None if value is None else int(value)
     except (TypeError, ValueError):
@@ -150,25 +150,6 @@ def _normalize_progress_snapshot(snapshot: dict[str, Any] | None) -> dict[str, A
         "total_chapters": _coerce_positive_int(snapshot.get("total_chapters")),
         "chapter_title": _coerce_str(snapshot.get("chapter_title")),
         "title": _coerce_str(snapshot.get("title")),
-    }
-
-
-def _invalid_progress_payload(snapshot: dict[str, Any] | None) -> dict[str, Any]:
-    job_id = ""
-    book_id = None
-    if isinstance(snapshot, dict):
-        job_id = _coerce_str(snapshot.get("job_id")) or ""
-        book_id = _coerce_str(snapshot.get("book_id"))
-
-    if not job_id:
-        return {"status": "idle", "job_id": ""}
-
-    return {
-        "status": "error",
-        "job_id": job_id,
-        "book_id": book_id,
-        "error": "Progress data became invalid",
-        "code": ErrorCode.INVALID_PROGRESS_SNAPSHOT,
     }
 
 

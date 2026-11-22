@@ -1,9 +1,4 @@
-"""FastAPI dependency providers with Dependency Inversion and OWASP security.
-
-Implements:
-- OWASP A01: Access Control (same-origin validation)
-- OWASP A03/A10: Input validation delegated to :mod:`core.validators`
-"""
+"""Application-scoped services and the FastAPI dependencies that expose them."""
 
 from __future__ import annotations
 
@@ -16,8 +11,7 @@ from fastapi import FastAPI, Request, status
 
 import config
 from core import create_default_kernel
-
-# New architectural imports (Dependency Inversion)
+from core.cache import clear_all_caches, start_all_cleanup_tasks, stop_all_cleanup_tasks
 from core.repository import DownloadJobRepository
 from core.services import DownloadQueueService
 from core.session_store import SessionStore
@@ -25,17 +19,10 @@ from core.session_store import SessionStore
 if TYPE_CHECKING:
     from collections.abc import Callable, Generator
 
-    from core.interfaces import IDownloadJobRepository
     from core.kernel import Kernel
 
 logger = logging.getLogger(__name__)
 
-# Queue storage and timing come straight from configuration so that
-# ``RYLIOX_QUEUE__*`` environment overrides apply. The module-level names are
-# kept as aliases for backward-compatible imports.
-DOWNLOAD_QUEUE_DB = config.DOWNLOAD_QUEUE_DB
-DOWNLOAD_ERROR_LOG_DIR = config.DOWNLOAD_ERROR_LOG_DIR
-QUEUE_POLL_INTERVAL_SECONDS: float = config.SETTINGS.queue.poll_interval_seconds
 _SAFE_METHODS = {"GET", "HEAD", "OPTIONS", "TRACE"}
 
 
@@ -49,60 +36,41 @@ class ForbiddenOriginError(Exception):
         super().__init__(f"Cross-origin request blocked for '{operation}'.")
 
 
-def _build_download_queue(
-    # Dependency injection: se puede pasar repository custom para testing
-    repository: IDownloadJobRepository | None = None,
-) -> DownloadQueueService:
-    """Build DownloadQueueService with dependency injection."""
-
-    async def _async_kernel_factory() -> Kernel:
+def _build_download_queue() -> DownloadQueueService:
+    async def _kernel_factory() -> Kernel:
         return create_default_kernel()
 
-    # Si no se provee repository, crear el default
-    if repository is None:
-        repository = DownloadJobRepository(
-            db_path=config.DOWNLOAD_QUEUE_DB,
-            terminal_job_retention=config.SETTINGS.queue.terminal_job_retention,
-        )
-
-    # Inyección de dependencias al service layer
+    settings = config.SETTINGS
     queue = DownloadQueueService(
-        kernel_factory=_async_kernel_factory,
-        repository=repository,  # Inyección del repository
+        kernel_factory=_kernel_factory,
+        repository=DownloadJobRepository(
+            db_path=config.DOWNLOAD_QUEUE_DB,
+            terminal_job_retention=settings.queue.terminal_job_retention,
+        ),
         error_log_dir=config.DOWNLOAD_ERROR_LOG_DIR,
-        poll_interval_seconds=QUEUE_POLL_INTERVAL_SECONDS,
-        max_queued_jobs=config.SETTINGS.queue.max_queued_jobs,
-        download_timeout_seconds=config.SETTINGS.http.request_timeout_seconds,
+        poll_interval_seconds=settings.queue.poll_interval_seconds,
+        max_queued_jobs=settings.queue.max_queued_jobs,
+        download_timeout_seconds=settings.http.request_timeout_seconds,
     )
     queue.start()
     return queue
 
 
-async def initialize_app_services(
-    app: FastAPI,
-    # Permite inyección de dependencias para testing
-    repository: IDownloadJobRepository | None = None,
-) -> None:
+async def initialize_app_services(app: FastAPI) -> None:
     """Initialize all application-scoped services during startup."""
-    from core.cache import clear_all_caches, start_all_cleanup_tasks
-
     await clear_all_caches()
     await start_all_cleanup_tasks()
     app.state.session_store = SessionStore()
-    # Initialize kernel and enter its async context so plugins can use
-    # ``self.kernel.http`` for the lifetime of the app.
+    # The kernel stays entered for the lifetime of the app so plugins can use its HTTP client.
     kernel = create_default_kernel()
     await kernel.__aenter__()
     app.state.kernel = kernel
-    # Usar la factory con inyección de dependencias
-    app.state.download_queue = _build_download_queue(repository=repository)
-    logger.info("Application services initialized with architectural improvements.")
+    app.state.download_queue = _build_download_queue()
+    logger.info("Application services initialized.")
 
 
 async def shutdown_app_services(app: FastAPI) -> None:
     """Stop services in a safe order during shutdown."""
-    from core.cache import stop_all_cleanup_tasks
-
     await stop_all_cleanup_tasks()
     download_queue: DownloadQueueService | None = getattr(app.state, "download_queue", None)
     if download_queue is not None:
@@ -119,9 +87,6 @@ async def shutdown_app_services(app: FastAPI) -> None:
             logger.info("Kernel HTTP session closed.")
         except Exception:
             logger.exception("Error while closing kernel HTTP session.")
-
-
-# === Dependency Injection Providers ===
 
 
 def get_kernel(request: Request) -> Generator[Kernel, None, None]:

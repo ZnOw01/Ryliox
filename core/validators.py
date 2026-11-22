@@ -15,18 +15,6 @@ from urllib.parse import unquote, urlparse
 
 logger = logging.getLogger(__name__)
 
-# OWASP A03: XSS prevention patterns
-_DANGEROUS_HTML_PATTERNS: tuple[Pattern[str], ...] = (
-    re.compile(r"<script", re.IGNORECASE),
-    re.compile(r"javascript:", re.IGNORECASE),
-    re.compile(r"on\w+\s*=", re.IGNORECASE),
-    re.compile(r"<iframe", re.IGNORECASE),
-    re.compile(r"<object", re.IGNORECASE),
-    re.compile(r"<embed", re.IGNORECASE),
-    re.compile(r"expression\s*\(", re.IGNORECASE),
-    re.compile(r"data:text/html", re.IGNORECASE),
-)
-
 _ALLOWED_SCHEMES: frozenset[str] = frozenset({"http", "https"})
 
 # OWASP A10: SSRF prevention - blocked hosts (including localhost variants)
@@ -49,8 +37,6 @@ _DANGEROUS_URL_HOSTS: frozenset[str] = frozenset(  # nosec B104
 _BOOK_ID_PATTERN: Pattern[str] = re.compile(r"^urn:orm:book:[a-f0-9]{32}$", re.IGNORECASE)
 _ISBN_PATTERN: Pattern[str] = re.compile(r"^\d{9}[\dX]$|^\d{13}$")
 
-_SAFE_FILENAME_CHARS: Pattern[str] = re.compile(r"^[\w\-_. ]+$")
-
 # OWASP A03: Path traversal prevention
 _PATH_TRAVERSAL_PATTERNS: tuple[Pattern[str], ...] = (
     re.compile(r"\.\.[\\/]"),
@@ -58,17 +44,9 @@ _PATH_TRAVERSAL_PATTERNS: tuple[Pattern[str], ...] = (
     re.compile(r"\.\.\Z"),
 )
 
-# Control chars to block (allow tab, LF, CR)
-_CONTROL_CHARS: frozenset[int] = frozenset(range(0x20)) - frozenset({0x09, 0x0A, 0x0D})
-
 MAX_BOOK_ID_LENGTH: int = 50
 MAX_URL_LENGTH: int = 2048
-MAX_FILENAME_LENGTH: int = 255
-MAX_INPUT_LENGTH: int = 10000
 MAX_PATH_LENGTH: int = 4096
-
-# DNS lookup timeout (seconds)
-_DNS_LOOKUP_TIMEOUT: float = 5.0
 
 
 def _is_dangerous_ip(ip_str: str) -> bool:
@@ -182,28 +160,20 @@ def validate_url_sync(url: str, allowed_hosts: set[str] | None = None) -> str:
             url[:100],
         )
 
-    # DNS rebinding protection (sync with timeout via signal alarm on Unix)
+    # Reject names that resolve to a private or reserved address.
     try:
-        # Use socket with timeout for DNS resolution
-        socket.setdefaulttimeout(_DNS_LOOKUP_TIMEOUT)
-        try:
-            addr_info = socket.getaddrinfo(hostname, None)
-            for _, _, _, _, sockaddr in addr_info:
-                ip_str = str(sockaddr[0])
-                if _is_dangerous_ip(ip_str):
-                    raise ValidationError(
-                        "url",
-                        f"URL hostname '{hostname}' resolves to private/reserved IP '{ip_str}'",
-                        url[:100],
-                    )
-        finally:
-            socket.setdefaulttimeout(None)
-    except socket.gaierror:
-        pass
-    except ValidationError:
-        raise
-    except Exception as exc:
-        logger.debug("Sync DNS validation failed for %s: %s", hostname, exc)
+        addr_info = socket.getaddrinfo(hostname, None)
+    except (OSError, UnicodeError) as exc:
+        logger.debug("DNS lookup failed for %s: %s", hostname, exc)
+    else:
+        for _, _, _, _, sockaddr in addr_info:
+            ip_str = str(sockaddr[0])
+            if _is_dangerous_ip(ip_str):
+                raise ValidationError(
+                    "url",
+                    f"URL hostname '{hostname}' resolves to private/reserved IP '{ip_str}'",
+                    url[:100],
+                )
 
     if hostname_lower in _DANGEROUS_URL_HOSTS:
         raise ValidationError(
@@ -280,83 +250,6 @@ def validate_file_path(path: str, base_dir: Path | None = None, must_exist: bool
     return resolved_path
 
 
-def validate_filename(filename: str) -> str:
-    """Validate filename for safety."""
-    if not filename:
-        raise ValidationError("filename", "Filename cannot be empty", filename)
-
-    if len(filename) > MAX_FILENAME_LENGTH:
-        raise ValidationError(
-            "filename",
-            f"Filename too long (max {MAX_FILENAME_LENGTH} chars)",
-            filename[:50],
-        )
-
-    if "/" in filename or "\\" in filename:
-        raise ValidationError("filename", "Filename cannot contain path separators", filename[:50])
-
-    filename = Path(filename).name
-
-    if not filename.strip():
-        raise ValidationError(
-            "filename", "Filename cannot consist entirely of whitespace", filename[:50]
-        )
-
-    if filename.startswith(".") or filename.startswith("~"):
-        raise ValidationError("filename", "Filename cannot start with '.' or '~'", filename[:50])
-
-    dangerous_exts = {
-        ".exe",
-        ".dll",
-        ".bat",
-        ".cmd",
-        ".sh",
-        ".php",
-        ".jsp",
-        ".asp",
-        ".aspx",
-    }
-    if any(filename.lower().endswith(ext) for ext in dangerous_exts):
-        raise ValidationError("filename", "Filename has dangerous extension", filename[:50])
-
-    if not _SAFE_FILENAME_CHARS.match(filename):
-        raise ValidationError("filename", "Filename contains unsafe characters", filename[:50])
-
-    return filename
-
-
-def validate_user_input(
-    text: str | None, allow_html: bool = False, max_length: int = MAX_INPUT_LENGTH
-) -> str:
-    """Validate user input for XSS and injection attacks."""
-    if text is None:
-        raise ValidationError("input", "Input cannot be None", text)
-
-    if not isinstance(text, str):
-        text = str(text)
-
-    if len(text) > max_length:
-        raise ValidationError("input", f"Input too long (max {max_length} chars)", text[:100])
-
-    # Unicode normalization to prevent homograph attacks
-    text = unicodedata.normalize("NFKC", text)
-
-    # Check for control characters
-    for char in text:
-        if ord(char) in _CONTROL_CHARS:
-            raise ValidationError("input", "Input contains control characters", text[:50])
-
-    # Check for dangerous HTML if not explicitly allowed
-    if not allow_html:
-        for pattern in _DANGEROUS_HTML_PATTERNS:
-            if pattern.search(text):
-                raise ValidationError(
-                    "input", "Input contains potentially dangerous HTML/JS", text[:100]
-                )
-
-    return text
-
-
 def sanitize_for_logs(text: str, max_length: int = 500) -> str:
     """Sanitize text for safe logging (prevents log injection)."""
     if not isinstance(text, str):
@@ -377,16 +270,12 @@ def sanitize_for_logs(text: str, max_length: int = 500) -> str:
 
 __all__ = [
     "MAX_BOOK_ID_LENGTH",
-    "MAX_FILENAME_LENGTH",
-    "MAX_INPUT_LENGTH",
     "MAX_PATH_LENGTH",
     "MAX_URL_LENGTH",
     "ValidationError",
     "sanitize_for_logs",
     "validate_book_id",
     "validate_file_path",
-    "validate_filename",
     "validate_url",
     "validate_url_sync",
-    "validate_user_input",
 ]

@@ -98,15 +98,6 @@ class TestDownloadJobDTO:
         assert dto.book_id == "b1"
         assert len(dto.job_id) == 32
 
-    def test_to_dict_backward_compat(self):
-        dto = DownloadJobDTO(book_id="b1", output_dir=Path("/tmp"))
-        assert dto.to_dict() == dto.model_dump()
-
-    def test_from_dict_backward_compat(self):
-        data = {"book_id": "b1", "output_dir": "/tmp"}
-        dto = DownloadJobDTO.from_dict(data)
-        assert dto.book_id == "b1"
-
     def test_frozen_prevents_mutation(self):
         dto = DownloadJobDTO(book_id="b1", output_dir=Path("/tmp"))
         with pytest.raises(ValidationError):
@@ -181,26 +172,6 @@ class TestDownloadProgressDTO:
         assert dto.total_chapters == 10
         assert dto.chapter_title == "Advanced Topics"
 
-    def test_with_updates_creates_new_instance(self):
-        dto1 = DownloadProgressDTO(status="queued")
-        dto2 = dto1.with_updates(status="downloading", percentage=10)
-        assert dto1.status == "queued"
-        assert dto2.status == "downloading"
-        assert dto2.percentage == 10
-        assert dto1 is not dto2
-
-    def test_with_updates_preserves_unchanged_fields(self):
-        dto1 = DownloadProgressDTO(status="queued", current_chapter=0, total_chapters=5)
-        dto2 = dto1.with_updates(status="downloading")
-        assert dto2.current_chapter == 0
-        assert dto2.total_chapters == 5
-
-    def test_with_updates_queue_position(self):
-        dto1 = DownloadProgressDTO(queue_position=1)
-        dto2 = dto1.with_updates(queue_position=2)
-        assert dto2.queue_position == 2
-        assert dto1.queue_position == 1
-
     def test_model_dump_excludes_empty_and_none(self):
         dto = DownloadProgressDTO()
         dumped = dto.model_dump()
@@ -254,15 +225,6 @@ class TestDownloadProgressDTO:
         dto = DownloadProgressDTO.model_validate({"status": "completed"})
         assert dto.status == "completed"
         assert dto.percentage == 0
-
-    def test_to_dict_backward_compat(self):
-        dto = DownloadProgressDTO(status="downloading")
-        assert dto.to_dict() == dto.model_dump()
-
-    def test_from_dict_backward_compat(self):
-        dto = DownloadProgressDTO.from_dict({"status": "completed", "percentage": 100})
-        assert dto.status == "completed"
-        assert dto.percentage == 100
 
     def test_frozen_prevents_mutation(self):
         dto = DownloadProgressDTO(status="queued")
@@ -389,14 +351,6 @@ class TestDownloadResultDTO:
         )
         assert dto.pdf_paths == ["/tmp/p1.pdf", "/tmp/p2.pdf"]
 
-    def test_to_dict_backward_compat(self):
-        dto = DownloadResultDTO(book_id="b1", title="T", epub_path="/tmp/book.epub")
-        assert dto.to_dict() == dto.model_dump()
-
-    def test_from_dict_backward_compat(self):
-        dto = DownloadResultDTO.from_dict({"book_id": "b1", "title": "T", "epub": "/tmp/book.epub"})
-        assert dto.epub_path == "/tmp/book.epub"
-
 
 class TestDownloadErrorDTO:
     def test_creation_with_required_fields(self):
@@ -476,15 +430,6 @@ class TestDownloadErrorDTO:
         dto = DownloadErrorDTO.model_validate({"error": "err", "code": "custom"})
         assert dto.code == "custom"
 
-    def test_to_dict_backward_compat(self):
-        dto = DownloadErrorDTO(error="err", code="c")
-        assert dto.to_dict() == dto.model_dump()
-
-    def test_from_dict_backward_compat(self):
-        dto = DownloadErrorDTO.from_dict({"error": "err", "code": "c"})
-        assert dto.error == "err"
-        assert dto.code == "c"
-
     def test_heterogeneous_details_dict(self):
         dto = DownloadErrorDTO(
             error="err",
@@ -529,11 +474,3 @@ class TestJobSnapshotDTO:
         assert restored.job_id == original.job_id
         assert restored.book_id == original.book_id
         assert restored.status == original.status
-
-    def test_to_dict_backward_compat(self):
-        dto = JobSnapshotDTO(job_id="j1", book_id="b1", status="queued")
-        assert dto.to_dict() == dto.model_dump()
-
-    def test_from_dict_backward_compat(self):
-        dto = JobSnapshotDTO.from_dict({"job_id": "j1", "book_id": "b1", "status": "queued"})
-        assert dto.job_id == "j1"

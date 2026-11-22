@@ -11,11 +11,6 @@ logger = logging.getLogger(__name__)
 
 
 class AuthPlugin(Plugin):
-    async def validate_session(self) -> bool:
-        """Return True if the current cookie jar authenticates successfully."""
-        status = await self.get_status()
-        return bool(status.get("valid"))
-
     async def get_status(self) -> dict[str, Any]:
         """Return a structured session status.
 

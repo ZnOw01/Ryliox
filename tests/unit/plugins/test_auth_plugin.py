@@ -94,10 +94,3 @@ async def test_get_status_requires_dict_payload():
     status = await plugin.get_status()
 
     assert status == {"valid": False, "reason": "not_authenticated"}
-
-
-@pytest.mark.asyncio
-async def test_validate_session_returns_boolean_status():
-    plugin, _ = _make_plugin(_FakeResponse(200, {"user_type": "Active"}))
-
-    assert await plugin.validate_session() is True

@@ -19,11 +19,7 @@ Usage:
 from __future__ import annotations
 
 import asyncio
-import os
-import re
-import tempfile
 from pathlib import Path
-from unittest.mock import patch
 
 import pytest
 from fastapi.testclient import TestClient
@@ -33,21 +29,13 @@ from core.audit import (
     AuditLogger,
     AuditSeverity,
 )
-from core.secrets import (
-    SecretManager,
-    generate_secure_token,
-    hash_sensitive_value,
-    verify_hashed_value,
-)
 
 # Import security modules
 from core.validators import (
     ValidationError,
     validate_book_id,
     validate_file_path,
-    validate_filename,
     validate_url,
-    validate_user_input,
 )
 
 # =============================================================================
@@ -107,91 +95,12 @@ class TestBrokenAccessControl:
 
 
 # =============================================================================
-# A02: Cryptographic Failures Tests
-# =============================================================================
-
-
-class TestCryptographicFailures:
-    """Tests for OWASP A02: Cryptographic Failures."""
-
-    def test_secure_token_generation(self):
-        """Test that tokens are cryptographically secure."""
-        token1 = generate_secure_token(32)
-        token2 = generate_secure_token(32)
-
-        # Tokens should be unique
-        assert token1 != token2
-
-        # Tokens should have expected length
-        assert len(token1) >= 32
-
-        # Tokens should be URL-safe
-        assert re.match(r"^[A-Za-z0-9_-]+$", token1)
-
-    def test_secret_encryption(self, tmp_path):
-        """Test that secrets are encrypted at rest."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            secrets_file = Path(tmpdir) / "secrets.enc"
-
-            with patch.dict(os.environ, {"SECRET_MASTER_PASSWORD": "test-master-key"}):
-                manager = SecretManager(
-                    secrets_file=secrets_file,
-                    master_key_file=Path(tmpdir) / ".master_key",
-                )
-
-                # Store a secret
-                manager.set("api_key", "super-secret-value")
-
-                # Verify file is encrypted (not plaintext)
-                encrypted_content = secrets_file.read_bytes()
-                assert b"super-secret-value" not in encrypted_content
-
-                # Retrieve and verify
-                retrieved = manager.get("api_key")
-                assert retrieved == "super-secret-value"
-
-    def test_sensitive_value_hashing(self):
-        """Test secure hashing of sensitive values."""
-        value = "password123"
-        hashed = hash_sensitive_value(value)
-
-        # Hash should be in expected format (salt$hash)
-        assert "$" in hashed
-
-        # Same value should produce different hashes (due to salt)
-        hashed2 = hash_sensitive_value(value)
-        assert hashed != hashed2
-
-        # Verification should work
-        assert verify_hashed_value(value, hashed)
-        assert not verify_hashed_value("wrong-password", hashed)
-
-
-# =============================================================================
 # A03: Injection Tests
 # =============================================================================
 
 
 class TestInjection:
     """Tests for OWASP A03: Injection."""
-
-    def test_xss_prevention(self):
-        """Test XSS prevention in user input."""
-        # Script tags should be blocked
-        with pytest.raises(ValidationError):
-            validate_user_input("<script>alert('xss')</script>")
-
-        # Event handlers should be blocked
-        with pytest.raises(ValidationError):
-            validate_user_input("<img onload=alert('xss')>")
-
-        # JavaScript protocol should be blocked
-        with pytest.raises(ValidationError):
-            validate_user_input("javascript:alert('xss')")
-
-        # Valid input should pass
-        clean = validate_user_input("Hello World")
-        assert clean == "Hello World"
 
     def test_sql_injection_prevention(self):
         """Test SQL injection prevention in identifiers."""
@@ -201,18 +110,6 @@ class TestInjection:
 
         with pytest.raises(ValidationError):
             validate_book_id("1 OR 1=1")
-
-    def test_command_injection_prevention(self):
-        """Test command injection prevention in paths."""
-        # Command injection attempts should be blocked
-        with pytest.raises(ValidationError):
-            validate_filename("file.txt; rm -rf /")
-
-        with pytest.raises(ValidationError):
-            validate_filename("file.txt && cat /etc/passwd")
-
-        with pytest.raises(ValidationError):
-            validate_filename("file.txt`whoami`")
 
 
 # =============================================================================
@@ -287,9 +184,9 @@ class TestVulnerableComponents:
         safety or snyk to scan dependencies.
         """
         pyproject_file = Path(__file__).parent.parent.parent / "pyproject.toml"
-        assert pyproject_file.exists(), "pyproject.toml debe existir"
+        assert pyproject_file.exists(), "pyproject.toml must exist"
         content = pyproject_file.read_text(encoding="utf-8")
-        assert "[project]" in content, "El proyecto debe declarar dependencias en pyproject.toml"
+        assert "[project]" in content, "pyproject.toml must declare the project"
 
 
 # =============================================================================

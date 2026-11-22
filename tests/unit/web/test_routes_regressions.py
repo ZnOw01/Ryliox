@@ -55,7 +55,6 @@ def _build_client(
         app.state.download_queue = queue or SimpleNamespace(
             get_progress=lambda job_id=None: {},
             get_progress_version=lambda: 0,
-            wait_for_progress_change=lambda previous, timeout: previous,
         )
 
     async def fake_shutdown(_app):
@@ -115,7 +114,6 @@ def test_progress_with_unknown_job_id_returns_not_found(
     queue = SimpleNamespace(
         get_progress=lambda job_id=None: {},
         get_progress_version=lambda: 0,
-        wait_for_progress_change=lambda previous, timeout: previous,
     )
     with _build_client(monkeypatch, queue=queue) as client:
         response = client.get(
