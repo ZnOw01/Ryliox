@@ -256,7 +256,7 @@ export function AuthStatusCard() {
                 <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" />
                 {persistedCookieCount > 0
                   ? `${t('auth.cookies.saved')}: ${persistedCookieCount}`
-                  : 'SQLite Vault Encrypted'}
+                  : t('auth.cookies.stored_encrypted')}
               </span>
             </div>
           </div>

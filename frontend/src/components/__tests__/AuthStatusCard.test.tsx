@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { vi } from 'vitest';
 import i18n from '../../i18n/config';
+import { getStatus } from '../../lib/api';
 import { AuthStatusCard } from '../AuthStatusCard';
 
 vi.mock('../../lib/api', () => ({
@@ -40,6 +41,26 @@ describe('AuthStatusCard i18n', () => {
       view.unmount();
       queryClient.clear();
       await i18n.changeLanguage(originalLanguage);
+    }
+  });
+});
+
+describe('AuthStatusCard with a valid session', () => {
+  it('describes stored cookies in the UI language', async () => {
+    vi.mocked(getStatus).mockResolvedValueOnce({ valid: true, has_cookies: true, reason: null });
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const view = render(
+      <QueryClientProvider client={queryClient}>
+        <AuthStatusCard />
+      </QueryClientProvider>
+    );
+
+    try {
+      expect(await screen.findByText('Cookies cifradas en el servidor')).toBeInTheDocument();
+      expect(screen.queryByText(/sqlite vault/i)).toBeNull();
+    } finally {
+      view.unmount();
+      queryClient.clear();
     }
   });
 });

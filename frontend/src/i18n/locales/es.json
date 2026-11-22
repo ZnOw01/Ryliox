@@ -30,6 +30,7 @@
 			"status": "Servicio: {{status}}"
 		},
 		"cookies": {
+			"stored_encrypted": "Cookies cifradas en el servidor",
 			"saved": "Cookies guardadas",
 			"label": "Cookies (JSON o encabezado HTTP)",
 			"placeholder": "{\"cookie\": \"valor\"} o \"a=1; b=2\"",
