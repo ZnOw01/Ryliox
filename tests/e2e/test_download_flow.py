@@ -15,6 +15,7 @@ Requirements:
 
 from __future__ import annotations
 
+import json
 import time
 from pathlib import Path
 
@@ -80,44 +81,27 @@ class TestAuthenticationFlow:
         """Test the cookie setup dialog flow."""
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
-            context = browser.new_context(viewport={"width": 1280, "height": 720})
+            context = browser.new_context(viewport={"width": 1280, "height": 720}, locale="en-US")
             page = context.new_page()
 
             try:
-                # Navigate to app
                 page.goto(base_url)
                 page.wait_for_load_state("networkidle")
 
-                # Look for cookie/settings button
-                # Note: Selectors depend on actual UI implementation
-                cookie_button = page.locator(
-                    "[data-testid='cookie-button'], button:has-text('Cookies'), button:has-text('Auth')"
-                ).first
+                # Without a session the card offers to configure cookies; with one, the
+                # editor may already be open. Either way it must end up open.
+                editor = page.locator("#cookies-payload")
+                if not editor.is_visible():
+                    page.get_by_role("button", name="Configure cookies").click()
+                expect(editor).to_be_visible()
 
-                if cookie_button.is_visible():
-                    cookie_button.click()
-
-                    # Wait for dialog
-                    dialog = page.locator("[data-testid='cookie-dialog'], dialog, .modal").first
-                    expect(dialog).to_be_visible()
-
-                    # Try to find cookie input
-                    cookie_input = page.locator(
-                        "textarea, [data-testid='cookie-input'], input[type='text']"
-                    ).first
-                    if cookie_input.is_visible():
-                        # Enter cookies as JSON
-                        cookie_json = str(sample_cookies).replace("'", '"')
-                        cookie_input.fill(cookie_json)
-
-                        # Submit
-                        submit_button = page.locator(
-                            "button:has-text('Save'), button:has-text('Submit'), [data-testid='save-cookies']"
-                        ).first
-                        submit_button.click()
-
-                        # Wait for success indication
-                        page.wait_for_timeout(1000)
+                save = page.get_by_role("button", name="Save cookies")
+                editor.fill("")
+                expect(save).to_be_disabled()
+                editor.fill(json.dumps(sample_cookies))
+                expect(save).to_be_enabled()
+                # Not submitted on purpose: TEST_BASE_URL may point at a real instance,
+                # and saving would replace that instance's stored session.
 
             finally:
                 context.close()
@@ -391,27 +375,22 @@ class TestUIInteractions:
         """Test selecting different output formats."""
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
-            context = browser.new_context(viewport={"width": 1280, "height": 720})
+            context = browser.new_context(viewport={"width": 1280, "height": 720}, locale="en-US")
             page = context.new_page()
 
             try:
                 page.goto(base_url)
                 page.wait_for_load_state("networkidle")
 
-                # Look for format selection
-                format_select = page.locator(
-                    "select, [data-testid='format-select'], button:has-text('EPUB'), button:has-text('PDF')"
-                ).first
+                group = page.get_by_role("radiogroup", name="Download format selector")
+                radios = group.get_by_role("radio")
+                expect(radios.first).to_be_visible()
+                assert radios.count() >= 2, "The server should offer more than one format"
 
-                if format_select.is_visible():
-                    # Try to change format
-                    format_select.click()
-                    page.wait_for_timeout(500)
-
-                    # Select PDF option if available
-                    pdf_option = page.locator("option:has-text('PDF'), text='PDF'").first
-                    if pdf_option.is_visible():
-                        pdf_option.click()
+                target = radios.nth(1)
+                target.click()
+                expect(target).to_have_attribute("aria-checked", "true")
+                expect(radios.first).to_have_attribute("aria-checked", "false")
 
             finally:
                 context.close()

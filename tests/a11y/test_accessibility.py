@@ -9,6 +9,11 @@ from playwright.async_api import async_playwright
 pytestmark = [pytest.mark.a11y, pytest.mark.e2e]
 
 
+# Astro drops the island's `ssr` attribute once React has hydrated it. The app polls
+# the API, so "networkidle" is not a reliable signal.
+HYDRATED = "astro-island:not([ssr])"
+
+
 @pytest.mark.asyncio
 async def test_skip_link_present(base_url):
     """Test that skip link is present and functional."""
@@ -19,21 +24,16 @@ async def test_skip_link_present(base_url):
         try:
             await page.goto(base_url)
 
-            # Tab to get to skip link
+            await page.wait_for_selector(HYDRATED, state="attached")
             await page.keyboard.press("Tab")
 
-            # Check if skip link is focused
-            skip_link = await page.locator(".skip-link:focus").is_visible()
-            assert skip_link, "Skip link should be visible when focused"
+            skip_link = page.locator("a[href='#main-content']:focus")
+            assert await skip_link.is_visible(), "The first Tab stop should be a visible skip link"
 
-            # Press the skip link
             await page.keyboard.press("Enter")
 
-            # Check if main content is focused
-            main_content = await page.locator("main").is_focused()
-            assert main_content or await page.locator("main:focus").count() > 0, (
-                "Main content should receive focus after skip link"
-            )
+            focused = await page.evaluate("() => document.activeElement?.tagName.toLowerCase()")
+            assert focused == "main", f"Main content should receive focus, got {focused}"
 
         finally:
             await browser.close()
@@ -87,36 +87,25 @@ async def test_aria_labels_present(base_url):
         try:
             await page.goto(base_url)
 
-            # Check buttons without visible text have aria-label
-            icon_buttons = await page.locator(
-                "button:not(:has(> span:not(.sr-only))):not(:has(> text))"
-            ).all()
+            await page.wait_for_selector(HYDRATED, state="attached")
+            unnamed = await page.evaluate(
+                """() => [...document.querySelectorAll('button')]
+                    .filter(b => b.offsetWidth || b.offsetHeight)
+                    .filter(b => !(b.innerText.trim() || b.getAttribute('aria-label')
+                        || b.getAttribute('aria-labelledby') || b.title))
+                    .map(b => b.outerHTML.slice(0, 160))"""
+            )
+            assert unnamed == [], f"Buttons without an accessible name: {unnamed}"
 
-            for button in icon_buttons:
-                if await button.is_visible():
-                    aria_label = await button.get_attribute("aria-label")
-                    title = await button.get_attribute("title")
-
-                    assert aria_label or title, (
-                        f"Icon button should have aria-label or title: {await button.evaluate('el => el.outerHTML')}"
-                    )
-
-            # Check form inputs have labels
-            inputs = await page.locator("input, select, textarea").all()
-            for input_el in inputs:
-                if await input_el.is_visible():
-                    input_id = await input_el.get_attribute("id")
-                    aria_label = await input_el.get_attribute("aria-label")
-                    aria_labelledby = await input_el.get_attribute("aria-labelledby")
-
-                    has_label = False
-                    if input_id:
-                        label = await page.locator(f"label[for='{input_id}']").count()
-                        has_label = label > 0
-
-                    assert has_label or aria_label or aria_labelledby, (
-                        f"Input should have associated label: {await input_el.evaluate('el => el.outerHTML')}"
-                    )
+            # `labels` covers both <label for> and an input wrapped in its <label>.
+            unlabelled = await page.eval_on_selector_all(
+                "input:not([type='hidden']), select, textarea",
+                """els => els
+                    .filter(e => !(e.labels?.length || e.getAttribute('aria-label')
+                        || e.getAttribute('aria-labelledby')))
+                    .map(e => e.outerHTML.slice(0, 160))""",
+            )
+            assert unlabelled == [], f"Form controls without a label: {unlabelled}"
 
         finally:
             await browser.close()
@@ -226,16 +215,13 @@ async def test_aria_live_regions(base_url):
         try:
             await page.goto(base_url)
 
-            # Check for aria-live regions
-            live_regions = await page.locator("[aria-live]").all()
+            await page.wait_for_selector(HYDRATED, state="attached")
+            values = await page.eval_on_selector_all(
+                "[aria-live]", "els => els.map(e => e.getAttribute('aria-live'))"
+            )
 
-            assert len(live_regions) > 0, "Page should have at least one aria-live region"
-
-            # Verify regions have appropriate values
-            valid_values = {"polite", "assertive", "off"}
-            for region in live_regions:
-                live_value = await region.get_attribute("aria-live")
-                assert live_value in valid_values, f"Invalid aria-live value: {live_value}"
+            assert values, "Page should have at least one aria-live region"
+            assert set(values) <= {"polite", "assertive", "off"}, values
 
         finally:
             await browser.close()
