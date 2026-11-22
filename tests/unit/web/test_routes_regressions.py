@@ -160,6 +160,7 @@ def test_reveal_supports_synchronous_system_plugin(monkeypatch: pytest.MonkeyPat
     revealed_file.touch()
     system = SyncSystemPlugin()
     kernel = DummyKernel(system=system)
+    monkeypatch.setattr("web.routes.system.config.OUTPUT_ROOT", tmp_path)
     monkeypatch.setattr("web.routes.system.config.OUTPUT_DIR", tmp_path)
 
     with _build_client(monkeypatch, kernel=kernel) as client:
@@ -217,3 +218,50 @@ def test_progress_error_does_not_expose_internal_trace_path():
 
     assert "trace_log" not in payload
     assert payload["details"] == {"reason": "render failed"}
+
+
+def test_reveal_accepts_book_from_previous_output_dir_under_root(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+):
+    # A book downloaded before the output folder was changed in Settings still
+    # lives under the authorized root and must stay revealable.
+    old_dir = tmp_path / "old"
+    old_dir.mkdir()
+    revealed_file = old_dir / "book.epub"
+    revealed_file.touch()
+    new_dir = tmp_path / "new"
+    new_dir.mkdir()
+    system = SyncSystemPlugin()
+    kernel = DummyKernel(system=system)
+    monkeypatch.setattr("web.routes.system.config.OUTPUT_ROOT", tmp_path)
+    monkeypatch.setattr("web.routes.system.config.OUTPUT_DIR", new_dir)
+
+    with _build_client(monkeypatch, kernel=kernel) as client:
+        response = client.post(
+            "/api/reveal",
+            json={"path": str(revealed_file)},
+            headers={"origin": "http://testserver"},
+        )
+
+    assert response.status_code == 200
+    assert system.revealed_path == revealed_file.resolve()
+
+
+def test_reveal_rejects_path_outside_output_root(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    root = tmp_path / "root"
+    root.mkdir()
+    outside = tmp_path / "secret.txt"
+    outside.touch()
+    system = SyncSystemPlugin()
+    monkeypatch.setattr("web.routes.system.config.OUTPUT_ROOT", root)
+    monkeypatch.setattr("web.routes.system.config.OUTPUT_DIR", root)
+
+    with _build_client(monkeypatch, kernel=DummyKernel(system=system)) as client:
+        response = client.post(
+            "/api/reveal",
+            json={"path": str(outside)},
+            headers={"origin": "http://testserver"},
+        )
+
+    assert response.status_code == 403
+    assert system.revealed_path is None

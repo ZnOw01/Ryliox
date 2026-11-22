@@ -425,7 +425,9 @@ async def reveal_file(
             detail={"error": "Path is required", "code": ErrorCode.PATH_REQUIRED},
         )
 
-    allowed_base = Path(config.OUTPUT_DIR).resolve()
+    # Books may live anywhere under the authorized root: a per-download
+    # output_dir, or the folder in use before the output dir was changed.
+    allowed_base = Path(config.OUTPUT_ROOT).resolve()
     try:
         path = validate_file_path(data.path, base_dir=allowed_base)
     except ValidationError as exc:
