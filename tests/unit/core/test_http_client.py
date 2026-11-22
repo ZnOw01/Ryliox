@@ -216,3 +216,22 @@ async def test_http_client_preserves_unmodified_cookie_scope_on_refresh(monkeypa
     assert refresh["domain"] == "learning.oreilly.com"
     assert refresh["path"] == "/library"
     assert refresh["secure"] is True
+
+
+def test_jwt_status_decodes_base64url_payload():
+    """JWT segments are base64url: '-' and '_' must decode, not mark the token invalid."""
+    import base64
+    import json
+    import time
+
+    payload = json.dumps({"exp": int(time.time()) + 3600, "sub": "user?>?>"}).encode()
+    segment = base64.urlsafe_b64encode(payload).rstrip(b"=").decode()
+    assert "-" in segment or "_" in segment
+
+    client = HttpClient(cookies_file=config.COOKIES_FILE)
+    client._auth_cookies = {"orm-jwt": f"header.{segment}.signature"}
+
+    status = client.get_jwt_status()
+
+    assert status is not None
+    assert status["valid"] is True
