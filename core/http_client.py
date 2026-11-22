@@ -102,7 +102,7 @@ class HttpClient:
         if self._client is None:
             self._client = httpx.AsyncClient(
                 headers=dict(config.HEADERS),
-                timeout=config.REQUEST_TIMEOUT,
+                timeout=config.SETTINGS.http.timeout,
             )
             self._owns_client = True
         self._load_cookies(self._cookies_file)
@@ -396,7 +396,7 @@ class HttpClient:
         # (non-awaiting) read-modify-write happens under the lock.
         with self._rate_lock:
             elapsed = time.time() - self.last_request_time
-            delay = config.REQUEST_DELAY - elapsed
+            delay = config.SETTINGS.http.delay - elapsed
             self.last_request_time = time.time() + max(delay, 0.0)
         if delay > 0:
             await asyncio.sleep(delay)
@@ -416,8 +416,8 @@ class HttpClient:
         self._apply_auth_cookies()
 
         allow_redirects = kwargs.pop("allow_redirects", False)
-        max_retries = max(0, int(getattr(config, "REQUEST_RETRIES", 0)))
-        backoff = float(getattr(config, "REQUEST_RETRY_BACKOFF", 0.5))
+        max_retries = config.SETTINGS.http.retries
+        backoff = config.SETTINGS.http.retry_backoff
 
         attempt = 0
         while True:

@@ -17,7 +17,7 @@ from core.audit import AuditEventType, AuditLogger
 from core.services import DownloadQueueService, QueueCapacityError
 from core.session_store import SessionStore
 from plugins.pdf import restricted_url_fetcher
-from web.server import RequestBodyLimitMiddleware, create_app
+from web.server import RequestBodyLimitMiddleware, create_app, run_server
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -89,6 +89,18 @@ def test_remote_bind_requires_admin_token(monkeypatch) -> None:
 
     with pytest.raises(RuntimeError, match="ADMIN_TOKEN"):
         create_app()
+
+
+def test_host_flag_is_subject_to_the_remote_bind_checks(monkeypatch) -> None:
+    monkeypatch.setattr(config.SETTINGS.server, "host", "127.0.0.1")
+    monkeypatch.setattr(config.SETTINGS.security, "admin_token", None)
+    served = MagicMock()
+    monkeypatch.setattr("web.server.uvicorn.run", served)
+    monkeypatch.setattr("web.server.configure_logging", lambda **_: None)
+
+    with pytest.raises(RuntimeError, match="ADMIN_TOKEN"):
+        run_server(host="0.0.0.0")
+    served.assert_not_called()
 
 
 @pytest.mark.asyncio

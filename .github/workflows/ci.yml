@@ -24,8 +24,6 @@ jobs:
       - run: uv run --frozen --python ${{ matrix.python-version }} ruff format --check .
       - run: uv run --frozen --python ${{ matrix.python-version }} mypy
       - run: uv run --frozen --python ${{ matrix.python-version }} pytest -p no:cacheprovider
-        env:
-          PATHS: '{"data_dir":"/tmp/ryliox-data","output_dir":"/tmp/ryliox-output","audit_log_dir":"/tmp/ryliox-data/audit","audit_log_file":"/tmp/ryliox-data/audit.log","secrets_dir":"/tmp/ryliox-data/secrets","secrets_file":"/tmp/ryliox-data/secrets.enc"}'
   frontend:
     runs-on: ubuntu-latest
     defaults:

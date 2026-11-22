@@ -10,14 +10,14 @@ pytestmark = [pytest.mark.a11y, pytest.mark.e2e]
 
 
 @pytest.mark.asyncio
-async def test_skip_link_present():
+async def test_skip_link_present(base_url):
     """Test that skip link is present and functional."""
     async with async_playwright() as p:
         browser = await p.chromium.launch()
         page = await browser.new_page()
 
         try:
-            await page.goto("http://localhost:8000")
+            await page.goto(base_url)
 
             # Tab to get to skip link
             await page.keyboard.press("Tab")
@@ -40,14 +40,14 @@ async def test_skip_link_present():
 
 
 @pytest.mark.asyncio
-async def test_color_contrast():
+async def test_color_contrast(base_url):
     """Test color contrast ratios meet WCAG 2.1 AA (4.5:1)."""
     async with async_playwright() as p:
         browser = await p.chromium.launch()
         page = await browser.new_page()
 
         try:
-            await page.goto("http://localhost:8000")
+            await page.goto(base_url)
 
             # Check various text elements for contrast
             # This is a basic check - in production use axe-core or similar
@@ -78,14 +78,14 @@ async def test_color_contrast():
 
 
 @pytest.mark.asyncio
-async def test_aria_labels_present():
+async def test_aria_labels_present(base_url):
     """Test that interactive elements have ARIA labels or accessible text."""
     async with async_playwright() as p:
         browser = await p.chromium.launch()
         page = await browser.new_page()
 
         try:
-            await page.goto("http://localhost:8000")
+            await page.goto(base_url)
 
             # Check buttons without visible text have aria-label
             icon_buttons = await page.locator(
@@ -123,14 +123,14 @@ async def test_aria_labels_present():
 
 
 @pytest.mark.asyncio
-async def test_keyboard_navigation():
+async def test_keyboard_navigation(base_url):
     """Test that all interactive elements are keyboard accessible."""
     async with async_playwright() as p:
         browser = await p.chromium.launch()
         page = await browser.new_page()
 
         try:
-            await page.goto("http://localhost:8000")
+            await page.goto(base_url)
 
             # Get all interactive elements
             interactive_elements = await page.locator(
@@ -179,14 +179,14 @@ async def test_keyboard_navigation():
 
 
 @pytest.mark.asyncio
-async def test_heading_hierarchy():
+async def test_heading_hierarchy(base_url):
     """Test that headings follow proper hierarchy (h1 > h2 > h3...)."""
     async with async_playwright() as p:
         browser = await p.chromium.launch()
         page = await browser.new_page()
 
         try:
-            await page.goto("http://localhost:8000")
+            await page.goto(base_url)
 
             # Check for h1
             h1_count = await page.locator("h1").count()
@@ -217,14 +217,14 @@ async def test_heading_hierarchy():
 
 
 @pytest.mark.asyncio
-async def test_aria_live_regions():
+async def test_aria_live_regions(base_url):
     """Test that dynamic content updates use aria-live regions."""
     async with async_playwright() as p:
         browser = await p.chromium.launch()
         page = await browser.new_page()
 
         try:
-            await page.goto("http://localhost:8000")
+            await page.goto(base_url)
 
             # Check for aria-live regions
             live_regions = await page.locator("[aria-live]").all()
@@ -242,14 +242,14 @@ async def test_aria_live_regions():
 
 
 @pytest.mark.asyncio
-async def test_form_labels():
+async def test_form_labels(base_url):
     """Test that all form inputs have associated labels."""
     async with async_playwright() as p:
         browser = await p.chromium.launch()
         page = await browser.new_page()
 
         try:
-            await page.goto("http://localhost:8000")
+            await page.goto(base_url)
 
             # Check all form inputs
             inputs = await page.locator("input:not([type='hidden']), select, textarea").all()
@@ -288,14 +288,14 @@ async def test_form_labels():
 
 
 @pytest.mark.asyncio
-async def test_alt_text_on_images():
+async def test_alt_text_on_images(base_url):
     """Test that images have alt text."""
     async with async_playwright() as p:
         browser = await p.chromium.launch()
         page = await browser.new_page()
 
         try:
-            await page.goto("http://localhost:8000")
+            await page.goto(base_url)
 
             images = await page.locator("img").all()
 
@@ -317,14 +317,14 @@ async def test_alt_text_on_images():
 
 
 @pytest.mark.asyncio
-async def test_landmark_regions():
+async def test_landmark_regions(base_url):
     """Test that page has proper landmark regions."""
     async with async_playwright() as p:
         browser = await p.chromium.launch()
         page = await browser.new_page()
 
         try:
-            await page.goto("http://localhost:8000")
+            await page.goto(base_url)
 
             # Check for main landmark
             main_count = await page.locator("main").count()
@@ -344,7 +344,7 @@ async def test_landmark_regions():
 
 
 @pytest.mark.asyncio
-async def test_reduced_motion_respected():
+async def test_reduced_motion_respected(base_url):
     """Test that animations respect prefers-reduced-motion."""
     async with async_playwright() as p:
         # Launch with reduced motion preference
@@ -353,7 +353,7 @@ async def test_reduced_motion_respected():
         page = await context.new_page()
 
         try:
-            await page.goto("http://localhost:8000")
+            await page.goto(base_url)
 
             # Check if reduced motion is respected in CSS
             # Elements with animation classes should have animation: none

@@ -2,22 +2,17 @@
 
 from __future__ import annotations
 
-import os
+from prometheus_client import (
+    CONTENT_TYPE_LATEST,
+    CollectorRegistry,
+    Counter,
+    Gauge,
+    Histogram,
+    Info,
+    generate_latest,
+)
 
-try:
-    from prometheus_client import (
-        CONTENT_TYPE_LATEST,
-        CollectorRegistry,
-        Counter,
-        Gauge,
-        Histogram,
-        Info,
-        generate_latest,
-    )
-
-    PROMETHEUS_AVAILABLE = True
-except ImportError:
-    PROMETHEUS_AVAILABLE = False
+import config
 
 
 class MetricsManager:
@@ -35,9 +30,7 @@ class MetricsManager:
         if self._initialized:
             return
 
-        self._enabled = (
-            PROMETHEUS_AVAILABLE and os.getenv("ENABLE_METRICS", "true").lower() != "false"
-        )
+        self._enabled = config.SETTINGS.metrics.enabled
 
         if not self._enabled:
             self._initialized = True
@@ -125,8 +118,7 @@ class MetricsManager:
             registry=self._registry,
         )
 
-        app_version = os.getenv("APP_VERSION", "dev")
-        self.app_info.info({"version": app_version, "name": "ryliox"})
+        self.app_info.info({"version": config.APP_VERSION, "name": "ryliox"})
 
         self._initialized = True
 

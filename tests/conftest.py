@@ -1,19 +1,10 @@
-"""Global pytest fixtures and configuration for Ryliox tests.
-
-This module provides shared fixtures for all test types:
-- Unit tests
-- Integration tests
-- E2E tests
-- Performance tests
-- Security tests
-"""
+"""Shared fixtures for the Ryliox test suite."""
 
 from __future__ import annotations
 
+import atexit
 import os
-
-# Add project root to path for imports
-import sys
+import shutil
 import tempfile
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -22,13 +13,26 @@ from urllib.error import URLError
 from urllib.request import urlopen
 
 import pytest
-import pytest_asyncio
+from cryptography.fernet import Fernet
 from fastapi.testclient import TestClient
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
-repo_root_str = str(REPO_ROOT)
-if repo_root_str not in sys.path:
-    sys.path.insert(0, repo_root_str)
+# The suite must never touch a developer's real state or depend on their
+# ``.env``: point every path at a throwaway directory and supply the keys that
+# would otherwise be created in the user's configuration directory. This has to
+# happen before ``config`` is first imported, which the project imports below do.
+_STATE_DIR = Path(tempfile.mkdtemp(prefix="ryliox-tests-"))
+atexit.register(shutil.rmtree, _STATE_DIR, ignore_errors=True)
+os.environ.update(
+    {
+        "RYLIOX_ENV_FILE": str(_STATE_DIR / "no.env"),
+        "RYLIOX_PATHS__DATA_DIR": str(_STATE_DIR / "data"),
+        "RYLIOX_PATHS__OUTPUT_DIR": str(_STATE_DIR / "output"),
+        "RYLIOX_PATHS__OUTPUT_ROOT": str(_STATE_DIR / "output"),
+        "RYLIOX_AUDIT__LOG_FILE": str(_STATE_DIR / "data" / "audit.log"),
+        "RYLIOX_AUDIT__HMAC_KEY": "0" * 64,
+        "RYLIOX_SESSION__ENCRYPTION_KEY": Fernet.generate_key().decode("ascii"),
+    }
+)
 
 from core.kernel import Kernel
 from core.repository import DownloadJobRepository
@@ -42,24 +46,25 @@ from web.dependencies import (
 from web.server import create_app
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncGenerator, Generator
+    from collections.abc import Generator
 
     from fastapi import FastAPI
 
-# ============================================================================
-# Pytest Configuration
-# ============================================================================
 
+@pytest.fixture
+def clean_settings_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Remove every variable the settings would read, for tests that build their own."""
+    import config
 
-def pytest_configure(config):
-    """Configure custom pytest markers."""
-    config.addinivalue_line("markers", "a11y: mark test as an accessibility test")
-    config.addinivalue_line("markers", "integration: mark test as an integration test")
-    config.addinivalue_line("markers", "e2e: mark test as an end-to-end test")
-    config.addinivalue_line("markers", "performance: mark test as a performance test")
-    config.addinivalue_line("markers", "security: mark test as a security test")
-    config.addinivalue_line("markers", "slow: mark test as slow (skipped by default)")
-    config.addinivalue_line("markers", "rate_limit: mark test as related to rate limiting")
+    groups = set(config.Settings.model_fields)
+    for name in list(os.environ):
+        key = name.lower()
+        if (
+            name.upper() in config.SHORT_NAMES
+            or key.startswith("ryliox_")
+            or key.split("__")[0] in groups
+        ):
+            monkeypatch.delenv(name)
 
 
 def pytest_addoption(parser):
@@ -113,12 +118,6 @@ def pytest_collection_modifyitems(config, items):
 # ============================================================================
 
 
-@pytest.fixture(scope="session")
-def project_root() -> Path:
-    """Return the project root directory."""
-    return Path(__file__).parent.parent
-
-
 @pytest.fixture(scope="function")
 def temp_dir() -> Generator[Path, None, None]:
     """Create a temporary directory for test data."""
@@ -130,14 +129,6 @@ def temp_dir() -> Generator[Path, None, None]:
 def temp_db_path(temp_dir: Path) -> Path:
     """Return a temporary database file path."""
     return temp_dir / "test.db"
-
-
-@pytest.fixture(scope="function")
-def temp_output_dir(temp_dir: Path) -> Path:
-    """Return a temporary output directory."""
-    output_dir = temp_dir / "output"
-    output_dir.mkdir(exist_ok=True)
-    return output_dir
 
 
 # ============================================================================
@@ -396,30 +387,6 @@ def authenticated_client(
 
 
 # ============================================================================
-# Async Fixtures
-# ============================================================================
-
-
-@pytest_asyncio.fixture(scope="function")
-async def async_test_client(test_app: FastAPI) -> AsyncGenerator[TestClient, None]:
-    """Create an async TestClient for async endpoint testing."""
-    async with TestClient(test_app) as client:
-        yield client
-
-
-@pytest_asyncio.fixture(scope="function")
-async def running_download_queue(
-    mock_download_queue: DownloadQueueService,
-) -> AsyncGenerator[DownloadQueueService, None]:
-    """Start and stop the download queue for testing."""
-    mock_download_queue.start()
-    try:
-        yield mock_download_queue
-    finally:
-        mock_download_queue.stop()
-
-
-# ============================================================================
 # Playwright Fixtures (for E2E tests)
 # ============================================================================
 
@@ -434,58 +401,3 @@ def base_url() -> str:
     except (OSError, URLError):
         pytest.skip(f"Live server is not available at {url}; set TEST_BASE_URL or start the API")
     return url
-
-
-# ============================================================================
-# Utility Fixtures
-# ============================================================================
-
-
-def extract_error(response_data: dict) -> str:
-    """Extract error message from FastAPI response, handling detail wrapping."""
-    if "error" in response_data:
-        return str(response_data.get("error", ""))
-    detail = response_data.get("detail", {})
-    if isinstance(detail, dict):
-        return str(detail.get("error", ""))
-    return str(detail) if detail else ""
-
-
-@pytest.fixture(scope="function")
-def rate_limit_headers() -> dict[str, str]:
-    """Return headers that trigger rate limiting for testing."""
-    return {
-        "X-Forwarded-For": "192.168.1.100",
-        "Origin": "http://localhost:8000",
-    }
-
-
-@pytest.fixture(scope="function")
-def malicious_payloads() -> dict[str, list[str]]:
-    """Return various malicious payloads for security testing."""
-    return {
-        "path_traversal": [
-            "../../../etc/passwd",
-            "..\\..\\..\\windows\\system32\\config\\sam",
-            "....//....//....//etc/passwd",
-            "%2e%2e%2f%2e%2e%2f%2e%2e%2fetc%2fpasswd",
-        ],
-        "xss": [
-            "<script>alert('xss')</script>",
-            "<img src=x onerror=alert('xss')>",
-            "javascript:alert('xss')",
-            "<iframe src='javascript:alert(1)'>",
-        ],
-        "sql_injection": [
-            "' OR '1'='1",
-            "'; DROP TABLE users; --",
-            "1' AND 1=1 --",
-            "' UNION SELECT * FROM users --",
-        ],
-        "command_injection": [
-            "; cat /etc/passwd",
-            "| whoami",
-            "`id`",
-            "$(uname -a)",
-        ],
-    }

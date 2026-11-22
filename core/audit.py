@@ -23,24 +23,6 @@ from core.validators import sanitize_for_logs
 
 logger = logging.getLogger(__name__)
 
-# HIGH-001: Use config.SETTINGS.audit.* instead of hardcoded paths
-AUDIT_LOG_DIR: Path = getattr(config.SETTINGS.audit, "log_dir", None) or Path(
-    os.getenv("AUDIT_LOG_DIR", "./data/audit")
-)
-AUDIT_LOG_FILE: Path = getattr(config.SETTINGS.audit, "log_file", None) or Path(
-    os.getenv("AUDIT_LOG_FILE", "./data/audit.log")
-)
-AUDIT_RETENTION_DAYS: int = getattr(
-    config.SETTINGS.audit, "retention_days", int(os.getenv("AUDIT_RETENTION_DAYS", "365"))
-)
-AUDIT_ENABLED: bool = os.getenv("AUDIT_ENABLED", "true").lower() in ("true", "1", "yes")
-AUDIT_FSYNC_ENABLED: bool = os.getenv("AUDIT_FSYNC_ENABLED", "true").lower() in (
-    "true",
-    "1",
-    "yes",
-)
-
-# Constants
 _MIN_PRINTABLE_ASCII: int = 32
 
 
@@ -248,19 +230,20 @@ class AuditLogger:
     def __init__(
         self,
         log_file: Path | None = None,
-        retention_days: int = AUDIT_RETENTION_DAYS,
-        enabled: bool = AUDIT_ENABLED,
+        retention_days: int | None = None,
+        enabled: bool | None = None,
     ) -> None:
         if hasattr(self, "_initialized"):
             return
 
-        self._log_file = log_file or AUDIT_LOG_FILE
-        self._retention_days = retention_days
-        self._enabled = enabled
+        settings = config.SETTINGS.audit
+        self._log_file = log_file or config.AUDIT_LOG_FILE
+        self._retention_days = settings.retention_days if retention_days is None else retention_days
+        self._enabled = settings.enabled if enabled is None else enabled
         self._last_hash: str = ""
         self._entry_count: int = 0
         self._file_lock: threading.Lock = threading.Lock()
-        self._fsync_enabled = AUDIT_FSYNC_ENABLED
+        self._fsync_enabled = settings.fsync_enabled
 
         self._log_file.parent.mkdir(parents=True, exist_ok=True)
 

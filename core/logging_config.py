@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import sys
 import time
 from datetime import UTC, datetime
@@ -109,25 +108,10 @@ class ColoredConsoleFormatter(logging.Formatter):
         )
 
 
-def configure_logging(
-    *,
-    level: str | None = None,
-    json_format: bool | None = None,
-) -> None:
-    """Configure structured logging for the application."""
-    raw_level = level if level is not None else os.getenv("LOG_LEVEL") or "INFO"
-    log_level = raw_level.upper()
-
-    is_production = os.getenv("ENVIRONMENT", "development").lower() in (
-        "production",
-        "prod",
-    )
-    use_json = json_format if json_format is not None else is_production
-
-    if use_json:
-        formatter: logging.Formatter = JSONLogFormatter()
-    else:
-        formatter = ColoredConsoleFormatter()
+def configure_logging(*, level: str, json_format: bool) -> None:
+    """Route all logging to stdout as JSON or as coloured console lines."""
+    log_level = level.upper()
+    formatter: logging.Formatter = JSONLogFormatter() if json_format else ColoredConsoleFormatter()
 
     root_logger = logging.getLogger()
     root_logger.setLevel(getattr(logging, log_level, logging.INFO))
@@ -149,5 +133,5 @@ def configure_logging(
     logger.info(
         "Logging configured: level=%s, format=%s",
         log_level,
-        "JSON" if use_json else "colored",
+        "JSON" if json_format else "colored",
     )

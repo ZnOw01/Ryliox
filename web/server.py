@@ -390,7 +390,7 @@ def _timeout_and_metrics_middleware_factory(timeout_seconds: float) -> Middlewar
 @asynccontextmanager
 async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.started_at = time.monotonic()
-    app.state.app_version = config.SETTINGS.server.app_version
+    app.state.app_version = config.APP_VERSION
     await initialize_app_services(app)
     logger.info("Ryliox ready on %s:%d", config.SETTINGS.server.host, config.SETTINGS.server.port)
     try:
@@ -414,7 +414,7 @@ def create_app() -> FastAPI:
 
     app = FastAPI(
         title="Ryliox",
-        version=settings.server.app_version,
+        version=config.APP_VERSION,
         description="O'Reilly Learning Platform book downloader.",
         docs_url=None if is_prod else "/api/docs",
         redoc_url=None if is_prod else "/api/redoc",
@@ -610,21 +610,26 @@ def _safe_static_file(root: Path, path: str) -> Path | None:
 # ─── Entrypoint ──────────────────────────────────────────────────────────────
 
 
-app = create_app()
-
-
 def run_server(host: str | None = None, port: int | None = None) -> None:
-    """Run the Uvicorn server (used by ``main.py`` and the launcher)."""
+    """Run the Uvicorn server (used by ``main.py`` and the launcher).
+
+    ``host`` and ``port`` override the configured bind address, so the
+    deployment checks in :func:`create_app` see the address actually served.
+    """
+    settings = config.SETTINGS
+    if host:
+        settings.server.host = host
+    if port:
+        settings.server.port = port
     configure_logging(
-        level=config.SETTINGS.logging.level,
-        json_format=config.SETTINGS.logging.json_logs,
+        level=settings.logging.level,
+        json_format=settings.logging.json_logs or settings.security.environment == "production",
     )
     uvicorn.run(
-        "web.server:app",
-        host=host or config.SETTINGS.server.host,
-        port=port or config.SETTINGS.server.port,
-        reload=False,
-        log_level=config.SETTINGS.logging.level.lower(),
+        create_app(),
+        host=settings.server.host,
+        port=settings.server.port,
+        log_level=settings.logging.level.lower(),
         access_log=False,
     )
 

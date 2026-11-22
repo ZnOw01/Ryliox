@@ -187,7 +187,7 @@ indent-style = "space"
 [tool.mypy]
 python_version = "3.11"
 mypy_path = ["."]
-files = ["core", "plugins", "utils", "web", "main.py"]
+files = ["core", "launcher", "plugins", "utils", "web", "config.py", "main.py"]
 check_untyped_defs = true
 disallow_untyped_defs = false
 disallow_incomplete_defs = true

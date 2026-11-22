@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import argparse
-import logging
 import sys
 
 import config
@@ -22,24 +21,12 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    logging.basicConfig(
-        level=config.SETTINGS.logging.level,
-        format="%(asctime)s %(levelname)-7s %(name)s :: %(message)s",
-    )
-
-    print("=" * 50)
-    print("  Ryliox")
-    print("=" * 50)
-    print(f"\n  Open http://{args.host}:{args.port} in your browser\n")
-    print("  Press Ctrl+C to stop\n")
-    print("=" * 50)
-
+    print(f"Ryliox — open http://{args.host}:{args.port} in your browser (Ctrl+C to stop)")
     try:
         run_server(host=args.host, port=args.port)
-        return 0
     except KeyboardInterrupt:
-        print("\n  Server stopped gracefully. Goodbye!")
-        return 0
+        print("\nServer stopped.")
+    return 0
 
 
 if __name__ == "__main__":
