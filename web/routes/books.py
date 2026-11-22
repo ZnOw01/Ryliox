@@ -37,7 +37,7 @@ def _has_valid_cookies(store: SessionStore | None) -> tuple[bool, int]:
 
     A ``None`` store is treated as "no cookies available" so callers fail
     safely. Storage errors are swallowed into ``(False, 0)`` so transient
-    issues don't crash the request — they surface as a 503 to the client.
+    issues don't crash the request — they surface as a 401 asking for cookies.
     """
     if store is None:
         return False, 0
@@ -50,7 +50,7 @@ def _has_valid_cookies(store: SessionStore | None) -> tuple[bool, int]:
 
 
 def _require_cookies(store: SessionStore, operation: str, book_id: str | None = None) -> None:
-    """Raise 503 with a helpful message when no cookies are configured.
+    """Raise 401 with a helpful message when no cookies are configured.
 
     Centralises the auth-required response so the three book routes stay
     consistent. ``operation`` is used in the log line; ``book_id`` is
@@ -62,7 +62,7 @@ def _require_cookies(store: SessionStore, operation: str, book_id: str | None = 
     detail = "Book " + book_id if book_id else operation
     logger.warning("%s attempted without cookies configured", detail)
     raise HTTPException(
-        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        status_code=status.HTTP_401_UNAUTHORIZED,
         detail={
             "error": "No session cookies configured. Please configure cookies first.",
             "code": ErrorCode.AUTH_REQUIRED,

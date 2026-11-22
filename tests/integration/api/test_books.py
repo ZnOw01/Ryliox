@@ -388,3 +388,25 @@ class TestBookAPIEdgeCases:
         data = response.json()
         # Zero pages should be normalized to None
         assert data["chapters"][0].get("pages") is None
+
+
+class TestRoutesWithoutCookies:
+    """Book routes need a session. Without one they ask for it, as a client error."""
+
+    @pytest.fixture
+    def empty_store(self, mock_session_store):
+        mock_session_store.save_cookies([])
+        assert mock_session_store.count_stored_cookies() == 0
+        return mock_session_store
+
+    @pytest.mark.parametrize(
+        "path",
+        ["/api/search?q=python", "/api/book/9781492056355", "/api/book/9781492056355/chapters"],
+    )
+    def test_asks_for_cookies_with_401(self, test_client: TestClient, empty_store, path):
+        response = test_client.get(path)
+
+        # 401, not 503: the request is missing credentials, the service is fine.
+        # Clients retry 5xx as transient; retrying cannot supply cookies.
+        assert response.status_code == 401
+        assert response.json()["code"] == "auth_required"
