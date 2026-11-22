@@ -196,6 +196,18 @@ export function ChapterSelector({
   const [rangeStart, setRangeStart] = useState<number | ''>('');
   const [rangeEnd, setRangeEnd] = useState<number | ''>('');
 
+  // The filter and range describe the previous book's chapters; a filter that
+  // matches nothing in the new book would hide its whole chapter list.
+  const bookId = selectedBook?.id ?? null;
+  const [filtersBookId, setFiltersBookId] = useState(bookId);
+  if (filtersBookId !== bookId) {
+    setFiltersBookId(bookId);
+    setShowAllChapters(false);
+    setFilterQuery('');
+    setRangeStart('');
+    setRangeEnd('');
+  }
+
   const filteredChapters = useMemo(() => {
     if (!filterQuery) return chapters;
     const q = filterQuery.toLowerCase();

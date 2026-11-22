@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 
 import { ChapterSelector } from '../ChapterSelector';
 
@@ -88,5 +88,45 @@ describe('ChapterSelector', () => {
     expect(screen.getByText('Chapter 3')).toBeInTheDocument();
     expect(screen.queryByText('Chapter 4')).not.toBeInTheDocument();
     expect(screen.getByText('Ver todos los capítulos (4)')).toBeInTheDocument();
+  });
+
+  it('drops the chapter filter and range when another book is selected', () => {
+    const props = {
+      error: null,
+      hasData: true,
+      isFetching: false,
+      isLoading: false,
+      onClear: () => {},
+      onSelectAll: () => {},
+      onToggleChapter: () => {},
+      selectedChapterIndexes: [],
+      selectedChapterSet: new Set<number>(),
+      selectable: true,
+    };
+    const { rerender } = render(
+      <ChapterSelector
+        {...props}
+        chapters={[{ index: 0, title: 'Kubernetes basics' }]}
+        selectedBook={{ id: 'book-a', title: 'A' }}
+        totalChapters={1}
+      />
+    );
+    fireEvent.change(screen.getByPlaceholderText('Buscar capítulo...'), {
+      target: { value: 'kubernetes' },
+    });
+    fireEvent.change(screen.getByPlaceholderText('De'), { target: { value: '1' } });
+
+    rerender(
+      <ChapterSelector
+        {...props}
+        chapters={[{ index: 0, title: 'Rust ownership' }]}
+        selectedBook={{ id: 'book-b', title: 'B' }}
+        totalChapters={1}
+      />
+    );
+
+    expect(screen.getByPlaceholderText('Buscar capítulo...')).toHaveValue('');
+    expect(screen.getByPlaceholderText('De')).toHaveValue(null);
+    expect(screen.getByText('Rust ownership')).toBeInTheDocument();
   });
 });
