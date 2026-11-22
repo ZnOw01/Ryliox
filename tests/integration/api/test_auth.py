@@ -100,9 +100,10 @@ class TestSaveCookies:
         )
 
         assert response.status_code == 403
-        data = response.json()
-        detail = data if "error" in data else data.get("detail", {})
-        assert "Cross-origin request blocked" in detail.get("error", "")
+        assert response.json() == {
+            "error": "Cross-origin request blocked for 'save_cookies'.",
+            "code": "cross_origin_blocked",
+        }
 
     def test_save_cookies_invalid_payload(self, test_client: TestClient, mock_kernel):
         """Test saving invalid cookie payload."""

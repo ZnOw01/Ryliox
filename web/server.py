@@ -539,9 +539,9 @@ def create_app() -> FastAPI:
     async def _forbidden_origin_handler(
         request: Request, exc: ForbiddenOriginError
     ) -> JSONResponse:
-        logger.warning("Cross-origin request blocked: %s", exc)
+        logger.warning("%s", exc)
         return error_response(
-            f"Cross-origin request blocked for '{exc.args[0]}'.",
+            str(exc),
             status.HTTP_403_FORBIDDEN,
             code=ErrorCode.CROSS_ORIGIN_BLOCKED,
         )
