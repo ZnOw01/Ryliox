@@ -246,10 +246,7 @@
 			"status_reconnecting": "retrying"
 		},
 		"errors": {
-			"generic": "The download failed. Try again; if it keeps failing, check the technical details.",
-			"auth_required": "There is no O'Reilly session. Save your cookies in the Session section and try again.",
-			"session_rejected": "O'Reilly rejected the session. Copy fresh cookies from your browser and save them again.",
-			"upstream_blocked": "O'Reilly is temporarily blocking requests. Wait a few minutes before retrying; your session is not the problem."
+			"generic": "The download failed. Try again; if it keeps failing, check the technical details."
 		},
 		"notifications": {
 			"download_started": "Download started",
@@ -365,7 +362,8 @@
 		"contact_support": "Contact support",
 		"invalid_session_after_cookies": "The cookies were saved, but O'Reilly does not accept the session. Copy the 'Cookie' header from the DevTools Network tab, or export with EditThisCookie including HttpOnly cookies.",
 		"upstream_blocked": "O'Reilly is temporarily blocking requests from Ryliox. Wait a few minutes and try again; your session is not the problem.",
-		"session_rejected": "O'Reilly rejected your session. Copy fresh cookies from your browser and save them again."
+		"session_rejected": "O'Reilly rejected your session. Copy fresh cookies from your browser and save them again.",
+		"rate_limited": "Too many requests in a row. Wait a moment and try again."
 	},
 	"loading": {
 		"searching": "Searching books...",

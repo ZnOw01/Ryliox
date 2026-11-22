@@ -246,10 +246,7 @@
 			"status_reconnecting": "reintentando"
 		},
 		"errors": {
-			"generic": "La descarga falló. Inténtalo de nuevo; si se repite, revisa los detalles técnicos.",
-			"auth_required": "No hay una sesión de O'Reilly. Guarda tus cookies en la sección Sesión y vuelve a intentarlo.",
-			"session_rejected": "O'Reilly rechazó la sesión. Copia cookies nuevas desde tu navegador y guárdalas otra vez.",
-			"upstream_blocked": "O'Reilly está bloqueando temporalmente las peticiones. Espera unos minutos antes de reintentar; tu sesión no es el problema."
+			"generic": "La descarga falló. Inténtalo de nuevo; si se repite, revisa los detalles técnicos."
 		},
 		"notifications": {
 			"download_started": "Descarga iniciada",
@@ -365,7 +362,8 @@
 		"contact_support": "Contactar soporte",
 		"invalid_session_after_cookies": "Las cookies se guardaron, pero O'Reilly no acepta la sesión. Copia el encabezado 'Cookie' desde la pestaña Red de DevTools, o exporta con EditThisCookie incluyendo las cookies HttpOnly.",
 		"upstream_blocked": "O'Reilly está bloqueando temporalmente las peticiones de Ryliox. Espera unos minutos y vuelve a intentarlo; tu sesión no es el problema.",
-		"session_rejected": "O'Reilly rechazó tu sesión. Copia cookies nuevas desde tu navegador y guárdalas otra vez."
+		"session_rejected": "O'Reilly rechazó tu sesión. Copia cookies nuevas desde tu navegador y guárdalas otra vez.",
+		"rate_limited": "Demasiadas peticiones seguidas. Espera un momento y vuelve a intentarlo."
 	},
 	"loading": {
 		"searching": "Buscando libros...",

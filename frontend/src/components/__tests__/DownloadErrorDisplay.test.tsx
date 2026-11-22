@@ -16,7 +16,7 @@ describe('download job errors', () => {
       />
     );
 
-    expect(screen.getByText(/o'reilly rechazó la sesión/i)).toBeInTheDocument();
+    expect(screen.getByText(/o'reilly rechazó (la|tu) sesión/i)).toBeInTheDocument();
     const raw = screen.getAllByText(new RegExp(RAW.slice(0, 20), 'i'));
     expect(raw).toHaveLength(1);
     expect(raw[0].closest('details')).not.toBeNull();

@@ -63,7 +63,7 @@ function getUserFriendlyMessage(error: ApiError | Record<string, unknown>): stri
     return t('errors.invalid_session_after_cookies');
   }
 
-  if (code === 'upstream_blocked' || code === 'session_rejected') {
+  if (code === 'rate_limited' || code === 'session_rejected' || code === 'upstream_blocked') {
     return t(`errors.${code}`);
   }
 
