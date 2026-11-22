@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -147,3 +148,32 @@ def test_every_state_file_follows_the_data_directory(tmp_path):
 
     paths = [Path(p) for p in json.loads(result.stdout)]
     assert all(path.is_relative_to(data_dir) for path in paths), paths
+
+
+ENV_EXAMPLE = Path(config.__file__).parent / ".env.example"
+LAUNCHER_VARIABLES = {
+    "RYLIOX_VENV",
+    "RYLIOX_TIMEOUT_UV",
+    "RYLIOX_TIMEOUT_BUN",
+    "RYLIOX_TIMEOUT_DOCKER",
+    "RYLIOX_TIMEOUT_SUBPROCESS",
+    "RYLIOX_MAX_SERVER_LOG_BYTES",
+    "RYLIOX_MAX_SERVER_LOG_BACKUPS",
+}
+
+
+def test_env_example_names_only_variables_that_have_an_effect():
+    names = re.findall(r"^#? ?([A-Z][A-Z0-9_]+)=", ENV_EXAMPLE.read_text(encoding="utf-8"), re.M)
+
+    def has_effect(name: str) -> bool:
+        if name in config.SHORT_NAMES or name in LAUNCHER_VARIABLES:
+            return True
+        group = re.match(r"RYLIOX_([A-Z_]+?)__", name)
+        return group is not None and group.group(1).lower() in config.Settings.model_fields
+
+    assert names
+    assert [name for name in names if not has_effect(name)] == []
+
+
+def test_env_example_matches_the_defaults():
+    assert config.Settings(_env_file=ENV_EXAMPLE) == config.Settings(_env_file=None)

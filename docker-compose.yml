@@ -20,17 +20,16 @@ services:
       - "127.0.0.1:8000:8000"
 
     environment:
-      SECURITY: '{"environment":"development","allow_unauthenticated_local_proxy":true}'
-      SERVER: '{"host":"0.0.0.0","port":8000}'
-      PATHS: '{"data_dir":"/app/data","output_dir":"/app/output"}'
-      PYTHONDONTWRITEBYTECODE: "1"
-      PYTHONUNBUFFERED: "1"
+      # The image binds 0.0.0.0 inside the container; the port is only published on
+      # the host's loopback (see above), so the admin token is not required here.
+      ENVIRONMENT: development
+      ALLOW_UNAUTHENTICATED_LOCAL_PROXY: "true"
       PYTHONDEVMODE: "1"
       LOG_LEVEL: info
       RYLIOX_TRUSTED_HOSTS: "localhost,127.0.0.1,ryliox-dev"
 
     volumes:
-      # Source mounts (read-write so uvicorn --reload can work if you add it)
+      # Source mounts: restart the container to pick up backend changes.
       - ./core:/app/core
       - ./plugins:/app/plugins
       - ./utils:/app/utils

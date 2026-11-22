@@ -18,7 +18,7 @@ COPY frontend/ ./
 RUN bun run build
 
 # -----------------------------------------------------------------------------
-# Stage 2: Builder — install Python dependencies in an isolated venv
+# Stage 2: Builder — install Python dependencies in an isolated venv (wheels only)
 # -----------------------------------------------------------------------------
 FROM python:${PYTHON_VERSION}-slim AS builder
 
@@ -30,17 +30,6 @@ ENV VIRTUAL_ENV=/opt/venv \
     UV_LINK_MODE=copy \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
-
-RUN apt-get update && apt-get install -y --no-install-recommends \
-        build-essential \
-        gcc \
-        libcairo2-dev \
-        libpango1.0-dev \
-        libgdk-pixbuf2.0-dev \
-        libffi-dev \
-        pkg-config \
-        shared-mime-info \
-    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
@@ -70,17 +59,14 @@ ENV VIRTUAL_ENV=/opt/venv \
     PORT=8000 \
     DATA_DIR=/app/data \
     OUTPUT_DIR=/app/output \
-    SECURITY={"environment":"production"}
+    ENVIRONMENT=production
 
+# WeasyPrint loads Pango and HarfBuzz at runtime; they bring fontconfig and a default font.
 RUN apt-get update && apt-get install -y --no-install-recommends \
         libpango-1.0-0 \
         libpangoft2-1.0-0 \
-        libpangocairo-1.0-0 \
         libharfbuzz0b \
-        libgdk-pixbuf2.0-0 \
-        libcairo2 \
-        libffi8 \
-        shared-mime-info \
+        libharfbuzz-subset0 \
         curl \
         tini \
     && rm -rf /var/lib/apt/lists/* \
@@ -89,7 +75,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR ${APP_HOME}
 
-RUN mkdir -p ${DATA_DIR}/logs ${OUTPUT_DIR} \
+# Created here so the named volumes mounted over them inherit the app user's ownership.
+RUN mkdir -p ${DATA_DIR}/logs ${OUTPUT_DIR} ${APP_HOME}/.config/ryliox \
     && chown -R ${APP_USER}:${APP_USER} ${APP_HOME}
 
 # Copy the venv and the application code from the builder
@@ -107,4 +94,4 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
 STOPSIGNAL SIGTERM
 
 ENTRYPOINT ["tini", "--"]
-CMD ["uvicorn", "web.server:create_app", "--factory", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers"]
+CMD ["python", "-m", "web.server"]

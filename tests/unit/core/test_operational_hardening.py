@@ -10,6 +10,7 @@ import httpx
 import pytest
 from cryptography.fernet import Fernet
 from fastapi import FastAPI, Request
+from fastapi.testclient import TestClient
 
 import config
 import core.audit as audit_module
@@ -219,3 +220,17 @@ def test_audit_chain_restores_across_logger_restart(monkeypatch, tmp_path: Path)
 
     assert entries[-1].prev_hash == last_hash
     assert restored.verify_integrity()[0] is True
+
+
+def test_production_rejects_hosts_outside_the_allowlist(monkeypatch) -> None:
+    monkeypatch.setattr(config.SETTINGS.security, "environment", "production")
+    monkeypatch.setattr(config.SETTINGS.security, "admin_token", "t" * 40)
+    monkeypatch.setattr(config.SETTINGS.security, "allowed_hosts", ["ryliox.example"])
+    monkeypatch.setattr(config.SETTINGS.session, "encryption_key", Fernet.generate_key().decode())
+
+    with TestClient(create_app(), base_url="http://ryliox.example") as client:
+        allowed = client.get("/api/health")
+        rejected = client.get("/api/health", headers={"host": "evil.example"})
+
+    assert allowed.status_code == 200
+    assert rejected.status_code == 400
