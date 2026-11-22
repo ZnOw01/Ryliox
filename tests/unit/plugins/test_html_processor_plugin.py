@@ -78,3 +78,22 @@ def test_rewrite_href_rewrites_chapter_paths_to_local_xhtml():
 
     # Chapter hrefs are converted to local .xhtml references for EPUB navigation
     assert href == "ch1.xhtml"
+
+
+@pytest.mark.parametrize(
+    "src",
+    [
+        "https://learning.oreilly.com/api/v2/epubs/urn:orm:book:1/files/fig 1.png",
+        "https://learning.oreilly.com/library/cover/1/fig.png?size=large",
+        "assets/fig(1).png",
+    ],
+)
+def test_rewritten_image_src_names_the_file_the_assets_plugin_saves(src):
+    from plugins.assets import AssetsPlugin
+
+    content, images = HtmlProcessorPlugin().process(
+        f'<div id="sbo-rt-content"><img src="{src}"/></div>', "1"
+    )
+
+    assert images == [src]
+    assert f'src="Images/{AssetsPlugin._filename_from_url(src)}"' in content

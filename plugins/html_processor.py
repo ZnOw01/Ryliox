@@ -7,6 +7,7 @@ from urllib.parse import urljoin, urlparse, urlsplit, urlunsplit
 
 from bs4 import BeautifulSoup, CData
 
+from .assets import AssetsPlugin
 from .base import Plugin
 
 logger = logging.getLogger(__name__)
@@ -115,7 +116,8 @@ class HtmlProcessorPlugin(Plugin):
             if not src:
                 continue
 
-            filename = src.split("/")[-1]
+            # Same name the assets plugin saves the download under.
+            filename = AssetsPlugin._filename_from_url(src, default=src.split("/")[-1])
             img["src"] = f"{path_prefix}Images/{filename}"
             images.append(src)
 
