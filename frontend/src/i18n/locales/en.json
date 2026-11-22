@@ -50,7 +50,10 @@
 			"format_json": "Format JSON",
 			"preview": "Preview",
 			"copy_to_clipboard": "Copy to clipboard",
-			"copy_json_to_clipboard": "Copy JSON to clipboard"
+			"copy_json_to_clipboard": "Copy JSON to clipboard",
+			"paste": "Paste",
+			"paste_from_clipboard": "Paste from clipboard",
+			"copied": "Copied"
 		},
 		"refresh": "Refresh",
 		"uptime": "Uptime"
@@ -93,7 +96,11 @@
 		},
 		"error": {
 			"generic": "Error searching books"
-		}
+		},
+		"remove_recent": "Remove “{{search}}” from recent searches",
+		"remove": "Remove",
+		"copy_isbn": "Copy ISBN",
+		"isbn_copied": "ISBN {{isbn}} copied"
 	},
 	"download": {
 		"title": "Download & Progress",
@@ -153,7 +160,8 @@
 			"first_n": "First {{count}}",
 			"last_n": "Last {{count}}",
 			"view_less": "Show fewer chapters",
-			"view_all": "Show all chapters ({{count}})"
+			"view_all": "Show all chapters ({{count}})",
+			"select_matching": "Select matching chapters"
 		},
 		"actions": {
 			"aria_label": "Download actions",

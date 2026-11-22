@@ -50,7 +50,10 @@
 			"format_json": "Formatear JSON",
 			"preview": "Vista previa",
 			"copy_to_clipboard": "Copiar al portapapeles",
-			"copy_json_to_clipboard": "Copiar JSON al portapapeles"
+			"copy_json_to_clipboard": "Copiar JSON al portapapeles",
+			"paste": "Pegar",
+			"paste_from_clipboard": "Pegar desde el portapapeles",
+			"copied": "Copiado"
 		},
 		"refresh": "Actualizar",
 		"uptime": "Uptime"
@@ -93,7 +96,11 @@
 		},
 		"error": {
 			"generic": "Error al buscar libros"
-		}
+		},
+		"remove_recent": "Quitar «{{search}}» de las búsquedas recientes",
+		"remove": "Quitar",
+		"copy_isbn": "Copiar ISBN",
+		"isbn_copied": "ISBN {{isbn}} copiado"
 	},
 	"download": {
 		"title": "Descarga y progreso",
@@ -153,7 +160,8 @@
 			"first_n": "Primeros {{count}}",
 			"last_n": "Últimos {{count}}",
 			"view_less": "Ver menos capítulos",
-			"view_all": "Ver todos los capítulos ({{count}})"
+			"view_all": "Ver todos los capítulos ({{count}})",
+			"select_matching": "Seleccionar coincidentes"
 		},
 		"actions": {
 			"aria_label": "Acciones de descarga",

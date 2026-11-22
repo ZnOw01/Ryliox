@@ -454,7 +454,7 @@ export function ChapterSelector({
                           type="button"
                           onClick={handleSelectFiltered}
                           className="text-[10px] bg-primary/10 text-primary font-semibold px-1.5 py-0.5 rounded hover:bg-primary/20 transition"
-                          title="Seleccionar coincidentes"
+                          title={t('download.chapters.select_matching')}
                         >
                           +{filteredChapters.length}
                         </button>

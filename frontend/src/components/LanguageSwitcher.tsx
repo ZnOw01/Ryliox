@@ -1,17 +1,10 @@
-import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { LANGUAGE_NAMES, AVAILABLE_LANGUAGES, type Language } from '../i18n/config';
 import { cn } from '../lib/cn';
 
 export function LanguageSwitcher() {
   const { t, i18n } = useTranslation();
-  const currentLanguage = ((i18n.resolvedLanguage || i18n.language).split('-')[0] ||
-    'es') as Language;
-
-  useEffect(() => {
-    document.documentElement.lang = currentLanguage;
-    document.documentElement.dir = 'ltr';
-  }, [currentLanguage]);
+  const currentLanguage = i18n.resolvedLanguage ?? i18n.language;
 
   const handleLanguageChange = (lng: Language) => {
     i18n.changeLanguage(lng);

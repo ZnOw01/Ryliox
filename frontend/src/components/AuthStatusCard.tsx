@@ -422,10 +422,11 @@ export function AuthStatusCard() {
                 type="button"
                 onClick={pasteFromClipboard}
                 className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2 py-1 text-[11px] font-medium text-muted-foreground hover:bg-accent hover:text-foreground transition"
-                title="Paste from clipboard"
+                title={t('auth.cookies.paste_from_clipboard')}
+                aria-label={t('auth.cookies.paste_from_clipboard')}
               >
-                <Clipboard className="h-3 w-3" />
-                <span className="hidden sm:inline">Pegar</span>
+                <Clipboard className="h-3 w-3" aria-hidden="true" />
+                <span className="hidden sm:inline">{t('auth.cookies.paste')}</span>
               </button>
               {cookiesText.trim() ? (
                 <>
@@ -448,7 +449,7 @@ export function AuthStatusCard() {
                       <>
                         <Check className="h-3 w-3 text-emerald-600 dark:text-emerald-400 stroke-[2.5]" />
                         <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
-                          Copiado
+                          {t('auth.cookies.copied')}
                         </span>
                       </>
                     ) : (

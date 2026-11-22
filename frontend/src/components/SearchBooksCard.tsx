@@ -609,8 +609,8 @@ export function SearchBooksCard() {
                         setRecentSearches(updated);
                       }}
                       className="opacity-0 group-hover/item:opacity-100 p-1 text-muted-foreground hover:text-foreground text-xs rounded transition"
-                      title="Eliminar"
-                      aria-label={`Eliminar ${search}`}
+                      title={t('search.remove')}
+                      aria-label={t('search.remove_recent', { search })}
                     >
                       <X className="h-3 w-3" />
                     </button>
@@ -846,11 +846,11 @@ export function SearchBooksCard() {
                                         e.stopPropagation();
                                         if (book.id) {
                                           navigator.clipboard.writeText(book.id);
-                                          toast.success(`ISBN ${book.id} copiado`);
+                                          toast.success(t('search.isbn_copied', { isbn: book.id }));
                                         }
                                       }}
                                       className="inline-block font-mono text-[10px] text-muted-foreground/60 bg-muted/60 hover:bg-muted hover:text-foreground px-1.5 py-0.5 rounded transition cursor-copy"
-                                      title="Copiar ISBN"
+                                      title={t('search.copy_isbn')}
                                     >
                                       ISBN: {book.id}
                                     </span>

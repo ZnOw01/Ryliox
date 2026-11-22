@@ -12,7 +12,7 @@ import { ThemeToggle } from './ThemeToggle';
 import { BeautifulToastContainer } from './ui/BeautifulToast';
 import { KeyboardShortcutsModal, useKeyboardShortcuts } from './ui/KeyboardNavigation';
 import { SkipLink } from './SkipLink';
-import i18n from '../i18n/config';
+import i18n, { applyPreferredLanguage } from '../i18n/config';
 import { authenticateAdmin } from '../lib/api';
 import { useTranslation } from 'react-i18next';
 import { useBookStore } from '../store/book-store';
@@ -174,6 +174,9 @@ export default function App() {
   const { t } = useTranslation();
   const selectedBook = useBookStore(state => state.selectedBook);
   const [shortcutsModalOpen, setShortcutsModalOpen] = useState(false);
+
+  // After hydration, so the first client render matches the prerendered HTML.
+  useEffect(applyPreferredLanguage, []);
 
   // Use lazy initialization to preserve QueryClient across HMR reloads
   const [queryClient] = useState(
