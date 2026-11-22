@@ -1,4 +1,4 @@
-import { formatName } from './utils';
+import { formatDescription, formatName } from './utils';
 import { useTranslation } from 'react-i18next';
 import { BookOpen, FileText, Layers, Sparkles, Check } from 'lucide-react';
 import { cn } from '../../lib/cn';
@@ -12,7 +12,6 @@ type FormatSelectorProps = {
   hasChapterSelection: boolean;
   isLoading: boolean;
   onChange: (value: string) => void;
-  selectedFormatDescription?: string;
   /** Accessible label for the format selector */
   ariaLabel?: string;
 };
@@ -54,10 +53,12 @@ export function FormatSelector({
   hasChapterSelection,
   isLoading,
   onChange,
-  selectedFormatDescription,
   ariaLabel,
 }: FormatSelectorProps) {
   const { t } = useTranslation();
+  const selectedFormatDescription = format
+    ? formatDescription(format, t, descriptions?.[format])
+    : undefined;
   const disabled = isLoading || formats.length === 0;
   const selectValue = disabled ? '' : format;
   const selectId = 'format-selector';
@@ -171,7 +172,7 @@ export function FormatSelector({
                     )}
                   </div>
                   <p className="mt-0.5 line-clamp-1 text-[10px] text-muted-foreground">
-                    {descriptions?.[item] || item.toUpperCase()}
+                    {formatDescription(item, t, descriptions?.[item]) ?? item.toUpperCase()}
                   </p>
                 </div>
               </button>

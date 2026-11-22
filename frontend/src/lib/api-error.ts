@@ -59,6 +59,10 @@ function getUserFriendlyMessage(error: ApiError | Record<string, unknown>): stri
     return t('errors.service_unavailable_description');
   }
 
+  if (code === 'invalid_session_after_cookies') {
+    return t('errors.invalid_session_after_cookies');
+  }
+
   // Return original message if no specific handling
   if (error instanceof ApiError) {
     return error.message;

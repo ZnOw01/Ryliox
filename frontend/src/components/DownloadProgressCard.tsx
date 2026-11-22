@@ -166,7 +166,6 @@ export function DownloadProgressCard() {
               format={manager.format}
               formats={manager.formats}
               descriptions={formatDescriptions}
-              selectedFormatDescription={manager.selectedFormatDescription}
               hasChapterSelection={manager.hasChapterSelection}
               bookOnlyFormats={manager.bookOnlyFormats}
               isLoading={manager.formatsQuery.isLoading}

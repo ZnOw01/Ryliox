@@ -123,7 +123,12 @@
 			},
 			"epub_single": "EPUB — Libro completo",
 			"pdf_combined": "PDF — Todo en un archivo",
-			"pdf_separate": "PDF — Un archivo por capítulo"
+			"pdf_separate": "PDF — Un archivo por capítulo",
+			"descriptions": {
+				"epub": "EPUB estándar, el formato por defecto",
+				"pdf": "Un solo PDF con el libro entero o los capítulos elegidos",
+				"pdf-chapters": "Un PDF por capítulo"
+			}
 		},
 		"chapters": {
 			"title": "Capítulos",
@@ -349,7 +354,8 @@
 		"cookies_required": "Cookies requeridas",
 		"cookies_required_description": "Necesitas configurar cookies válidas para descargar libros.",
 		"retry": "Reintentar",
-		"contact_support": "Contactar soporte"
+		"contact_support": "Contactar soporte",
+		"invalid_session_after_cookies": "Las cookies se guardaron, pero O'Reilly no acepta la sesión. Copia el encabezado 'Cookie' desde la pestaña Red de DevTools, o exporta con EditThisCookie incluyendo las cookies HttpOnly."
 	},
 	"loading": {
 		"searching": "Buscando libros...",

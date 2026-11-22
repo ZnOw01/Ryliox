@@ -107,6 +107,18 @@ export function formatName(format: string, t?: TFunction): string {
   }
 }
 
+/** The UI's own description of a format, else the server's, else none. */
+export function formatDescription(
+  format: string,
+  t: TFunction,
+  serverDescription?: string
+): string | undefined {
+  return (
+    t(`download.format.descriptions.${format}`, { defaultValue: serverDescription ?? '' }) ||
+    undefined
+  );
+}
+
 export function sseStatusClass(status: SseStatus): string {
   if (status === 'connected') {
     return 'border-green-200 bg-green-50 text-green-800';

@@ -298,7 +298,6 @@ export function useDownloadManager() {
   }, [formatsQuery.data?.book_only]);
   const hasChapterSelection = selectedChapterIndexes.length > 0;
   const invalidFormatWithChapterSelection = hasChapterSelection && bookOnlyFormats.has(format);
-  const selectedFormatDescription = format ? formatsQuery.data?.descriptions?.[format] : undefined;
 
   /**
    * Mutation para iniciar descarga con OPTIMISTIC UPDATES
@@ -577,7 +576,6 @@ export function useDownloadManager() {
     selectedChapterIndexes,
     selectedChapterSet,
     selectedBook,
-    selectedFormatDescription,
     selectAllChapters,
     setFormat,
     setSkipImages,

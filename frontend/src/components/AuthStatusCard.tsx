@@ -141,7 +141,7 @@ export function AuthStatusCard() {
       ]);
     },
     onError: (err: Error) => {
-      toast.error(`${t('download.notifications.cookies_error')}: ${err.message}`);
+      toast.error(`${t('download.notifications.cookies_error')}: ${parseApiError(err).message}`);
     },
   });
 
