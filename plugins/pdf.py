@@ -203,7 +203,7 @@ class PdfPlugin(Plugin):
             if not xhtml_path.exists():
                 continue
 
-            body = self._extract_chapter_body(xhtml_path)
+            body = self._extract_chapter_body(xhtml_path, oebps)
             chapter_title = self._escape_html(chapter.get("title", f"Chapter {i + 1}"))
 
             chapter_html = f"""<!DOCTYPE html>
@@ -259,7 +259,7 @@ class PdfPlugin(Plugin):
             if not xhtml_path.exists():
                 continue
 
-            body = self._extract_chapter_body(xhtml_path)
+            body = self._extract_chapter_body(xhtml_path, oebps)
             chapter_id = Path(chapter["filename"]).stem
             chapter_class = "chapter chapter-first" if not chapters_html_parts else "chapter"
 
@@ -349,9 +349,15 @@ class PdfPlugin(Plugin):
         <ul>{toc_items}</ul>
     </section>"""
 
-    def _extract_chapter_body(self, xhtml_path: Path) -> str:
-        """Extract body content from XHTML file."""
+    def _extract_chapter_body(self, xhtml_path: Path, oebps: Path | None = None) -> str:
+        """Extract body content from XHTML file.
+
+        With ``oebps``, relative ``src`` values are rebased from the chapter's
+        folder onto ``oebps``, the base URL the PDF document is rendered with.
+        """
         content = xhtml_path.read_text(encoding="utf-8")
+        if oebps is not None:
+            content = self._rebase_sources(content, xhtml_path.parent, oebps)
 
         # Find <body> content
         body_match = re.search(
@@ -364,6 +370,25 @@ class PdfPlugin(Plugin):
             return body_match.group(1)
 
         return content
+
+    @staticmethod
+    def _rebase_sources(content: str, chapter_dir: Path, oebps: Path) -> str:
+        root = oebps.resolve()
+        chapter_dir = chapter_dir.resolve()
+        if chapter_dir == root:
+            return content
+
+        def replacer(m: re.Match[str]) -> str:
+            url = m.group(2)
+            if not url or urlparse(url).scheme or url.startswith(("/", "#")):
+                return m.group(0)
+            try:
+                rebased = (chapter_dir / url).resolve().relative_to(root)
+            except ValueError:
+                return m.group(0)
+            return f"{m.group(1)}{rebased.as_posix()}{m.group(3)}"
+
+        return re.sub(r'(\bsrc=")([^"]*)(")', replacer, content)
 
     @staticmethod
     def _safe_chapter_path(oebps: Path, filename: str) -> Path:
