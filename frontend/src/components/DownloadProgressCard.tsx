@@ -25,15 +25,30 @@ export function DownloadProgressCard() {
   // Formats that can only download the full book (e.g. epub) cannot use chapter selection
   const chapterSelectable = !manager.bookOnlyFormats.has(manager.format);
   const notifiedTerminalRef = useRef<string | null>(null);
+  // Jobs this page saw queued or running. /api/progress returns the latest job,
+  // which on load is usually one that finished long ago; that is not news.
+  const seenActiveJobsRef = useRef(new Set<string>());
 
   useEffect(() => {
     const progress = manager.progressQuery.data;
     const status = progress?.status ?? '';
+    const jobId = progress?.job_id ?? null;
+    // activeJobId is set only for a job this page started or saw running, so
+    // a job that fails before its first progress update is still announced.
+    if (manager.activeJobId) {
+      seenActiveJobsRef.current.add(manager.activeJobId);
+    }
     if (!TERMINAL_DOWNLOAD_STATES.has(status)) {
+      if (jobId) {
+        seenActiveJobsRef.current.add(jobId);
+      }
+      return;
+    }
+    if (!jobId || !seenActiveJobsRef.current.has(jobId)) {
       return;
     }
 
-    const notificationKey = `${progress?.job_id ?? 'local'}:${status}`;
+    const notificationKey = `${jobId}:${status}`;
     if (notifiedTerminalRef.current === notificationKey) {
       return;
     }
@@ -52,7 +67,7 @@ export function DownloadProgressCard() {
       toast.info(message);
       announce(message);
     }
-  }, [manager.progressQuery.data, t]);
+  }, [manager.activeJobId, manager.progressQuery.data, t]);
 
   const errors = useMemo(() => {
     return [
