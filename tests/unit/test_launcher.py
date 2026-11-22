@@ -82,3 +82,19 @@ def test_sigterm_stops_the_server_child(tmp_path):
         if pid_file.exists() and pid_file.read_text().strip():
             with contextlib.suppress(ProcessLookupError):
                 os.kill(int(pid_file.read_text()), signal.SIGKILL)
+
+
+def test_old_node_falls_back_to_the_installed_astro_cli(monkeypatch, tmp_path):
+    from launcher import _frontend
+
+    astro_cli = tmp_path / "frontend" / "node_modules" / "astro" / "bin" / "astro.mjs"
+    astro_cli.parent.mkdir(parents=True)
+    astro_cli.write_text("")
+    monkeypatch.setattr(_frontend, "REPO_ROOT", tmp_path)
+    monkeypatch.setattr(_frontend, "current_node_version", lambda: (20, 0, 0))
+    monkeypatch.setattr(_frontend.shutil, "which", lambda name: f"/bin/{name}")
+
+    command = _frontend.build_command("/bin/bun")
+
+    assert command[0] == "/bin/npx"
+    assert command[-2:] == [str(astro_cli), "build"]

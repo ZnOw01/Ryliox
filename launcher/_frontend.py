@@ -91,7 +91,7 @@ def build_command(bun: str) -> list[str]:
         return [bun, "run", "build"]
 
     npx = shutil.which("npx")
-    astro_entry = REPO_ROOT / "frontend" / "node_modules" / "astro" / "astro.js"
+    astro_entry = REPO_ROOT / "frontend" / "node_modules" / "astro" / "bin" / "astro.mjs"
     if npx and astro_entry.exists():
         print(
             " - Bun is available but the detected Node version is not compatible; using "
@@ -107,7 +107,7 @@ def build_command(bun: str) -> list[str]:
 
     found = f"v{version[0]}.{version[1]}.{version[2]}" if version else "unknown"
     raise RuntimeError(
-        "Astro 7 requires an even Node.js version >= 22.12.0. "
+        "Astro 7 requires Node.js >= 22.12.0. "
         f"Detected version: {found}. Install Node 22/24 or ensure npx is available."
     )
 
