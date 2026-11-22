@@ -7,6 +7,7 @@ import os
 import queue
 import re
 import shutil
+import signal
 import subprocess
 import threading
 import time
@@ -170,6 +171,7 @@ def launch_server(venv: Path, port: int, steps: Steps, label: str) -> None:
     if os.name == "nt":
         creationflags = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
     process: subprocess.Popen[Any] | None = None
+    previous_sigterm = _raise_keyboard_interrupt_on_sigterm()
     try:
         _rotate_log_file(LOG_FILE)
         print(f" - Live log: {LOG_FILE}")
@@ -198,6 +200,24 @@ def launch_server(venv: Path, port: int, steps: Steps, label: str) -> None:
         print("\n  Server stopped by user.")
     except Exception as exc:
         raise RuntimeError(f"Failed to launch server: {exc}") from exc
+    finally:
+        if previous_sigterm is not None:
+            signal.signal(signal.SIGTERM, previous_sigterm)
+
+
+def _raise_keyboard_interrupt_on_sigterm() -> Any:
+    """Treat SIGTERM like Ctrl+C so the server child is stopped, not orphaned.
+
+    Returns the previous handler, or None when it was not replaced (Windows has
+    no catchable SIGTERM from other processes; handlers only work on the main thread).
+    """
+    if os.name == "nt" or threading.current_thread() is not threading.main_thread():
+        return None
+
+    def _handler(signum: int, frame: object) -> None:
+        raise KeyboardInterrupt
+
+    return signal.signal(signal.SIGTERM, _handler)
 
 
 def _wait_for_server_process(process: subprocess.Popen[Any]) -> int:
