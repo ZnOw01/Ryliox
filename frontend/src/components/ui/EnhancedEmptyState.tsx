@@ -399,7 +399,7 @@ export function EnhancedEmptyState({
       {IllustrationComponent && !illustration && (
         <motion.div
           className={cn(
-            'mb-6 text-gray-400',
+            'mb-6 text-muted-foreground/70',
             variant === 'compact' && 'mb-4',
             variant === 'inline' && 'mb-3'
           )}
@@ -429,7 +429,7 @@ export function EnhancedEmptyState({
       {!IllustrationComponent && Icon && (
         <motion.div
           className={cn(
-            'mb-4 rounded-2xl bg-gradient-to-br from-muted to-muted/50 p-4 text-gray-500',
+            'mb-4 rounded-2xl bg-gradient-to-br from-muted to-muted/50 p-4 text-muted-foreground',
             variant === 'compact' && 'mb-3 p-3',
             variant === 'inline' && 'mb-2 p-2',
             variant === 'inspirational' && 'mb-6 p-5'
@@ -453,7 +453,7 @@ export function EnhancedEmptyState({
       {/* Título */}
       <motion.h3
         className={cn(
-          'font-heading font-semibold text-gray-900 leading-tight dark:text-foreground',
+          'font-heading font-semibold text-foreground leading-tight',
           variant === 'default' && 'text-lg',
           variant === 'compact' && 'text-base',
           variant === 'inline' && 'text-sm',
@@ -470,7 +470,7 @@ export function EnhancedEmptyState({
       {description && (
         <motion.p
           className={cn(
-            'mt-2 text-gray-500 leading-relaxed dark:text-muted-foreground',
+            'mt-2 text-muted-foreground leading-relaxed',
             variant === 'default' && 'text-sm max-w-[320px]',
             variant === 'compact' && 'text-xs max-w-[260px]',
             variant === 'inline' && 'text-xs max-w-[200px]',
@@ -487,7 +487,7 @@ export function EnhancedEmptyState({
       {/* Quote inspiracional */}
       {finalQuote && variant === 'inspirational' && (
         <motion.blockquote
-          className="mt-4 max-w-[340px] text-sm italic text-gray-500 dark:text-muted-foreground"
+          className="mt-4 max-w-[340px] text-sm italic text-muted-foreground"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.25 }}
@@ -504,7 +504,7 @@ export function EnhancedEmptyState({
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.25 }}
         >
-          <p className="mb-3 text-xs font-medium uppercase tracking-wide text-gray-500">
+          <p className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
             {t('common.how_to_start')}
           </p>
           <ol className="space-y-2 text-left">
@@ -516,10 +516,10 @@ export function EnhancedEmptyState({
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: 0.3 + i * 0.1 }}
               >
-                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-gray-100 text-xs font-semibold text-gray-500">
+                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold text-muted-foreground">
                   {i + 1}
                 </span>
-                <span className="text-gray-500">{step}</span>
+                <span className="text-muted-foreground">{step}</span>
               </motion.li>
             ))}
           </ol>

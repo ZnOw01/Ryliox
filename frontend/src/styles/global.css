@@ -96,7 +96,7 @@
   --secondary: var(--neutral-100);
   --secondary-foreground: var(--text-primary);
   --muted: var(--neutral-100);
-  --muted-foreground: #6b7280;
+  --muted-foreground: #5f6672; /* 4.5:1 or more on every light surface, down to neutral-200 */
   --accent: var(--brand-100);
   --accent-foreground: var(--brand-800);
   --destructive: #dc2626;
@@ -328,27 +328,6 @@ body::after {
 
 #astro-dev-toolbar {
   display: none !important;
-}
-
-/* Skip Link */
-.skip-link {
-  position: absolute;
-  top: -40px;
-  left: 0;
-  background: #000;
-  color: #fff;
-  padding: 8px 16px;
-  z-index: 10000;
-  text-decoration: none;
-  font-weight: 500;
-  border-radius: 0 0 4px 0;
-  transition: top 0.2s ease;
-}
-
-.skip-link:focus {
-  top: 0;
-  outline: 2px solid #fff;
-  outline-offset: -2px;
 }
 
 /* Focus Visible */
