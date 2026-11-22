@@ -1,19 +1,19 @@
 import { motion } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 import { cn } from '../../lib/cn';
-import type { Icon as PhosphorIcon } from '@phosphor-icons/react';
 import {
-  MagnifyingGlass,
+  Search,
   FileX,
   FolderOpen,
-  WifiSlash,
+  WifiOff,
   BookOpen,
   Cookie,
-  DownloadSimple,
+  Download,
   Compass,
-  Sparkle,
+  Sparkles,
   ArrowRight,
-} from '@phosphor-icons/react';
+  type LucideIcon,
+} from 'lucide-react';
 
 export type EmptyStateVariant = 'default' | 'compact' | 'inline' | 'inspirational';
 export type EmptyStateType = 'search' | 'cookies' | 'downloads' | 'book' | 'offline' | 'generic';
@@ -21,8 +21,8 @@ export type EmptyStateType = 'search' | 'cookies' | 'downloads' | 'book' | 'offl
 export interface EmptyStateProps {
   /** Tipo de empty state para contenido predefinido */
   type?: EmptyStateType;
-  /** Phosphor icon component o icon name string */
-  icon?: PhosphorIcon | keyof typeof iconMap;
+  /** Lucide icon component o icon name string */
+  icon?: LucideIcon | keyof typeof iconMap;
   /** Título principal */
   title?: string;
   /** Descripción secundaria */
@@ -34,7 +34,7 @@ export interface EmptyStateProps {
     label: string;
     onClick: () => void;
     variant?: 'primary' | 'secondary' | 'ghost';
-    icon?: PhosphorIcon;
+    icon?: LucideIcon;
   };
   /** Acción secundaria */
   secondaryAction?: {
@@ -51,22 +51,22 @@ export interface EmptyStateProps {
   quote?: string;
 }
 
-const iconMap: Record<string, PhosphorIcon> = {
-  search: MagnifyingGlass,
+const iconMap: Record<string, LucideIcon> = {
+  search: Search,
   file: FileX,
   folder: FolderOpen,
-  offline: WifiSlash,
+  offline: WifiOff,
   book: BookOpen,
   cookie: Cookie,
-  download: DownloadSimple,
+  download: Download,
   compass: Compass,
-  sparkle: Sparkle,
+  sparkle: Sparkles,
 };
 
 // Contenido predefinido por tipo
 const defaultContent: Record<
   EmptyStateType,
-  { title: string; description: string; icon: PhosphorIcon; quote?: string; steps?: string[] }
+  { title: string; description: string; icon: LucideIcon; quote?: string; steps?: string[] }
 > = {
   search: {
     title: 'Comienza tu búsqueda',
@@ -87,7 +87,7 @@ const defaultContent: Record<
   downloads: {
     title: 'Aún no hay descargas',
     description: 'Selecciona un libro y elige los capítulos que quieres descargar.',
-    icon: DownloadSimple,
+    icon: Download,
     steps: ['Busca un libro', 'Selecciona los capítulos', 'Elige el formato y descarga'],
   },
   book: {
@@ -98,7 +98,7 @@ const defaultContent: Record<
   offline: {
     title: 'Sin conexión',
     description: 'Parece que no hay conexión a internet. Verifica tu red.',
-    icon: WifiSlash,
+    icon: WifiOff,
   },
   generic: {
     title: 'No hay contenido',
@@ -369,7 +369,7 @@ export function EnhancedEmptyState({
       }[type]
     : null;
   const content = localizedContent ?? (type ? defaultContent[type] : null);
-  const Icon: PhosphorIcon | null =
+  const Icon: LucideIcon | null =
     typeof IconProp === 'string'
       ? iconMap[IconProp] || content?.icon || FolderOpen
       : IconProp || content?.icon || null;
@@ -446,7 +446,6 @@ export function EnhancedEmptyState({
               variant === 'inline' && 'h-5 w-5',
               variant === 'inspirational' && 'h-12 w-12'
             )}
-            weight="regular"
           />
         </motion.div>
       )}
@@ -557,16 +556,10 @@ export function EnhancedEmptyState({
             >
               {action.label}
               {action.icon && (
-                <action.icon
-                  className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5"
-                  weight="regular"
-                />
+                <action.icon className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5" />
               )}
               {!action.icon && action.variant !== 'ghost' && (
-                <ArrowRight
-                  className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5"
-                  weight="regular"
-                />
+                <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5" />
               )}
             </motion.button>
           )}

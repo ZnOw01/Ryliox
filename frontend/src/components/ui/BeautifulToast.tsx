@@ -3,7 +3,15 @@ import { create } from 'zustand';
 import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { cn } from '../../lib/cn';
-import { CheckCircle, XCircle, Warning, Info, X, Sparkle } from '@phosphor-icons/react';
+import {
+  CircleCheck,
+  CircleX,
+  TriangleAlert,
+  Info,
+  X,
+  Sparkles,
+  type LucideIcon,
+} from 'lucide-react';
 
 export type ToastType = 'success' | 'error' | 'warning' | 'info' | 'loading';
 
@@ -146,7 +154,7 @@ export const toast = {
 const toastConfig: Record<
   ToastType,
   {
-    icon: typeof CheckCircle;
+    icon: LucideIcon;
     bg: string;
     border: string;
     text: string;
@@ -156,7 +164,7 @@ const toastConfig: Record<
   }
 > = {
   success: {
-    icon: CheckCircle,
+    icon: CircleCheck,
     bg: 'bg-emerald-50 dark:bg-emerald-950/30',
     border: 'border-emerald-200 dark:border-emerald-800/50',
     text: 'text-emerald-900 dark:text-emerald-100',
@@ -165,7 +173,7 @@ const toastConfig: Record<
     progressColor: 'bg-emerald-500',
   },
   error: {
-    icon: XCircle,
+    icon: CircleX,
     bg: 'bg-red-50 dark:bg-red-950/30',
     border: 'border-red-200 dark:border-red-800/50',
     text: 'text-red-900 dark:text-red-100',
@@ -174,7 +182,7 @@ const toastConfig: Record<
     progressColor: 'bg-red-500',
   },
   warning: {
-    icon: Warning,
+    icon: TriangleAlert,
     bg: 'bg-amber-50 dark:bg-amber-950/30',
     border: 'border-amber-200 dark:border-amber-800/50',
     text: 'text-amber-900 dark:text-amber-100',
@@ -192,7 +200,7 @@ const toastConfig: Record<
     progressColor: 'bg-blue-500',
   },
   loading: {
-    icon: Sparkle,
+    icon: Sparkles,
     bg: 'bg-slate-50 dark:bg-slate-900/50',
     border: 'border-slate-200 dark:border-slate-700/50',
     text: 'text-slate-900 dark:text-slate-100',
@@ -274,10 +282,10 @@ function ToastItem({ toast: toastItem, onDismiss, index }: ToastItemProps) {
               animate={{ rotate: 360 }}
               transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
             >
-              <Icon className="h-5 w-5" weight="fill" />
+              <Icon className="h-5 w-5" strokeWidth={2.5} aria-hidden="true" />
             </motion.div>
           ) : (
-            <Icon className="h-5 w-5" weight="fill" />
+            <Icon className="h-5 w-5" strokeWidth={2.5} aria-hidden="true" />
           )}
         </motion.div>
 
@@ -334,7 +342,7 @@ function ToastItem({ toast: toastItem, onDismiss, index }: ToastItemProps) {
             whileHover={{ scale: 1.1, rotate: 90 }}
             whileTap={{ scale: 0.9 }}
           >
-            <X className="h-4 w-4" weight="bold" />
+            <X className="h-4 w-4" strokeWidth={2.5} aria-hidden="true" />
           </motion.button>
         )}
       </div>

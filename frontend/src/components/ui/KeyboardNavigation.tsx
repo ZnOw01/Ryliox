@@ -2,7 +2,7 @@ import { useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 import { cn } from '../../lib/cn';
-import { X, Keyboard } from '@phosphor-icons/react';
+import { X, Keyboard } from 'lucide-react';
 
 // Tipos para atajos de teclado
 export interface KeyboardShortcut {
@@ -232,7 +232,7 @@ export function KeyboardShortcutsModal({ isOpen, onClose }: KeyboardShortcutsHel
             <div className="flex items-center justify-between border-b border-border px-6 py-4">
               <div className="flex items-center gap-3">
                 <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
-                  <Keyboard className="h-5 w-5 text-primary" weight="regular" />
+                  <Keyboard className="h-5 w-5 text-primary" aria-hidden="true" />
                 </div>
                 <div>
                   <h2 id="shortcuts-title" className="text-lg font-semibold text-foreground">
@@ -250,7 +250,7 @@ export function KeyboardShortcutsModal({ isOpen, onClose }: KeyboardShortcutsHel
                 whileTap={{ scale: 0.95 }}
                 aria-label={t('common.close')}
               >
-                <X className="h-5 w-5" weight="regular" />
+                <X className="h-5 w-5" aria-hidden="true" />
               </motion.button>
             </div>
 

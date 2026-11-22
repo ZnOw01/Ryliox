@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { BookOpen, ImageBroken, Spinner } from '@phosphor-icons/react';
+import { BookOpen, ImageOff, LoaderCircle } from 'lucide-react';
 import { cn } from '../../lib/cn';
 
 interface BookCoverProps {
@@ -90,7 +90,7 @@ export function BookCover({
 
       {imageState === 'loading' && src && (
         <div className="absolute inset-0 flex items-center justify-center bg-muted">
-          <Spinner className="h-5 w-5 animate-spin text-muted-foreground" weight="regular" />
+          <LoaderCircle className="h-5 w-5 animate-spin text-muted-foreground" aria-hidden="true" />
         </div>
       )}
 
@@ -102,17 +102,9 @@ export function BookCover({
           transition={{ delay: 0.1 }}
         >
           {imageState === 'error' ? (
-            <ImageBroken
-              className="h-6 w-6 text-muted-foreground"
-              weight="regular"
-              aria-hidden="true"
-            />
+            <ImageOff className="h-6 w-6 text-muted-foreground" aria-hidden="true" />
           ) : (
-            <BookOpen
-              className="h-6 w-6 text-muted-foreground"
-              weight="regular"
-              aria-hidden="true"
-            />
+            <BookOpen className="h-6 w-6 text-muted-foreground" aria-hidden="true" />
           )}
           {showPlaceholderText && (
             <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground leading-tight">
