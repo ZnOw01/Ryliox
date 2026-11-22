@@ -1,4 +1,3 @@
-import type { ChapterSummary } from '../../lib/types';
 import type { SseStatus } from '../../hooks/useDownloadManager';
 import type { TFunction } from 'i18next';
 
@@ -8,10 +7,6 @@ function roundToSingleDecimal(value: number): number {
 
 function formatDecimal(value: number): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(1);
-}
-
-function chapterPagesLabel(pages: number, t: TFunction): string {
-  return `${pages} ${pages === 1 ? t('common.page') : t('common.pages')}`;
 }
 
 export function formatReadingMinutes(
@@ -110,28 +105,6 @@ export function formatName(format: string, t?: TFunction): string {
         .map(part => part.slice(0, 1).toUpperCase() + part.slice(1))
         .join(' ');
   }
-}
-
-export function chapterMeta(chapter: ChapterSummary, t?: TFunction): string | null {
-  const pieces: string[] = [];
-  if (typeof chapter.pages === 'number' && t) {
-    pieces.push(chapterPagesLabel(chapter.pages, t));
-  }
-  const reading = t ? formatReadingMinutes(chapter.minutes, t) : null;
-  if (reading) {
-    pieces.push(reading);
-  }
-  return pieces.length > 0 ? pieces.join(' | ') : null;
-}
-
-export function renderOutputPath(value: string | string[] | null | undefined) {
-  if (!value) {
-    return null;
-  }
-  if (Array.isArray(value)) {
-    return value.join(' | ');
-  }
-  return value;
 }
 
 export function sseStatusClass(status: SseStatus): string {

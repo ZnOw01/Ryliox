@@ -20,7 +20,6 @@ import {
 } from 'lucide-react';
 import { parseApiError } from '../lib/api-error';
 import { toast } from './ui/BeautifulToast';
-import { cn } from '../lib/cn';
 
 type StatusTone = 'green' | 'amber' | 'red' | 'checking';
 

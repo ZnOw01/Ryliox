@@ -365,24 +365,3 @@ export function BeautifulToastContainer() {
     </div>
   );
 }
-
-// Hook para usar toasts fácilmente
-export function useToast() {
-  const { addToast, removeToast, clearAll } = useToastStore();
-
-  return {
-    toast: {
-      success: toast.success,
-      error: toast.error,
-      warning: toast.warning,
-      info: toast.info,
-      loading: toast.loading,
-      custom: toast.custom,
-      dismiss: toast.dismiss,
-      dismissAll: toast.dismissAll,
-    },
-    addToast,
-    removeToast,
-    clearAll,
-  };
-}
