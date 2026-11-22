@@ -42,12 +42,18 @@ export function useKeyboardShortcuts(shortcuts: KeyboardShortcut[]) {
               break;
           }
         } else {
-          // Sin modificador - ignorar si hay modificadores presionados
-          modifierMatches = !event.ctrlKey && !event.altKey && !event.shiftKey && !event.metaKey;
+          // Sin modificador - ignorar si hay modificadores presionados. Shift is
+          // allowed for symbols, since it is what types them ('?' is Shift+/).
+          const isSymbol = !/^[a-z0-9]$/i.test(shortcut.key);
+          modifierMatches =
+            !event.ctrlKey && !event.altKey && !event.metaKey && (isSymbol || !event.shiftKey);
         }
 
-        // Para atajos no globales, ignorar si estamos en un input
-        if (shortcut.scope !== 'global' && isInput) {
+        // Para atajos no globales, ignorar si estamos en un input. A global
+        // shortcut without Ctrl/Alt/Meta is a plain character there, so the
+        // field keeps it (Escape is not a character and still works).
+        const typesCharacter = !shortcut.modifier && shortcut.key.length === 1;
+        if (isInput && (shortcut.scope !== 'global' || typesCharacter)) {
           continue;
         }
 
@@ -152,21 +158,7 @@ const shortcutsList = [
   },
   {
     categoryKey: 'keyboard_shortcuts.search',
-    items: [
-      { keys: ['/'], descriptionKey: 'keyboard_shortcuts.shortcuts.focus_search' },
-      { keys: ['Ctrl', 'K'], descriptionKey: 'keyboard_shortcuts.shortcuts.quick_search' },
-      { keys: ['Ctrl', 'L'], descriptionKey: 'keyboard_shortcuts.shortcuts.clear_search' },
-    ],
-  },
-  {
-    categoryKey: 'keyboard_shortcuts.download',
-    items: [
-      { keys: ['Ctrl', 'D'], descriptionKey: 'keyboard_shortcuts.shortcuts.start_download' },
-      {
-        keys: ['Ctrl', 'Shift', 'D'],
-        descriptionKey: 'keyboard_shortcuts.shortcuts.cancel_download',
-      },
-    ],
+    items: [{ keys: ['Ctrl', 'K'], descriptionKey: 'keyboard_shortcuts.shortcuts.quick_search' }],
   },
   {
     categoryKey: 'keyboard_shortcuts.general',
