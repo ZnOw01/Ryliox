@@ -1,4 +1,4 @@
-"""Process and port management utilities for local runtime launcher."""
+"""Find and stop the processes listening on the server port."""
 
 from __future__ import annotations
 
@@ -170,102 +170,6 @@ def find_listener_pids(port: int) -> set[int]:
     return _find_listener_pids_posix(port)
 
 
-def is_port_listening(port: int) -> bool:
-    """Return True when any process is listening on the given port."""
-    return bool(find_listener_pids(port))
-
-
-def wait_until_port_listening(
-    port: int,
-    timeout_seconds: float = 20.0,
-    poll_interval: float = 0.2,
-) -> bool:
-    """Poll until a TCP port is listening or timeout expires."""
-    deadline = time.time() + timeout_seconds
-    while time.time() < deadline:
-        if is_port_listening(port):
-            return True
-        time.sleep(poll_interval)
-    return is_port_listening(port)
-
-
-def first_listener_pid(port: int) -> int | None:
-    """Return the first listener PID for a port, if any."""
-    pids = sorted(find_listener_pids(port))
-    return pids[0] if pids else None
-
-
-def start_background_process(
-    command: list[str],
-    cwd: Path,
-    env: dict[str, str],
-    log_file: Path,
-) -> None:
-    """Spawn a detached background process with stdout/stderr appended to a log file."""
-    log_file.parent.mkdir(exist_ok=True)
-    with open(log_file, "a", encoding="utf-8") as log_handle:
-        popen_kwargs: dict = {
-            "cwd": cwd,
-            "stdout": log_handle,
-            "stderr": log_handle,
-            "env": env,
-        }
-        if os.name == "nt":
-            popen_kwargs["creationflags"] = getattr(
-                subprocess, "CREATE_NEW_PROCESS_GROUP", 0
-            ) | getattr(subprocess, "CREATE_NO_WINDOW", 0)
-        else:
-            popen_kwargs["start_new_session"] = True
-
-        subprocess.Popen(command, **popen_kwargs)  # nosec B603
-
-
-def write_background_pid(pid_file: Path, pid: int) -> None:
-    """Write launcher-managed background PID to file."""
-    pid_file.parent.mkdir(exist_ok=True)
-    pid_file.write_text(str(pid), encoding="utf-8")
-
-
-def read_background_pid(pid_file: Path) -> int | None:
-    """Read launcher-managed background PID if available."""
-    if not pid_file.exists():
-        return None
-    try:
-        value = pid_file.read_text(encoding="utf-8").strip()
-        return int(value) if value else None
-    except (ValueError, OSError):
-        return None
-
-
-def clear_background_pid(pid_file: Path) -> None:
-    """Delete launcher-managed background PID file."""
-    if pid_file.exists():
-        pid_file.unlink(missing_ok=True)
-
-
-def print_runtime_status(port: int, pid_file: Path, log_file: Path) -> None:
-    """Print backend listener and tracked launcher PID status."""
-    backend_pids = sorted(find_listener_pids(port))
-    tracked_pid = read_background_pid(pid_file)
-    tracked_label = "none"
-
-    if tracked_pid:
-        if tracked_pid in backend_pids or is_process_alive(tracked_pid):
-            tracked_label = str(tracked_pid)
-        else:
-            tracked_label = f"{tracked_pid} (stale)"
-            if not backend_pids:
-                clear_background_pid(pid_file)
-                tracked_label = f"{tracked_pid} (stale-cleared)"
-
-    print("[status] Runtime listeners")
-    print(f" - Backend ({port}): {'up' if backend_pids else 'down'}")
-    if backend_pids:
-        print(f"   PIDs: {', '.join(str(pid) for pid in backend_pids)}")
-    print(f" - Tracked backend PID: {tracked_label}")
-    print(f" - Backend log: {log_file if log_file.exists() else 'not created yet'}")
-
-
 def stop_pid(pid: int) -> None:
     """Terminate a process by PID, escalating when required."""
     if pid == os.getpid() or pid <= 0:
@@ -324,45 +228,11 @@ def stop_port(port: int, step_label: str) -> None:
             print(f" - Could not stop process {pid}: {exc}")
 
 
-def stop_background_server(port: int, pid_file: Path) -> None:
-    """Stop launcher-managed background server and clear stale PID state."""
-    print("[1/2] Stopping background backend web server...")
-    stopped = False
-    found = False
-
-    pid = read_background_pid(pid_file)
-    listener_pids = find_listener_pids(port)
-    if pid:
-        if pid in listener_pids and is_process_alive(pid):
-            found = True
-            try:
-                stop_pid(pid)
-                print(f" - Stopped PID from launcher file: {pid}.")
-                stopped = True
-            except RuntimeError as exc:
-                print(f" - Could not stop PID {pid}: {exc}")
-        else:
-            print(f" - Ignoring tracked PID {pid}: not listening on port {port}.")
-    clear_background_pid(pid_file)
-
-    extra_pids = find_listener_pids(port)
-    for extra_pid in sorted(extra_pids):
-        found = True
-        try:
-            stop_pid(extra_pid)
-            if extra_pid in find_listener_pids(port):
-                print(f" - Could not stop listener PID {extra_pid}: still listening on {port}.")
-            else:
-                print(f" - Stopped listener PID: {extra_pid}.")
-                stopped = True
-        except RuntimeError as exc:
-            print(f" - Could not stop listener PID {extra_pid}: {exc}")
-
-    if not found:
-        print(" - No running server found.")
-    elif not stopped:
-        print(
-            " - Server is still running. Close the owner terminal or retry with elevated permissions."
-        )
-
-    print("[2/2] Done.")
+def print_runtime_status(port: int, log_file: Path) -> None:
+    """Print which processes listen on the server port and where the log is."""
+    pids = sorted(find_listener_pids(port))
+    print("[status] Runtime listeners")
+    print(f" - Backend ({port}): {'up' if pids else 'down'}")
+    if pids:
+        print(f"   PIDs: {', '.join(str(pid) for pid in pids)}")
+    print(f" - Backend log: {log_file if log_file.exists() else 'not created yet'}")

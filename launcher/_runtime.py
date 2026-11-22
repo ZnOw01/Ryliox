@@ -13,8 +13,7 @@ import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-import config
-from core import process_manager
+from launcher import _processes
 
 if TYPE_CHECKING:
     from launcher._steps import Steps
@@ -24,49 +23,9 @@ REPO_ROOT: Path = Path(__file__).resolve().parent.parent
 TIMEOUT_UV_SECONDS: int = int(os.getenv("RYLIOX_TIMEOUT_UV", "300"))
 TIMEOUT_SUBPROCESS_SECONDS: int = int(os.getenv("RYLIOX_TIMEOUT_SUBPROCESS", "60"))
 
-# Whitelisted runtime packages used to verify that the virtual environment is
-# usable. The names here are also the literal strings passed to ``python -c``,
-# so they MUST be hardcoded and pattern-checked — never built from a
-# requirements file.
-_PACKAGE_NAME_PATTERN: re.Pattern[str] = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
-_ALLOWED_RUNTIME_PACKAGES: frozenset[str] = frozenset(
-    {
-        "fastapi",
-        "uvicorn",
-        "bleach",
-        "lxml",
-        "httpx",
-        "pydantic",
-        "pydantic_settings",
-        "fake_useragent",
-        "cryptography",
-        "jinja2",
-        "markdown",
-        "PIL",
-        "weasyprint",
-        "ebooklib",
-        "starlette",
-        "anyio",
-        "h11",
-        "certifi",
-        "charset_normalizer",
-        "idna",
-        "urllib3",
-        "requests",
-        "bs4",
-        "jwt",
-        "prometheus_client",
-        "psutil",
-        "dotenv",
-        "platformdirs",
-        "watchfiles",
-    }
-)
-
 RUN_DIR: Path = REPO_ROOT / ".run"
 PROJECT_LOG_DIR: Path = REPO_ROOT / "logs"
 VENV_DIR: Path = Path(os.getenv("RYLIOX_VENV", RUN_DIR / "venv")).resolve()
-PID_FILE: Path = RUN_DIR / "web-server.pid"
 LOG_FILE: Path = PROJECT_LOG_DIR / "server-current.log"
 MAX_SERVER_LOG_BYTES: int = int(os.getenv("RYLIOX_MAX_SERVER_LOG_BYTES", str(10 * 1024 * 1024)))
 MAX_SERVER_LOG_BACKUPS: int = int(os.getenv("RYLIOX_MAX_SERVER_LOG_BACKUPS", "5"))
@@ -77,21 +36,11 @@ _DOWNLOAD_PROGRESS_RE: re.Pattern[str] = re.compile(
 )
 
 
-def resolve_port(raw: str | None, default: int = 8000) -> int:
-    try:
-        parsed = int(raw) if raw else default
-    except (TypeError, ValueError):
-        print(f"  [WARN] Invalid port value {raw!r}, using default {default}")
-        return default
-    if not 1 <= parsed <= 65_535:
-        print(f"  [WARN] Port {parsed} out of range, using default {default}")
-        return default
-    return parsed
+DEFAULT_PORT: int = 8000
 
 
 def server_url(port: int) -> str:
-    scheme = "https" if config.SETTINGS.security.enable_https_redirect else "http"
-    return f"{scheme}://localhost:{port}"
+    return f"http://localhost:{port}"
 
 
 def venv_python() -> Path:
@@ -167,104 +116,40 @@ def uv_env() -> dict[str, str]:
     return env
 
 
-def _venv_has_runtime_dependencies(venv_python: Path) -> bool:
-    """Verify the venv can import every whitelisted runtime package."""
-    for name in sorted(_ALLOWED_RUNTIME_PACKAGES):
-        if not _PACKAGE_NAME_PATTERN.match(name):
-            print(f"  [WARN] Skipping invalid package name: {name}")
-            continue
-        result = subprocess.run(
-            [str(venv_python), "-c", f"import {name}"],
-            cwd=REPO_ROOT,
-            capture_output=True,
-            check=False,
-            timeout=10,
-        )
-        if result.returncode != 0:
-            return False
-    return True
-
-
 def ensure_python_runtime(steps: Steps) -> Path:
-    venv = venv_python()
-    uv = require_uv()
-
-    if not venv.exists():
-        _sync_venv(
-            steps, uv, "Creating virtual environment and synchronising dependencies with uv..."
-        )
-    else:
-        steps.next("Virtual environment found.")
-
-    if _venv_has_runtime_dependencies(venv):
-        steps.next("Python dependencies already installed.")
-    elif _sync_venv(steps, uv, "Installing/updating Python dependencies with uv..."):
-        if not _venv_has_runtime_dependencies(venv):
-            _recover_corrupt_venv(steps, uv)
-    return venv
-
-
-def _sync_venv(steps: Steps, uv: str, label: str) -> bool:
-    try:
-        run_checked(
-            [uv, "sync", "--frozen"],
-            steps.format(label),
-            timeout=TIMEOUT_UV_SECONDS,
-            env=uv_env(),
-        )
-        return True
-    except RuntimeError:
-        if VENV_DIR.exists():
-            shutil.rmtree(VENV_DIR, ignore_errors=True)
-        return False
-
-
-def _recover_corrupt_venv(steps: Steps, uv: str) -> None:
-    print("   [WARN] Virtual environment appears corrupt. Recreating from scratch...")
-    if VENV_DIR.exists():
-        shutil.rmtree(VENV_DIR, ignore_errors=True)
+    """Create or update the launcher's virtual environment from ``uv.lock``."""
     run_checked(
-        [uv, "sync", "--frozen"],
-        steps.format("Recreating virtual environment with uv..."),
+        [require_uv(), "sync", "--frozen"],
+        steps.format("Synchronising Python dependencies with uv..."),
         timeout=TIMEOUT_UV_SECONDS,
         env=uv_env(),
     )
+    return venv_python()
 
 
-def clean_runtime_cache() -> bool:
-    """Remove transient runtime files without deleting diagnostic logs."""
-    print(" - Cleaning runtime cache...")
-    if not config.DATA_DIR.exists():
-        print(f"   [INFO] DATA_DIR does not exist yet: {config.DATA_DIR}")
-        return True
-    if not config.DATA_DIR.is_dir():
-        print(f"   [WARN] DATA_DIR is not a directory: {config.DATA_DIR}")
-        return False
+def server_port(requested: int | None) -> int:
+    """Return ``--port`` when given, otherwise the port the project settings resolve to.
 
-    cleaned: list[str] = []
-    errors: list[str] = []
-    files: list[Path] = []
-
-    db_name = config.SETTINGS.queue.db_name or config.SETTINGS.download_db_name
-    if db_name:
-        files.append(config.DATA_DIR / db_name)
-
-    for path in files:
-        try:
-            path.unlink()
-            cleaned.append(path.name)
-        except OSError as exc:
-            errors.append(f"{path.name}: {exc}")
-            print(f"   [WARN] Could not delete {path.name}: {exc}")
-
-    if cleaned:
-        print(f"   Deleted: {', '.join(cleaned)}")
-    if errors:
-        print(f"   Failed to delete {len(errors)} file(s)")
-        return False
-    if not cleaned:
-        print("   Nothing to clean.")
-    return True
+    The settings are read through the launcher's virtual environment so the
+    launcher itself needs nothing beyond the standard library.
+    """
+    if requested is not None:
+        return requested
+    python = venv_python()
+    if not python.exists():
+        return DEFAULT_PORT
+    result = subprocess.run(
+        [str(python), "-c", "import config; print(config.SETTINGS.server.port)"],
+        cwd=REPO_ROOT,
+        env=server_env(),
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=TIMEOUT_SUBPROCESS_SECONDS,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(f"Could not load the configuration:\n{result.stderr.strip()[-800:]}")
+    return int(result.stdout.strip())
 
 
 def ensure_run_dir() -> None:
@@ -273,12 +158,14 @@ def ensure_run_dir() -> None:
 
 
 def stop_port(steps: Steps, port: int) -> None:
-    process_manager.stop_port(port, step_label=steps.format(f"Releasing localhost:{port}..."))
+    _processes.stop_port(port, step_label=steps.format(f"Releasing localhost:{port}..."))
 
 
-def launch_server(venv: Path, steps: Steps, label: str) -> None:
+def launch_server(venv: Path, port: int, steps: Steps, label: str) -> None:
     """Launch the web server in the foreground (blocks until exit)."""
     steps.next(label)
+    env = server_env()
+    env["RYLIOX_SERVER__PORT"] = str(port)
     creationflags = 0
     if os.name == "nt":
         creationflags = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
@@ -289,7 +176,7 @@ def launch_server(venv: Path, steps: Steps, label: str) -> None:
         process = subprocess.Popen(
             [str(venv), "-X", "utf8", "-m", "web.server"],
             cwd=REPO_ROOT,
-            env=server_env(),
+            env=env,
             creationflags=creationflags,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
@@ -302,7 +189,9 @@ def launch_server(venv: Path, steps: Steps, label: str) -> None:
         output.start()
         returncode = _wait_for_server_process(process)
         output.stop()
-        if returncode != 0:
+        if returncode < 0:
+            print("\n  Server stopped.")
+        elif returncode != 0:
             raise RuntimeError(f"Server process exited with code {returncode}.")
     except KeyboardInterrupt:
         _stop_foreground_server(process)
@@ -434,7 +323,7 @@ def _summarize_server_line(line: str) -> str | None:
             f"[download] {progress.group('percent')}% "
             f"{progress.group('status')} job={progress.group('job')[:8]} - {message}"
         )
-    if "Application startup complete" in text or "Ryliox ready" in text:
+    if "Ryliox ready" in text:
         return "[server] ready"
     if "Uvicorn running on" in text:
         return f"[server] {text}"
@@ -454,8 +343,8 @@ def _strip_ansi(value: str) -> str:
 
 
 def run_status(port: int) -> None:
-    process_manager.print_runtime_status(port=port, pid_file=PID_FILE, log_file=LOG_FILE)
+    _processes.print_runtime_status(port=port, log_file=LOG_FILE)
 
 
 def run_stop(port: int) -> None:
-    process_manager.stop_background_server(port=port, pid_file=PID_FILE)
+    _processes.stop_port(port, step_label=f"Stopping the server on localhost:{port}...")

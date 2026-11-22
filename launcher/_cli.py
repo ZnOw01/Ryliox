@@ -3,15 +3,13 @@
 from __future__ import annotations
 
 import argparse
-import os
 import sys
 import threading
 import time
 import webbrowser
 from pathlib import Path
 
-import config
-from launcher._runtime import REPO_ROOT, resolve_port, server_url
+from launcher._runtime import REPO_ROOT
 
 MODES: dict[str, str] = {
     "1": "unified",
@@ -76,11 +74,21 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--rebuild-frontend", action="store_true")
     parser.add_argument(
         "--port",
-        type=int,
+        type=_port,
         default=None,
-        help="Server port (overrides PORT env var and default)",
+        help="Server port (overrides the configured port)",
     )
     return parser.parse_args(argv)
+
+
+def _port(raw: str) -> int:
+    try:
+        port = int(raw)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"invalid port: {raw!r}") from None
+    if not 1 <= port <= 65_535:
+        raise argparse.ArgumentTypeError(f"port out of range: {port}")
+    return port
 
 
 def resolve_mode(argv: list[str], args: argparse.Namespace) -> str:
@@ -113,24 +121,3 @@ def banner() -> None:
     print(" Ryliox Launcher")
     print("==========================================")
     print()
-
-
-def get_port(args: argparse.Namespace) -> int:
-    if args.port is not None:
-        return resolve_port(str(args.port))
-    return resolve_port(os.getenv("PORT", str(config.SETTINGS.server.port)))
-
-
-__all__ = [
-    "MODES",
-    "MODE_LABELS",
-    "is_stdin_interactive",
-    "open_browser_async",
-    "interactive_mode",
-    "parse_args",
-    "resolve_mode",
-    "safe_error",
-    "banner",
-    "get_port",
-    "server_url",
-]

@@ -7,7 +7,6 @@ import shutil
 import subprocess
 from typing import TYPE_CHECKING
 
-import config
 from launcher._runtime import REPO_ROOT, run_checked
 
 if TYPE_CHECKING:
@@ -16,9 +15,7 @@ if TYPE_CHECKING:
     from launcher._steps import Steps
 
 TIMEOUT_BUN_SECONDS: int = int(os.getenv("RYLIOX_TIMEOUT_BUN", "300"))
-ASTRO_FALLBACK_NODE_VERSION: str = (
-    getattr(config.SETTINGS.server, "astro_fallback_node_version", None) or "22.20.0"
-)
+ASTRO_FALLBACK_NODE_VERSION: str = "22.20.0"
 
 WATCH_EXTENSIONS: frozenset[str] = frozenset(
     {".astro", ".tsx", ".ts", ".jsx", ".js", ".css", ".json"}
@@ -26,8 +23,6 @@ WATCH_EXTENSIONS: frozenset[str] = frozenset(
 WATCH_PATHS: tuple[str, ...] = (
     "src",
     "astro.config.mjs",
-    "tailwind.config.mjs",
-    "postcss.config.js",
     "package.json",
 )
 EXCLUDED_DIRS: frozenset[str] = frozenset({"node_modules", ".git", ".github", ".vscode", "dist"})

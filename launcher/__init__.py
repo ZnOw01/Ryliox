@@ -16,21 +16,20 @@ from typing import TYPE_CHECKING
 from launcher import _cli, _docker, _frontend
 from launcher._cli import (
     banner,
-    get_port,
     interactive_mode,
     open_browser_async,
     parse_args,
     resolve_mode,
     safe_error,
-    server_url,
 )
 from launcher._runtime import (
-    clean_runtime_cache,
     ensure_python_runtime,
     ensure_run_dir,
     launch_server,
     run_status,
     run_stop,
+    server_port,
+    server_url,
     stop_port,
 )
 from launcher._steps import Steps
@@ -40,45 +39,46 @@ if TYPE_CHECKING:
 
 REPO_ROOT = _cli.REPO_ROOT
 
-# Steps for the interactive-mode loop (which does not pre-print totals).
-_INTERACTIVE_STEPS: Callable[[], Steps] = lambda: Steps(total=6)
+# Docker Compose publishes this port; see docker-compose.yml.
+_DOCKER_PORT = 8000
 
 
 # ── Mode implementations ────────────────────────────────────────────────────
 
 
-def _run_unified(port: int, open_browser: bool, rebuild: bool) -> None:
+def _run_unified(requested_port: int | None, open_browser: bool, rebuild: bool) -> None:
     steps = Steps(total=6)
-    stop_port(steps, port)
     steps.next("Mode: unified")
     venv = ensure_python_runtime(steps)
-    _frontend.ensure_build(steps, rebuild=rebuild)
-    if not clean_runtime_cache():
-        print("   [WARN] Cache cleanup had errors, but continuing...")
-    if open_browser:
-        open_browser_async(server_url(port))
-    launch_server(venv, steps, label=f"Starting unified server at {server_url(port)}...")
-
-
-def _run_docker(port: int, open_browser: bool) -> None:
-    steps = Steps(total=4)
+    port = server_port(requested_port)
     stop_port(steps, port)
-    steps.next("Mode: Docker Compose")
-    _docker.run_docker(steps, port)
+    _frontend.ensure_build(steps, rebuild=rebuild)
     if open_browser:
         open_browser_async(server_url(port))
+    launch_server(venv, port, steps, label=f"Starting unified server at {server_url(port)}...")
+
+
+def _run_docker(open_browser: bool) -> None:
+    steps = Steps(total=4)
+    stop_port(steps, _DOCKER_PORT)
+    steps.next("Mode: Docker Compose")
+    _docker.run_docker(steps, _DOCKER_PORT)
+    if open_browser:
+        open_browser_async(server_url(_DOCKER_PORT))
 
 
 # ── Dispatch ────────────────────────────────────────────────────────────────
 
 
-def _build_dispatch(port: int, open_browser: bool, rebuild: bool) -> dict[str, Callable[[], None]]:
+def _build_dispatch(
+    requested_port: int | None, open_browser: bool, rebuild: bool
+) -> dict[str, Callable[[], None]]:
     return {
         "quit": lambda: None,
-        "status": lambda: run_status(port),
-        "stop": lambda: run_stop(port),
-        "docker": lambda: _run_docker(port, open_browser),
-        "unified": lambda: _run_unified(port, open_browser, rebuild),
+        "status": lambda: run_status(server_port(requested_port)),
+        "stop": lambda: run_stop(server_port(requested_port)),
+        "docker": lambda: _run_docker(open_browser),
+        "unified": lambda: _run_unified(requested_port, open_browser, rebuild),
     }
 
 
@@ -90,14 +90,13 @@ def main() -> int:
         os.chdir(REPO_ROOT)
         argv = sys.argv[1:]
         args = parse_args(argv)
-        port = get_port(args)
         open_browser = not args.no_browser
         ensure_run_dir()
-        dispatch = _build_dispatch(port, open_browser, args.rebuild_frontend)
+        dispatch = _build_dispatch(args.port, open_browser, args.rebuild_frontend)
 
         if not argv:
             banner()
-            return _interactive_loop(dispatch, port)
+            return _interactive_loop(dispatch)
 
         mode = resolve_mode(argv, args)
         if mode == "quit":
@@ -128,7 +127,7 @@ def main() -> int:
         return 1
 
 
-def _interactive_loop(dispatch: dict[str, Callable[[], None]], port: int) -> int:
+def _interactive_loop(dispatch: dict[str, Callable[[], None]]) -> int:
     while True:
         mode = interactive_mode()
         if mode == "quit":

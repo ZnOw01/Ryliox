@@ -7,7 +7,6 @@ import shutil
 import subprocess
 from typing import TYPE_CHECKING
 
-import config
 from launcher._runtime import REPO_ROOT, run_checked, server_url
 
 if TYPE_CHECKING:
@@ -89,4 +88,3 @@ def run_docker(steps: Steps, port: int) -> None:
     verify_running(compose)
 
     print(f"\nServer available at {server_url(port)}")
-    _ = config  # keep import explicit for future use
