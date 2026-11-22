@@ -527,9 +527,22 @@ class DownloadQueueService:
                 # have shorter timeouts and the user can also cancel via the
                 # UI. On expiry asyncio.TimeoutError propagates and the job
                 # is marked failed.
-                result = runner.run(
-                    asyncio.wait_for(run_download(), timeout=self._download_timeout_seconds)
-                )
+                async def run_with_deadline() -> DownloadResult:
+                    deadline = asyncio.timeout(self._download_timeout_seconds)
+                    try:
+                        async with deadline:
+                            return await run_download()
+                    except TimeoutError as exc:
+                        # The deadline raises a bare TimeoutError, which would
+                        # surface to the user as just "Download failed".
+                        if not deadline.expired():
+                            raise
+                        raise TimeoutError(
+                            f"Download did not finish within {self._download_timeout_seconds:g} "
+                            "seconds. Large books may need a higher REQUEST_TIMEOUT_SECONDS."
+                        ) from exc
+
+                result = runner.run(run_with_deadline())
 
             if self._check_and_signal_cancel(job.job_id, cancel_event):
                 raise DownloadCancelledError("Download cancelled by user")

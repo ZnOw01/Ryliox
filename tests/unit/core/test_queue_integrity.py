@@ -397,3 +397,33 @@ def test_service_requeues_inflight_jobs_only_when_starting(
     assert queue_sizes[-1] == 1
     assert active_downloads[-1] == 0
     assert service.stop()
+
+
+def test_download_timeout_is_reported_with_an_explanation(tmp_path: Path) -> None:
+    import asyncio
+
+    repository = DownloadJobRepository(tmp_path / "queue.sqlite3")
+    job = _job(1, tmp_path)
+    repository.save(job)
+
+    class Downloader:
+        async def download(self, **kwargs: object) -> SimpleNamespace:
+            await asyncio.sleep(5)
+            raise AssertionError("unreachable")
+
+    async def kernel_factory() -> _Kernel:
+        return _Kernel({"downloader": Downloader()})
+
+    service = DownloadQueueService(
+        kernel_factory=kernel_factory,
+        repository=repository,
+        error_log_dir=tmp_path,
+        download_timeout_seconds=1,
+    )
+    service._run_job(job)
+
+    snapshot = repository.get_by_id(job.job_id)
+    assert snapshot is not None
+    assert snapshot["status"] == "error"
+    assert "did not finish within 1 seconds" in snapshot["error"]
+    assert "REQUEST_TIMEOUT_SECONDS" in snapshot["error"]
