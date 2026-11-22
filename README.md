@@ -37,7 +37,7 @@ Export any book to EPUB 3 or PDF from a single, beautiful local web app.
 | **Persistent download queue** | Jobs survive restarts — persisted in SQLite |
 | **Live progress** | Real-time status streamed with Server-Sent Events |
 | **Session vault** | Cookie-based auth, SQLite-first storage with Fernet encryption |
-| **Microkernel architecture** | Auth, book, chapters, assets, EPUB and PDF as hot-pluggable plugins |
+| **Microkernel architecture** | Auth, book, chapters, assets, EPUB and PDF as plugins |
 | **OWASP-aware defaults** | Same-origin checks, security headers, CSP, rate limiting, audit logging with HMAC |
 | **Observability** | Prometheus metrics, health probes, typed Pydantic configuration |
 | **Internationalized UI** | i18next-powered Astro 7 + React 19 + Tailwind CSS 4 frontend |
@@ -88,7 +88,7 @@ The launcher creates an isolated Python environment in `.run/venv`, installs fro
 Ryliox needs your O'Reilly session cookies to access purchased or subscribed content.
 
 1. Open the web UI.
-2. Click **Set cookies**.
+2. Click **Configure cookies**.
 3. Paste a full JSON cookie export from a browser extension such as **EditThisCookie**.
 
 > [!IMPORTANT]
@@ -209,11 +209,11 @@ Configuration is loaded from `.env` into a **typed Pydantic settings model**. St
 
 | Area | Examples | Notes |
 | --- | --- | --- |
-| Server | `HOST`, `PORT`, `APP_VERSION` | Bind address and app metadata |
+| Server | `HOST`, `PORT`, `BASE_URL` | Bind address and O'Reilly base URL |
 | HTTP | `REQUEST_*`, `USER_AGENT`, `ACCEPT_*` | Outbound client behavior |
 | Security | `ENVIRONMENT`, `CSP_POLICY`, `ALLOWED_HOSTS` | Headers, host checks, CSP |
-| Rate limit | `RATE_LIMIT_*`, `API_RATE_LIMIT_*` | Endpoint throttling |
-| Secrets | `SECRET_MASTER_PASSWORD` | Encryption and rotation |
+| Rate limit | `RATE_LIMIT_*` | Throttling for `POST /api/download` and `POST /api/cookies` |
+| Keys | `SESSION_ENCRYPTION_KEY`, `AUDIT_HMAC_KEY` | Cookie encryption and audit-log integrity |
 | Audit | `AUDIT_*` | Audit log retention and integrity |
 | Cache | `CACHE_*` | Resource cache sizes and TTLs |
 
@@ -221,9 +221,12 @@ Runtime paths default to local, git-ignored directories:
 
 | Path | Contents |
 | --- | --- |
-| `data/` | SQLite databases, cookies, audit logs, secrets |
+| `data/` | SQLite databases, cookies, audit log |
 | `output/` | Generated EPUB / PDF files |
 | `.run/` | Launcher-managed local runtime files |
+| `logs/` | Launcher server log |
+
+Outside production, generated keys live in the user configuration directory (`~/.config/ryliox` on Linux), not in `data/`.
 
 ## Secure Deployment
 
@@ -270,7 +273,7 @@ bun run build
 **Security checks**
 
 ```bash
-uv sync --extra security
+uv sync --extra dev --extra security
 uv run pytest tests/security -q --run-security
 ```
 
@@ -331,8 +334,7 @@ Ryliox/
 ├── frontend/            Astro 7 + React 19 + Tailwind CSS 4
 ├── tests/               Unit · integration · contract · security · e2e · a11y · performance
 ├── Dockerfile           Multi-stage production image
-├── docker-compose.yml   Local orchestration (loopback-only)
-└── epubcheck/           EPUB validation assets
+└── docker-compose.yml   Local orchestration (loopback-only)
 ```
 
 ## Roadmap

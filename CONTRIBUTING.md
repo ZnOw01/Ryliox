@@ -25,7 +25,7 @@
 | 🐛 | **Report a bug** | [Open an issue](https://github.com/ZnOw01/Ryliox/issues) with repro steps (see below) |
 | 💡 | **Suggest a feature** | Open an issue describing the use case, not just the solution |
 | 📖 | **Improve docs** | Typos, clarity, examples — always welcome |
-| 🌍 | **Translate the UI** | Add a locale under `frontend/src/i18n/` |
+| 🌍 | **Translate the UI** | Add a locale under `frontend/src/i18n/locales/` and register it in `frontend/src/i18n/config.ts` |
 | 🧩 | **Write a plugin** | Extend the microkernel — see `plugins/base.py` |
 | 🔧 | **Submit code** | Fork, branch, PR — the full flow is below |
 
@@ -91,7 +91,7 @@ flowchart LR
    - `docs/short-description` — documentation only
 3. **Make your changes** in small, focused commits.
 4. **Run all checks** (see below) — CI runs the same ones.
-5. **Open the PR** against `main` and fill in the template.
+5. **Open the PR** against `main`.
 
 ## 📝 Commit Convention
 
@@ -192,7 +192,7 @@ bun run build
 **Security suite** (optional locally, encouraged for security-related changes)
 
 ```bash
-uv sync --extra security
+uv sync --extra dev --extra security
 uv run pytest tests/security -q --run-security
 ```
 
