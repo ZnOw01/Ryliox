@@ -188,6 +188,7 @@
 			"status_running": "En progreso",
 			"status_completed": "Completado",
 			"status_error": "Error",
+			"status_cancelling": "Cancelando",
 			"status_cancelled": "Cancelado",
 			"steps": {
 				"queued": "En cola",

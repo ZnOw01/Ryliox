@@ -62,6 +62,7 @@ export function formatStatusLabel(status: string, t?: TFunction): string {
     idle: t('download.progress.status_idle'),
     queued: t('download.progress.status_queued'),
     running: t('download.progress.status_running'),
+    cancelling: t('download.progress.status_cancelling'),
     completed: t('download.progress.status_completed'),
     error: t('download.progress.status_error'),
     cancelled: t('download.progress.status_cancelled'),
