@@ -37,3 +37,23 @@ describe('download job errors', () => {
     );
   });
 });
+
+describe('running job summary', () => {
+  it('does not show the server progress text, which is English', () => {
+    render(
+      <ProgressStatus
+        currentLabel="running"
+        progressPercent={82}
+        progress={{
+          status: 'running',
+          job_id: 'job-1',
+          percentage: 82,
+          message: '82% - Downloading CSS (3/10)',
+        }}
+      />
+    );
+
+    expect(screen.getByText(/estado: en progreso/i)).toBeInTheDocument();
+    expect(screen.queryByText(/downloading css/i)).toBeNull();
+  });
+});

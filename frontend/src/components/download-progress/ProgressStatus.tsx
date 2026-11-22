@@ -38,9 +38,6 @@ export function ProgressStatus({ currentLabel, progress, progressPercent }: Prog
   const statusLabel = formatStatusLabel(currentLabel, t);
   const epubName = outputFileNames(progress?.epub);
   const pdfName = outputFileNames(progress?.pdf);
-  const shouldShowSummaryMessage = Boolean(
-    progress?.message && progress.message.toLowerCase() !== 'completed'
-  );
   const hasTechnicalDetails = Boolean(progress?.details || progress?.code || progress?.error);
   const chapterProgress =
     typeof progress?.current_chapter === 'number' &&
@@ -245,10 +242,6 @@ export function ProgressStatus({ currentLabel, progress, progressPercent }: Prog
               <span className="font-semibold text-foreground">{etaLabel}</span>
             </span>
           </div>
-        ) : null}
-
-        {!chapterProgress && shouldShowSummaryMessage ? (
-          <p className="text-xs leading-relaxed text-muted-foreground">{progress?.message}</p>
         ) : null}
 
         {epubName ? (
