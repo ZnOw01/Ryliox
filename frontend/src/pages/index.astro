@@ -24,17 +24,12 @@ import App from '../components/App';
       content="Descarga y gestiona tu biblioteca técnica de O'Reilly Learning en PDF y EPUB. Rápido, por capítulos y sin complicaciones."
     />
     <meta property="og:type" content="website" />
-    <meta property="og:url" content="https://ryliox.app" />
-    <meta property="og:image" content="/og-image.png" />
-    <meta property="og:image:width" content="1200" />
-    <meta property="og:image:height" content="630" />
-    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:card" content="summary" />
     <meta name="twitter:title" content="Ryliox — Descargador de libros O'Reilly" />
     <meta
       name="twitter:description"
       content="Descarga y gestiona tu biblioteca técnica de O'Reilly Learning."
     />
-    <meta name="twitter:image" content="/og-image.png" />
 
     <!-- PWA -->
     <link rel="manifest" href="/manifest.json" />
@@ -66,7 +61,6 @@ import App from '../components/App';
         "@type": "WebApplication",
         "name": "Ryliox",
         "description": "Descargador de libros t\u00e9cnicos de O'Reilly Learning en formato PDF y EPUB.",
-        "url": "https://ryliox.app",
         "applicationCategory": "Multimedia",
         "operatingSystem": "All",
         "browserRequirements": "Requiere JavaScript. Compatible con Chrome, Firefox, Safari y Edge.",
@@ -92,67 +86,6 @@ import App from '../components/App';
         if (isDark) {
           document.documentElement.classList.add('dark');
         }
-      })();
-    </script>
-
-    <script is:inline>
-      // Service Worker registration
-      (function () {
-        if ('serviceWorker' in navigator) {
-          window.addEventListener('load', function () {
-            navigator.serviceWorker
-              .register('/service-worker.js')
-              .then(function (registration) {
-                console.log('ServiceWorker registered:', registration.scope);
-              })
-              .catch(function (error) {
-                console.log('ServiceWorker registration failed:', error);
-              });
-          });
-        }
-      })();
-    </script>
-
-    <script is:inline>
-      // Clear legacy service workers (dev cleanup)
-      (() => {
-        window.addEventListener('load', () => {
-          const host = window.location.hostname;
-          const isLocalHost = host === 'localhost' || host === '127.0.0.1';
-          if (!isLocalHost) {
-            return;
-          }
-
-          const clearLegacyRuntime = async () => {
-            try {
-              if ('serviceWorker' in navigator) {
-                const registrations = await navigator.serviceWorker.getRegistrations();
-                const ownRegistrations = registrations.filter(registration => {
-                  const scriptUrl =
-                    registration.active?.scriptURL ||
-                    registration.waiting?.scriptURL ||
-                    registration.installing?.scriptURL ||
-                    '';
-                  const normalized = scriptUrl.toLowerCase();
-                  return normalized.includes('/service-worker.js') || normalized.includes('ryliox');
-                });
-                await Promise.all(ownRegistrations.map(registration => registration.unregister()));
-              }
-
-              if ('caches' in window) {
-                const cacheKeys = await caches.keys();
-                const ownCacheKeys = cacheKeys.filter(cacheKey =>
-                  cacheKey.toLowerCase().startsWith('ryliox')
-                );
-                await Promise.all(ownCacheKeys.map(cacheKey => caches.delete(cacheKey)));
-              }
-            } catch (_error) {
-              // Ignore cleanup failures in local environments.
-            }
-          };
-
-          void clearLegacyRuntime();
-        });
       })();
     </script>
   </head>
