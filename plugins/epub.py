@@ -90,6 +90,10 @@ class EpubPlugin(Plugin):
         )
 
     @staticmethod
+    def _book_identifier(book_info: dict) -> str:
+        return str(book_info.get("isbn") or book_info.get("id") or "unknown")
+
+    @staticmethod
     def _sanitize_xml_id(raw: str) -> str:
         import re
 
@@ -118,11 +122,11 @@ class EpubPlugin(Plugin):
             css_files = []
         title = html.escape(self._sanitize_xml_text(book_info.get("title", "Unknown")))
         authors = book_info.get("authors", [])
-        isbn = book_info.get("isbn", book_info.get("id", "unknown"))
+        isbn = self._book_identifier(book_info)
         description = html.escape(self._sanitize_xml_text(book_info.get("description", "")[:500]))
         publishers = book_info.get("publishers", [])
-        language = book_info.get("language", "en")
-        pub_date = book_info.get("publication_date", "")
+        language = html.escape(book_info.get("language") or "en")
+        pub_date = book_info.get("publication_date") or ""
 
         author_xml = ""
         for author in authors:
@@ -182,17 +186,23 @@ class EpubPlugin(Plugin):
         for i, _ch in enumerate(chapter_entries):
             spine_items.append(f'    <itemref idref="ch{i:03d}"/>')
 
+        # EPUB forbids empty metadata elements, so leave out the ones we lack.
+        description_xml = (
+            f"    <dc:description>{description}</dc:description>\n" if description else ""
+        )
+        date_xml = (
+            f"    <dc:date>{html.escape(pub_date, quote=True)}</dc:date>\n" if pub_date else ""
+        )
+
         modified_timestamp = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
         content = f"""<?xml version="1.0" encoding="utf-8"?>
 <package xmlns="http://www.idpf.org/2007/opf" unique-identifier="bookid" version="3.0">
   <metadata xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/">
     <dc:title>{title}</dc:title>
-{author_xml}{publisher_xml}    <dc:description>{description}</dc:description>
-    <dc:language>{language}</dc:language>
+{author_xml}{publisher_xml}{description_xml}    <dc:language>{language}</dc:language>
     <dc:identifier id="bookid">{html.escape(isbn, quote=True)}</dc:identifier>
-    <dc:date>{html.escape(pub_date, quote=True)}</dc:date>
-    <meta property="dcterms:modified">{modified_timestamp}</meta>
+{date_xml}    <meta property="dcterms:modified">{modified_timestamp}</meta>
   </metadata>
   <manifest>
 {chr(10).join(manifest_items)}
@@ -206,7 +216,7 @@ class EpubPlugin(Plugin):
 
     def _write_toc_ncx(self, oebps: Path, book_info: dict, toc: list[dict]) -> None:
         title = html.escape(book_info.get("title", "Unknown"))
-        isbn = book_info.get("isbn", book_info.get("id", "unknown"))
+        isbn = self._book_identifier(book_info)
         authors = ", ".join(book_info.get("authors", ["Unknown"]))
 
         max_depth = self._get_max_depth(toc)
@@ -338,6 +348,7 @@ class EpubPlugin(Plugin):
             ".jpeg": "image/jpeg",
             ".png": "image/png",
             ".gif": "image/gif",
+            ".webp": "image/webp",
             ".svg": "image/svg+xml",
         }
         return types.get(suffix.lower(), "application/octet-stream")

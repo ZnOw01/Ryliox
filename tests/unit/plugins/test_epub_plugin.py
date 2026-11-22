@@ -75,3 +75,22 @@ def test_validate_manifest_files_rejects_missing_chapter(tmp_path: Path):
                 {"filename": "chapter02.html"},
             ],
         )
+
+
+def test_write_content_opf_has_no_empty_required_metadata(tmp_path: Path):
+    # The book plugin reports a missing ISBN, date or description as "".
+    oebps = tmp_path / "OEBPS"
+    (oebps / "Images").mkdir(parents=True)
+    (oebps / "Images" / "pic.webp").write_bytes(b"RIFF\x00\x00\x00\x00WEBP")
+
+    EpubPlugin()._write_content_opf(
+        oebps=oebps,
+        book_info={"id": "9781", "isbn": "", "description": "", "publication_date": ""},
+        chapter_entries=[],
+    )
+
+    opf = (oebps / "content.opf").read_text(encoding="utf-8")
+    assert '<dc:identifier id="bookid">9781</dc:identifier>' in opf
+    assert "<dc:description>" not in opf
+    assert "<dc:date>" not in opf
+    assert 'href="Images/pic.webp" media-type="image/webp"' in opf
