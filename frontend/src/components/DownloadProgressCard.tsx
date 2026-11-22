@@ -4,6 +4,7 @@ import { DownloadActions } from './download-progress/DownloadActions';
 import { ErrorNotice } from './download-progress/ErrorNotice';
 import { FormatSelector } from './download-progress/FormatSelector';
 import { ProgressStatus } from './download-progress/ProgressStatus';
+import { downloadErrorMessage } from './download-progress/utils';
 import { SseStatusBadge } from './download-progress/SseStatusBadge';
 import { cn } from '../lib/cn';
 import { Download, BookOpen, AlertTriangle, RotateCw, CheckCircle2 } from 'lucide-react';
@@ -43,7 +44,7 @@ export function DownloadProgressCard() {
       toast.success(message);
       announce(message);
     } else if (status === 'error') {
-      const message = progress?.error || t('download.notifications.download_error');
+      const message = downloadErrorMessage(progress, t);
       toast.error(message);
       announce(message, 'assertive');
     } else {

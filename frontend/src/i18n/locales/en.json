@@ -244,6 +244,12 @@
 			"status_error": "paused",
 			"status_reconnecting": "retrying"
 		},
+		"errors": {
+			"generic": "The download failed. Try again; if it keeps failing, check the technical details.",
+			"auth_required": "There is no O'Reilly session. Save your cookies in the Session section and try again.",
+			"session_rejected": "O'Reilly rejected the session. Copy fresh cookies from your browser and save them again.",
+			"upstream_blocked": "O'Reilly is temporarily blocking requests. Wait a few minutes before retrying; your session is not the problem."
+		},
 		"notifications": {
 			"download_started": "Download started",
 			"download_completed": "Download completed!",

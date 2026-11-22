@@ -1,5 +1,6 @@
 import type { SseStatus } from '../../hooks/useDownloadManager';
 import type { TFunction } from 'i18next';
+import type { ProgressResponse } from '../../lib/types';
 
 function roundToSingleDecimal(value: number): number {
   return Math.round(value * 10) / 10;
@@ -117,6 +118,20 @@ export function formatDescription(
     t(`download.format.descriptions.${format}`, { defaultValue: serverDescription ?? '' }) ||
     undefined
   );
+}
+
+const DOWNLOAD_ERROR_CODES = new Set(['auth_required', 'session_rejected', 'upstream_blocked']);
+
+/**
+ * What a failed job means to the user, in the UI language. The server's own
+ * text stays under the technical details; it is English and not for users.
+ */
+export function downloadErrorMessage(progress: ProgressResponse | undefined, t: TFunction): string {
+  const code = progress?.code;
+  if (code && DOWNLOAD_ERROR_CODES.has(code)) {
+    return t(`download.errors.${code}`);
+  }
+  return t('download.errors.generic');
 }
 
 export function sseStatusClass(status: SseStatus): string {

@@ -15,7 +15,7 @@ import {
 
 import { revealFile } from '../../lib/api';
 import type { ProgressResponse } from '../../lib/types';
-import { formatEta, formatStatusLabel } from './utils';
+import { downloadErrorMessage, formatEta, formatStatusLabel } from './utils';
 import { Badge } from '../ui/Badge';
 import { toast } from '../ui/BeautifulToast';
 import { cn } from '../../lib/cn';
@@ -196,6 +196,13 @@ export function ProgressStatus({ currentLabel, progress, progressPercent }: Prog
               aria-hidden="true"
             />
             <span>{t('download.progress.completed_message')}</span>
+          </div>
+        ) : null}
+
+        {isError ? (
+          <div className="flex items-start gap-2.5 rounded-xl border border-destructive/30 bg-destructive/5 px-3.5 py-2.5 text-sm font-medium text-destructive">
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={2} aria-hidden="true" />
+            <span>{downloadErrorMessage(progress, t)}</span>
           </div>
         ) : null}
 
