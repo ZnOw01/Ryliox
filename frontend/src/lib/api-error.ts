@@ -63,6 +63,10 @@ function getUserFriendlyMessage(error: ApiError | Record<string, unknown>): stri
     return t('errors.invalid_session_after_cookies');
   }
 
+  if (code === 'upstream_blocked' || code === 'session_rejected') {
+    return t(`errors.${code}`);
+  }
+
   // Return original message if no specific handling
   if (error instanceof ApiError) {
     return error.message;

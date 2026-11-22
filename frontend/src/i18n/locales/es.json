@@ -355,7 +355,9 @@
 		"cookies_required_description": "Necesitas configurar cookies válidas para descargar libros.",
 		"retry": "Reintentar",
 		"contact_support": "Contactar soporte",
-		"invalid_session_after_cookies": "Las cookies se guardaron, pero O'Reilly no acepta la sesión. Copia el encabezado 'Cookie' desde la pestaña Red de DevTools, o exporta con EditThisCookie incluyendo las cookies HttpOnly."
+		"invalid_session_after_cookies": "Las cookies se guardaron, pero O'Reilly no acepta la sesión. Copia el encabezado 'Cookie' desde la pestaña Red de DevTools, o exporta con EditThisCookie incluyendo las cookies HttpOnly.",
+		"upstream_blocked": "O'Reilly está bloqueando temporalmente las peticiones de Ryliox. Espera unos minutos y vuelve a intentarlo; tu sesión no es el problema.",
+		"session_rejected": "O'Reilly rechazó tu sesión. Copia cookies nuevas desde tu navegador y guárdalas otra vez."
 	},
 	"loading": {
 		"searching": "Buscando libros...",

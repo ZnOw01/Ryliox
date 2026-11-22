@@ -13,6 +13,7 @@ from core.cache import (
     get_chapter_list_cache,
     get_search_results_cache,
 )
+from core.http_client import UpstreamAuthError, UpstreamBlockedError
 from core.session_store import SessionStore
 from web.api_utils import ErrorCode
 from web.dependencies import get_kernel, get_session_store
@@ -43,6 +44,8 @@ def _has_valid_cookies(store: SessionStore | None) -> tuple[bool, int]:
         return False, 0
     try:
         count = store.count_stored_cookies()
+    except (UpstreamAuthError, UpstreamBlockedError):
+        raise
     except Exception as exc:
         logger.warning("Failed to check cookies: %s", exc)
         return False, 0
@@ -109,6 +112,8 @@ async def search(
         results = await book_plugin.search(search_term)
         await cache.set(cache_key, results)
         return SearchResponse(results=results)
+    except (UpstreamAuthError, UpstreamBlockedError):
+        raise
     except Exception as exc:
         logger.exception("Error searching for '%s'", search_term)
         raise HTTPException(
@@ -166,6 +171,8 @@ async def book_chapters(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail={"error": str(exc), "code": ErrorCode.BOOK_CHAPTERS_FAILED},
         ) from exc
+    except (UpstreamAuthError, UpstreamBlockedError):
+        raise
     except Exception as exc:
         logger.exception("Unexpected error fetching chapters for book %s", book_id)
         raise HTTPException(
@@ -247,6 +254,8 @@ async def book_info(
             status_code=status.HTTP_404_NOT_FOUND,
             detail={"error": str(exc), "code": ErrorCode.BOOK_FETCH_FAILED},
         ) from exc
+    except (UpstreamAuthError, UpstreamBlockedError):
+        raise
     except Exception as exc:
         logger.exception("Error inesperado al obtener libro %r.", book_id)
         raise HTTPException(

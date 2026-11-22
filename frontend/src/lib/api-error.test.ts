@@ -27,6 +27,18 @@ describe('server text shown in the UI language', () => {
     expect(message).not.toContain('still invalid');
   });
 
+  it.each(['upstream_blocked', 'session_rejected'])(
+    'explains %s in the UI language',
+    async code => {
+      await i18n.changeLanguage('es');
+
+      const { message } = parseApiError(new ApiError({ error: 'raw server text', code }, 503));
+
+      expect(message).toBe(i18n.t(`errors.${code}`));
+      expect(message).not.toContain('raw server text');
+    }
+  );
+
   it('describes known formats itself and falls back to the server for new ones', async () => {
     await i18n.changeLanguage('es');
     const t = i18n.t;

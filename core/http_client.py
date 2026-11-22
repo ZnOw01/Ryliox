@@ -66,6 +66,29 @@ def host_is_allowed(host: str) -> bool:
     return _host_matches_any((host or "").lower(), DEFAULT_ALLOWED_HOSTS)
 
 
+class UpstreamAuthError(RuntimeError):
+    """O'Reilly refused the request because of the session: none, or one it rejected."""
+
+    def __init__(self, message: str, code: str) -> None:
+        super().__init__(message)
+        self.code = code
+
+
+class UpstreamBlockedError(RuntimeError):
+    """O'Reilly's anti-bot layer refused the request. The session itself may be fine."""
+
+    code = "upstream_blocked"
+
+
+def _is_anti_bot_block(response: httpx.Response) -> bool:
+    """Akamai answers a blocked request with an HTML "Access Denied" page.
+
+    O'Reilly's API answers its own 403s with JSON, so an HTML body is the signal.
+    """
+    content_type = response.headers.get("content-type", "")
+    return "text/html" in content_type and "access denied" in response.text[:2000].lower()
+
+
 class HttpClient:
     """Async HTTP client with built-in URL allowlist and retry."""
 
@@ -492,12 +515,19 @@ class HttpClient:
 
     def _raise_for_auth_error(self, response: httpx.Response) -> None:
         if response.status_code == 403:
-            if not self._auth_cookies:
-                raise RuntimeError(
-                    "Not authenticated. Please copy cookies from your browser and POST them to /api/cookies."
+            if _is_anti_bot_block(response):
+                raise UpstreamBlockedError(
+                    "O'Reilly is temporarily blocking requests from this app. "
+                    "Wait a few minutes before trying again; your session is not the problem."
                 )
-            raise RuntimeError(
-                "Session token expired. Please copy fresh cookies from your browser and POST them to /api/cookies."
+            if not self._auth_cookies:
+                raise UpstreamAuthError(
+                    "Not authenticated. Please copy cookies from your browser and POST them to /api/cookies.",
+                    code="auth_required",
+                )
+            raise UpstreamAuthError(
+                "O'Reilly rejected the session. Copy fresh cookies from your browser and save them again.",
+                code="session_rejected",
             )
         if response.status_code >= 400:
             raise RuntimeError(f"HTTP {response.status_code} fetching {response.url}")

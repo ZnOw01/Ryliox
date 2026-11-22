@@ -410,3 +410,29 @@ class TestRoutesWithoutCookies:
         # Clients retry 5xx as transient; retrying cannot supply cookies.
         assert response.status_code == 401
         assert response.json()["code"] == "auth_required"
+
+
+class TestUpstreamRefusals:
+    """O'Reilly refusing a request is reported for what it is, with a code the UI translates."""
+
+    def test_anti_bot_block_is_503_upstream_blocked(self, test_client: TestClient, mock_kernel):
+        from core.http_client import UpstreamBlockedError
+
+        mock_kernel["book"].search = AsyncMock(side_effect=UpstreamBlockedError("blocked"))
+        response = test_client.get("/api/search?q=python")
+
+        assert response.status_code == 503
+        body = response.json()
+        assert body["code"] == "upstream_blocked"
+        assert "expired" not in body["error"].lower()
+
+    def test_rejected_session_is_401_session_rejected(self, test_client: TestClient, mock_kernel):
+        from core.http_client import UpstreamAuthError
+
+        mock_kernel["book"].fetch = AsyncMock(
+            side_effect=UpstreamAuthError("rejected", code="session_rejected")
+        )
+        response = test_client.get("/api/book/9781098156664")
+
+        assert response.status_code == 401
+        assert response.json()["code"] == "session_rejected"

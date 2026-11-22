@@ -34,6 +34,8 @@ class ErrorCode(StrEnum):
     PATH_OUTSIDE_OUTPUT_DIR = "path_outside_output_dir"
     REVEAL_FAILED = "reveal_failed"
     AUTH_REQUIRED = "auth_required"
+    SESSION_REJECTED = "session_rejected"
+    UPSTREAM_BLOCKED = "upstream_blocked"
     SEARCH_FAILED = "search_failed"
     JOB_NOT_FOUND = "job_not_found"
     CROSS_ORIGIN_BLOCKED = "cross_origin_blocked"

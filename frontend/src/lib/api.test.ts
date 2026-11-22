@@ -36,4 +36,20 @@ describe('API retry policy', () => {
     await expect(request).resolves.toEqual({ status: 'ok' });
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
+
+  it("does not retry when O'Reilly is blocking requests", async () => {
+    vi.useFakeTimers();
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(
+        new Response('{"error":"blocked","code":"upstream_blocked"}', { status: 503 })
+      );
+
+    const request = getHealth();
+    const settled = expect(request).rejects.toMatchObject({ code: 'upstream_blocked' });
+    await vi.runAllTimersAsync();
+
+    await settled;
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
 });

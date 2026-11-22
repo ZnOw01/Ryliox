@@ -90,6 +90,8 @@ async function parseResponseBody(response: Response): Promise<unknown> {
 function isTransientError(error: unknown): boolean {
   if (error instanceof TimeoutError) return true;
   if (error instanceof TypeError && error.message === 'Failed to fetch') return true;
+  // A block by O'Reilly's anti-bot layer gets worse with every retry.
+  if (error instanceof ApiError && error.code === 'upstream_blocked') return false;
   if (error instanceof ApiError && error.status >= 500) return true;
   return false;
 }

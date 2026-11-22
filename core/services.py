@@ -623,7 +623,8 @@ class DownloadQueueService:
         else:
             error_dto = DownloadErrorDTO(
                 error=message or "Download failed",
-                code="download_failed",
+                # Upstream errors carry their own code, so the UI can explain them.
+                code=getattr(exc, "code", None) or "download_failed",
                 details={"trace_log": trace_log} if trace_log else None,
                 trace_log=trace_log,
             )

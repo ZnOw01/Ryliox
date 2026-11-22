@@ -14,7 +14,7 @@ from typing import Any, Protocol, cast
 from urllib.parse import urlparse
 
 from core.contracts import ChapterInfo, DownloadCancelledError
-from core.http_client import host_is_allowed
+from core.http_client import UpstreamAuthError, host_is_allowed
 from plugins.base import Plugin
 
 
@@ -341,8 +341,9 @@ class DownloaderPlugin(Plugin):
                 and not jwt_status["valid"]
                 and not http_client.has_refresh_cookie()
             ):
-                raise RuntimeError(
-                    "Session token expired. Please copy fresh cookies from your browser and POST them to /api/cookies."
+                raise UpstreamAuthError(
+                    "The session has expired. Copy fresh cookies from your browser and save them again.",
+                    code="session_rejected",
                 )
 
         report("fetching_metadata", 5)

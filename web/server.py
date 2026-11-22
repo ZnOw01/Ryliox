@@ -33,6 +33,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.responses import Response
 
 import config
+from core.http_client import UpstreamAuthError, UpstreamBlockedError
 from core.logging_config import configure_logging
 from core.metrics import metrics
 from web.api_utils import ErrorCode, error_response
@@ -534,6 +535,22 @@ def create_app() -> FastAPI:
             code=code,
             headers=exc.headers,
         )
+
+    @app.exception_handler(UpstreamBlockedError)
+    async def _upstream_blocked_handler(
+        request: Request, exc: UpstreamBlockedError
+    ) -> JSONResponse:
+        logger.warning("O'Reilly blocked %s %s (anti-bot)", request.method, request.url.path)
+        return error_response(
+            str(exc),
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            code=ErrorCode.UPSTREAM_BLOCKED,
+            details={"retry_after_seconds": 300},
+        )
+
+    @app.exception_handler(UpstreamAuthError)
+    async def _upstream_auth_handler(request: Request, exc: UpstreamAuthError) -> JSONResponse:
+        return error_response(str(exc), status.HTTP_401_UNAUTHORIZED, code=exc.code)
 
     @app.exception_handler(ForbiddenOriginError)
     async def _forbidden_origin_handler(
