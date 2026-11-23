@@ -165,3 +165,13 @@ def test_write_content_opf_description_is_plain_text_cut_at_a_word(tmp_path: Pat
     assert "&lt;" not in description
     assert description.endswith("word…")
     assert len(description) <= 510
+
+
+def test_write_nav_xhtml_declares_the_book_language(tmp_path: Path):
+    oebps = tmp_path / "OEBPS"
+    oebps.mkdir()
+
+    EpubPlugin()._write_nav_xhtml(oebps, {"title": "T", "language": "es"}, [])
+
+    nav = (oebps / "nav.xhtml").read_text(encoding="utf-8")
+    assert 'lang="es" xml:lang="es"' in nav

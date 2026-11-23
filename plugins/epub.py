@@ -261,10 +261,11 @@ class EpubPlugin(Plugin):
         """Generate EPUB 3 navigation document (nav.xhtml)."""
         title = html.escape(self._sanitize_xml_text(book_info.get("title", "Unknown")))
         nav_items = self._build_nav_ol(toc)
+        lang = book_language(book_info)
 
         content = f"""<?xml version="1.0" encoding="utf-8"?>
 <!DOCTYPE html>
-<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops">
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" lang="{lang}" xml:lang="{lang}">
 <head>
   <title>{title}</title>
 </head>
