@@ -3,12 +3,18 @@
 from __future__ import annotations
 
 import contextlib
+import logging
 import re
 from collections.abc import Callable
 from pathlib import Path
 from urllib.parse import urlparse
 
+from core.contracts import DownloadCancelledError
+from core.http_client import UpstreamAuthError, UpstreamBlockedError
+
 from .base import Plugin
+
+logger = logging.getLogger(__name__)
 
 # Matches url(...) references inside stylesheets; shared with pdf.py.
 CSS_URL_RE = re.compile(r'url\(["\']?([^)"\']+)["\']?\)')
@@ -63,15 +69,30 @@ class AssetsPlugin(Plugin):
         output_dir: Path,
         progress_callback: Callable[[int, int], None] | None = None,
     ) -> dict[str, Path]:
+        """Download every image; return the ones that succeeded.
+
+        A single broken image is skipped and left out of the result, so one
+        bad URL cannot abort the whole book. A block, a rejected session or a
+        cancellation still stops the download at once.
+        """
         downloaded: dict[str, Path] = {}
         total = len(urls)
         for i, url in enumerate(urls):
             filename = self._filename_from_url(url, default=f"image{i:03d}.bin")
             save_path = output_dir / "Images" / filename
-            downloaded_path = await self.download_image(url, save_path)
-            downloaded[url] = downloaded_path or save_path
+            try:
+                downloaded_path = await self.download_image(url, save_path)
+            except (UpstreamBlockedError, UpstreamAuthError, DownloadCancelledError):
+                raise
+            except Exception as exc:
+                logger.warning("Skipping image %s: %s", filename, exc)
+            else:
+                downloaded[url] = downloaded_path or save_path
             if progress_callback:
                 progress_callback(i + 1, total)
+        skipped = len(set(urls)) - len(downloaded)
+        if skipped:
+            logger.warning("Skipped %d of %d images that could not be downloaded", skipped, total)
         return downloaded
 
     async def download_all_css(
