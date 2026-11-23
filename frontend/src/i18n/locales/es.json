@@ -54,7 +54,8 @@
 			"copy_json_to_clipboard": "Copiar JSON al portapapeles",
 			"paste": "Pegar",
 			"paste_from_clipboard": "Pegar desde el portapapeles",
-			"copied": "Copiado"
+			"copied": "Copiado",
+			"copied_to_clipboard": "Cookies copiadas al portapapeles."
 		},
 		"refresh": "Actualizar",
 		"uptime": "Tiempo activo"

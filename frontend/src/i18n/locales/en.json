@@ -54,7 +54,8 @@
 			"copy_json_to_clipboard": "Copy JSON to clipboard",
 			"paste": "Paste",
 			"paste_from_clipboard": "Paste from clipboard",
-			"copied": "Copied"
+			"copied": "Copied",
+			"copied_to_clipboard": "Cookies copied to clipboard."
 		},
 		"refresh": "Refresh",
 		"uptime": "Uptime"

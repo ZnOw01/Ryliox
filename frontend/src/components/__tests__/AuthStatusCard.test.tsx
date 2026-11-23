@@ -4,6 +4,7 @@ import { vi } from 'vitest';
 import i18n from '../../i18n/config';
 import { getStatus } from '../../lib/api';
 import { AuthStatusCard } from '../AuthStatusCard';
+import { useToastStore } from '../ui/BeautifulToast';
 
 vi.mock('../../lib/api', async importOriginal => ({
   ...(await importOriginal<typeof import('../../lib/api')>()),
@@ -47,7 +48,7 @@ describe('AuthStatusCard i18n', () => {
 });
 
 describe('AuthStatusCard copy button', () => {
-  it('clears the copied-cookies timer on unmount', async () => {
+  it('confirms the cookie copy and clears its timer on unmount', async () => {
     Object.defineProperty(navigator, 'clipboard', {
       configurable: true,
       value: { writeText: vi.fn().mockResolvedValue(undefined) },
@@ -67,6 +68,9 @@ describe('AuthStatusCard copy button', () => {
         fireEvent.click(screen.getByLabelText('Copiar JSON al portapapeles'));
       });
       expect(screen.getByText('Copiado')).toBeInTheDocument();
+      expect(useToastStore.getState().toasts.map(item => item.message)).toContain(
+        'Cookies copiadas al portapapeles.'
+      );
 
       view.unmount();
       queryClient.clear();

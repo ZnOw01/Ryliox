@@ -193,7 +193,7 @@ export function AuthStatusCard() {
     try {
       await navigator.clipboard.writeText(cookiesText);
       setCopiedCookies(true);
-      toast.success(t('download.progress.path_copied'));
+      toast.success(t('auth.cookies.copied_to_clipboard'));
       clearTimeout(copiedTimerRef.current);
       copiedTimerRef.current = setTimeout(() => setCopiedCookies(false), 2000);
     } catch {
