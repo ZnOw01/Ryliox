@@ -427,3 +427,118 @@ def test_download_timeout_is_reported_with_an_explanation(tmp_path: Path) -> Non
     assert snapshot["status"] == "error"
     assert "did not finish within 1 seconds" in snapshot["error"]
     assert "REQUEST_TIMEOUT_SECONDS" in snapshot["error"]
+
+
+def test_shutdown_mid_download_leaves_job_resumable(tmp_path: Path) -> None:
+    """A server shutdown is not a user cancel: the job resumes on the next start."""
+    repository = DownloadJobRepository(tmp_path / "queue.sqlite3")
+    job = _job(1, tmp_path)
+    repository.save(job)
+    claimed = repository.claim_next_queued()
+    assert claimed is not None
+
+    service: DownloadQueueService
+
+    class Downloader:
+        async def download(self, **kwargs: object) -> SimpleNamespace:
+            progress_callback = kwargs["progress_callback"]
+            assert callable(progress_callback)
+            service._stop_event.set()  # what stop() does while a job is running
+            progress_callback(
+                SimpleNamespace(
+                    status="running",
+                    percentage=40,
+                    message="working",
+                    eta_seconds=None,
+                    current_chapter=2,
+                    total_chapters=5,
+                    chapter_title="Chapter 2",
+                )
+            )
+            raise AssertionError("unreachable")
+
+    async def kernel_factory() -> _Kernel:
+        return _Kernel({"downloader": Downloader()})
+
+    service = DownloadQueueService(
+        kernel_factory=kernel_factory,
+        repository=repository,
+        error_log_dir=tmp_path,
+    )
+    service._run_job(claimed)
+
+    snapshot = repository.get_by_id(job.job_id)
+    assert snapshot is not None
+    assert snapshot["status"] not in {"cancelled", "error", "completed"}
+
+    repository.requeue_inflight()
+    snapshot = repository.get_by_id(job.job_id)
+    assert snapshot is not None
+    assert snapshot["status"] == "queued"
+
+
+def test_user_cancel_during_shutdown_still_cancels(tmp_path: Path) -> None:
+    repository = DownloadJobRepository(tmp_path / "queue.sqlite3")
+    job = _job(1, tmp_path)
+    repository.save(job)
+    claimed = repository.claim_next_queued()
+    assert claimed is not None
+
+    service: DownloadQueueService
+
+    class Downloader:
+        async def download(self, **kwargs: object) -> SimpleNamespace:
+            assert repository.request_cancel(job.job_id)[0] == "cancel_requested"
+            service._stop_event.set()
+            cancel_check = kwargs["cancel_check"]
+            assert callable(cancel_check)
+            assert cancel_check() is True
+            from core.contracts import DownloadCancelledError
+
+            raise DownloadCancelledError("Download cancelled by user")
+
+    async def kernel_factory() -> _Kernel:
+        return _Kernel({"downloader": Downloader()})
+
+    service = DownloadQueueService(
+        kernel_factory=kernel_factory,
+        repository=repository,
+        error_log_dir=tmp_path,
+    )
+    service._run_job(claimed)
+
+    snapshot = repository.get_by_id(job.job_id)
+    assert snapshot is not None
+    assert snapshot["status"] == "cancelled"
+
+
+def test_shutdown_after_publication_still_completes_the_job(tmp_path: Path) -> None:
+    """A book that was already published must not be reported as cancelled."""
+    repository = DownloadJobRepository(tmp_path / "queue.sqlite3")
+    job = _job(1, tmp_path)
+    repository.save(job)
+    claimed = repository.claim_next_queued()
+    assert claimed is not None
+
+    service: DownloadQueueService
+
+    class Downloader:
+        async def download(self, **kwargs: object) -> SimpleNamespace:
+            service._stop_event.set()  # shutdown begins right after publication
+            return SimpleNamespace(
+                book_id=job.book_id, title="Book", files={"epub": "x.epub"}, chapters_count=1
+            )
+
+    async def kernel_factory() -> _Kernel:
+        return _Kernel({"downloader": Downloader()})
+
+    service = DownloadQueueService(
+        kernel_factory=kernel_factory,
+        repository=repository,
+        error_log_dir=tmp_path,
+    )
+    service._run_job(claimed)
+
+    snapshot = repository.get_by_id(job.job_id)
+    assert snapshot is not None
+    assert snapshot["status"] == "completed"

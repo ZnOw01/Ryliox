@@ -544,7 +544,9 @@ class DownloadQueueService:
 
                 result = runner.run(run_with_deadline())
 
-            if self._check_and_signal_cancel(job.job_id, cancel_event):
+            # Only a user cancel can void a finished download; a shutdown that
+            # starts after publication must still record the completed book.
+            if self._repository.is_cancel_requested(job.job_id):
                 raise DownloadCancelledError("Download cancelled by user")
 
             pdf_paths = result.files.get("pdf")
@@ -619,6 +621,12 @@ class DownloadQueueService:
 
         if already_terminal:
             logger.info("Job %s is already terminal; preserving its state", job.job_id[:8])
+        elif self._stop_event.is_set() and not self._user_cancel_requested(job.job_id):
+            # Shutdown, not the user, stopped the job. Leave it in flight so
+            # requeue_inflight() resumes it on the next start.
+            logger.info("Job %s interrupted by shutdown; it will resume on restart", job.job_id[:8])
+            self._notify_progress_change()
+            return
         elif cancelled or self._check_and_signal_cancel(job.job_id, cancel_event):
             error_dto = DownloadErrorDTO(
                 error=message or "Download cancelled by user",
@@ -667,6 +675,13 @@ class DownloadQueueService:
             logger.debug("Could not inspect job %s terminal state", job_id, exc_info=True)
             return False
         return snapshot is not None and snapshot.get("status") in TERMINAL_STATES
+
+    def _user_cancel_requested(self, job_id: str) -> bool:
+        try:
+            return self._repository.is_cancel_requested(job_id)
+        except Exception:
+            logger.debug("Could not read cancel flag for job %s", job_id, exc_info=True)
+            return False
 
     def _check_and_signal_cancel(self, job_id: str, cancel_event: threading.Event) -> bool:
         """Check if cancellation was requested via any mechanism."""
