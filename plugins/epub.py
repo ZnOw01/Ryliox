@@ -7,6 +7,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from urllib.parse import urlsplit, urlunsplit
 
+from bs4 import BeautifulSoup
+
 from utils import sanitize_filename
 
 from .base import Plugin
@@ -91,6 +93,14 @@ class EpubPlugin(Plugin):
         )
 
     @staticmethod
+    def _plain_description(raw: str, limit: int = 500) -> str:
+        """Return the upstream HTML description as plain text, cut at a word."""
+        text = " ".join(BeautifulSoup(raw or "", "html.parser").get_text(" ").split())
+        if len(text) <= limit:
+            return text
+        return text[:limit].rsplit(" ", 1)[0] + "…"
+
+    @staticmethod
     def _book_identifier(book_info: dict) -> str:
         return str(book_info.get("isbn") or book_info.get("id") or "unknown")
 
@@ -124,7 +134,9 @@ class EpubPlugin(Plugin):
         title = html.escape(self._sanitize_xml_text(book_info.get("title", "Unknown")))
         authors = book_info.get("authors", [])
         isbn = self._book_identifier(book_info)
-        description = html.escape(self._sanitize_xml_text(book_info.get("description", "")[:500]))
+        description = html.escape(
+            self._sanitize_xml_text(self._plain_description(book_info.get("description", "")))
+        )
         publishers = book_info.get("publishers", [])
         language = book_language(book_info)
         pub_date = book_info.get("publication_date") or ""

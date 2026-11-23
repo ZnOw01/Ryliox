@@ -143,3 +143,25 @@ def test_write_content_opf_validates_language(tmp_path: Path, language: str, exp
 
     opf = (oebps / "content.opf").read_text(encoding="utf-8")
     assert f"<dc:language>{expected}</dc:language>" in opf
+
+
+def test_write_content_opf_description_is_plain_text_cut_at_a_word(tmp_path: Path):
+    # O'Reilly sends the description as HTML, often longer than the 500-char cap.
+    oebps = tmp_path / "OEBPS"
+    oebps.mkdir()
+    raw = (
+        "<span><div><p><i>Book</i> is a guide &amp; more.</p><p>"
+        + "word " * 200
+        + "</p></div></span>"
+    )
+
+    EpubPlugin()._write_content_opf(
+        oebps=oebps, book_info={"id": "9781", "description": raw}, chapter_entries=[]
+    )
+
+    opf = (oebps / "content.opf").read_text(encoding="utf-8")
+    description = opf.split("<dc:description>")[1].split("</dc:description>")[0]
+    assert description.startswith("Book is a guide &amp; more. word word")
+    assert "&lt;" not in description
+    assert description.endswith("word…")
+    assert len(description) <= 510
