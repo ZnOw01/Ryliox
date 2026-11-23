@@ -55,7 +55,9 @@
 			"paste": "Paste",
 			"paste_from_clipboard": "Paste from clipboard",
 			"copied": "Copied",
-			"copied_to_clipboard": "Cookies copied to clipboard."
+			"copied_to_clipboard": "Cookies copied to clipboard.",
+			"count_one": "{{count}} cookie",
+			"count_other": "{{count}} cookies"
 		},
 		"refresh": "Refresh",
 		"uptime": "Uptime"

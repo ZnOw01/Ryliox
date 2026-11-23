@@ -47,6 +47,27 @@ describe('AuthStatusCard i18n', () => {
   });
 });
 
+describe('AuthStatusCard cookie preview', () => {
+  it('counts a single pasted cookie in the singular', async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const view = render(
+      <QueryClientProvider client={queryClient}>
+        <AuthStatusCard />
+      </QueryClientProvider>
+    );
+
+    try {
+      fireEvent.change(await screen.findByLabelText('Cookies (JSON o encabezado HTTP)'), {
+        target: { value: '{"session":"value"}' },
+      });
+      expect(screen.getByText('1 cookie')).toBeInTheDocument();
+    } finally {
+      view.unmount();
+      queryClient.clear();
+    }
+  });
+});
+
 describe('AuthStatusCard copy button', () => {
   it('confirms the cookie copy and clears its timer on unmount', async () => {
     Object.defineProperty(navigator, 'clipboard', {

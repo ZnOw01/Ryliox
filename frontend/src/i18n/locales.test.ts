@@ -18,6 +18,8 @@ function flatten(tree: Tree, prefix = ''): Map<string, string> {
 // Words that are spelled the same in both languages.
 const SAME_IN_BOTH = new Set([
   'app.title',
+  'auth.cookies.count_one',
+  'auth.cookies.count_other',
   'common.error',
   'common.no',
   'download.progress.error',

@@ -560,7 +560,9 @@ function FormattedJsonPreview({ json }: { json: string }) {
     <div className="mt-2.5 overflow-hidden rounded-xl border border-border bg-muted/40 shadow-2xs">
       <div className="border-b border-border bg-muted/60 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
         <span>{t('auth.cookies.preview')}</span>
-        <span className="font-mono text-primary font-bold">{entries.length} cookies</span>
+        <span className="font-mono text-primary font-bold">
+          {t('auth.cookies.count', { count: entries.length })}
+        </span>
       </div>
       <div className="divide-y divide-border max-h-40 overflow-y-auto chapter-scroll">
         {entries.map(([key, value]) => (

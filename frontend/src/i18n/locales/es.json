@@ -55,7 +55,9 @@
 			"paste": "Pegar",
 			"paste_from_clipboard": "Pegar desde el portapapeles",
 			"copied": "Copiado",
-			"copied_to_clipboard": "Cookies copiadas al portapapeles."
+			"copied_to_clipboard": "Cookies copiadas al portapapeles.",
+			"count_one": "{{count}} cookie",
+			"count_other": "{{count}} cookies"
 		},
 		"refresh": "Actualizar",
 		"uptime": "Tiempo activo"
