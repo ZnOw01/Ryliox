@@ -5,7 +5,8 @@ import i18n from '../../i18n/config';
 import { getStatus } from '../../lib/api';
 import { AuthStatusCard } from '../AuthStatusCard';
 
-vi.mock('../../lib/api', () => ({
+vi.mock('../../lib/api', async importOriginal => ({
+  ...(await importOriginal<typeof import('../../lib/api')>()),
   getStatus: vi.fn().mockResolvedValue({
     valid: false,
     has_cookies: false,
