@@ -16,6 +16,7 @@ from urllib.parse import urlparse
 from core.contracts import ChapterInfo, DownloadCancelledError
 from core.http_client import UpstreamAuthError, host_is_allowed
 from plugins.base import Plugin
+from plugins.html_processor import book_language
 
 
 @dataclass
@@ -84,7 +85,9 @@ class HtmlProcessorProtocol(Protocol):
         self, html: str, book_id: str, skip_images: bool = False, path_prefix: str = ""
     ) -> tuple[str, list[str]]: ...
 
-    def wrap_xhtml(self, content: str, css_files: list[str], title: str = "") -> str: ...
+    def wrap_xhtml(
+        self, content: str, css_files: list[str], title: str = "", language: str = "en"
+    ) -> str: ...
 
     def inline_css_content_images(self, oebps: Path) -> None: ...
 
@@ -454,7 +457,9 @@ class DownloaderPlugin(Plugin):
                 css_refs = [
                     f"{path_prefix}Styles/Style{j:02d}.css" for j in range(len(all_css_urls))
                 ]
-                xhtml = html_processor.wrap_xhtml(processed, css_refs, ch["title"])
+                xhtml = html_processor.wrap_xhtml(
+                    processed, css_refs, ch["title"], language=book_language(book_info)
+                )
 
                 file_path.parent.mkdir(parents=True, exist_ok=True)
                 file_path.write_text(xhtml, encoding="utf-8")

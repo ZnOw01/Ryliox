@@ -76,7 +76,9 @@ class StubHtmlProcessorPlugin:
     def process(self, html: str, *_args: object, **_kwargs: object) -> tuple[str, list[str]]:
         return html, []
 
-    def wrap_xhtml(self, content: str, _css_files: list[str], title: str = "") -> str:
+    def wrap_xhtml(
+        self, content: str, _css_files: list[str], title: str = "", language: str = "en"
+    ) -> str:
         return f"<html><head><title>{title}</title></head><body>{content}</body></html>"
 
     def inline_css_content_images(self, _oebps: Path) -> None:

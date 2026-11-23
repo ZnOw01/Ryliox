@@ -10,7 +10,7 @@ from urllib.parse import urlsplit, urlunsplit
 from utils import sanitize_filename
 
 from .base import Plugin
-from .html_processor import VOID_TAGS
+from .html_processor import VOID_TAGS, book_language
 
 
 class EpubPlugin(Plugin):
@@ -126,7 +126,7 @@ class EpubPlugin(Plugin):
         isbn = self._book_identifier(book_info)
         description = html.escape(self._sanitize_xml_text(book_info.get("description", "")[:500]))
         publishers = book_info.get("publishers", [])
-        language = html.escape(book_info.get("language") or "en")
+        language = book_language(book_info)
         pub_date = book_info.get("publication_date") or ""
 
         author_xml = ""

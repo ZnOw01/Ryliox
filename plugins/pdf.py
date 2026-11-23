@@ -12,6 +12,7 @@ from utils.files import sanitize_filename
 
 from .assets import CSS_URL_RE
 from .base import Plugin
+from .html_processor import book_language
 
 
 def restricted_url_fetcher(book_dir: Path) -> Any:
@@ -197,6 +198,7 @@ class PdfPlugin(Plugin):
         original_css = self._load_css_files(oebps, css_files)
 
         pdf_paths: list[Path] = []
+        lang = book_language(book_info)
 
         for i, chapter in enumerate(chapters):
             xhtml_path = self._safe_chapter_path(oebps, chapter["filename"])
@@ -207,7 +209,7 @@ class PdfPlugin(Plugin):
             chapter_title = self._escape_html(chapter.get("title", f"Chapter {i + 1}"))
 
             chapter_html = f"""<!DOCTYPE html>
-<html>
+<html lang="{lang}">
 <head>
     <meta charset="utf-8">
     <title>{chapter_title}</title>
@@ -272,7 +274,7 @@ class PdfPlugin(Plugin):
         title = self._escape_html(book_info.get("title", "Untitled"))
 
         return f"""<!DOCTYPE html>
-<html>
+<html lang="{book_language(book_info)}">
 <head>
     <meta charset="utf-8">
     <title>{title}</title>

@@ -21,6 +21,22 @@ def test_image_filename_from_url_generates_stable_safe_name():
     assert filename.startswith("My_Cover_Image-")
 
 
+@pytest.mark.parametrize(
+    ("language", "expected"),
+    [
+        ("es", "es"),
+        ("pt_BR", "pt-BR"),
+        ("zh-Hant-TW", "zh-Hant-TW"),
+        ("", "en"),
+        ('x" onload="', "en"),
+    ],
+)
+def test_wrap_xhtml_declares_the_book_language(language: str, expected: str):
+    wrapped = HtmlProcessorPlugin().wrap_xhtml("<p>Hola</p>", [], "T", language=language)
+
+    assert f'lang="{expected}" xml:lang="{expected}"' in wrapped
+
+
 def test_wrap_xhtml_escapes_title_and_includes_stylesheets():
     plugin = HtmlProcessorPlugin()
 

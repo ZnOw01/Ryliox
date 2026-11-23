@@ -110,7 +110,9 @@ class DummyFullHtmlProcessorPlugin:
     ) -> tuple[str, list[str]]:
         return html, []
 
-    def wrap_xhtml(self, content: str, _css_files: list[str], title: str = "") -> str:
+    def wrap_xhtml(
+        self, content: str, _css_files: list[str], title: str = "", language: str = "en"
+    ) -> str:
         return f"<html><head><title>{title}</title></head><body>{content}</body></html>"
 
     def inline_css_content_images(self, _oebps: Path) -> None:
@@ -620,3 +622,40 @@ async def test_download_without_staging_support_keeps_legacy_direct_write(tmp_pa
     assert result.output_dir == tmp_path / "demo-book"
     assert result.files["epub"] == str(tmp_path / "demo-book" / "demo.epub")
     assert (tmp_path / "demo-book" / "demo.epub").is_file()
+
+
+@pytest.mark.asyncio
+async def test_download_writes_chapters_in_the_book_language(tmp_path: Path):
+    class SpanishBookPlugin:
+        async def fetch(self, _book_id: str) -> dict[str, object]:
+            return {"title": "Demo", "authors": ["Author"], "language": "es"}
+
+    class RecordingHtmlProcessor(DummyFullHtmlProcessorPlugin):
+        def __init__(self) -> None:
+            self.languages: list[str] = []
+
+        def wrap_xhtml(
+            self, content: str, _css_files: list[str], title: str = "", language: str = "en"
+        ) -> str:
+            self.languages.append(language)
+            return super().wrap_xhtml(content, _css_files, title, language)
+
+    html_processor = RecordingHtmlProcessor()
+    plugin = DownloaderPlugin(
+        book_plugin=SpanishBookPlugin(),
+        chapters_plugin=DummyChaptersPlugin(),
+        assets_plugin=DummyFullAssetsPlugin(),
+        html_processor_plugin=html_processor,
+        output_plugin=FakeStagedOutputPlugin(),
+        epub_plugin=DummyEpubPlugin(),
+    )
+
+    await plugin.download(
+        book_id="demo-book",
+        output_dir=tmp_path,
+        formats=["epub"],
+        skip_images=True,
+        job_id="job-lang",
+    )
+
+    assert html_processor.languages == ["es"]

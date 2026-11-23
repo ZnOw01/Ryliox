@@ -12,6 +12,18 @@ from .base import Plugin
 
 logger = logging.getLogger(__name__)
 
+DEFAULT_LANGUAGE = "en"
+# A BCP-47 language tag: a 2-3 letter primary language plus optional subtags.
+_LANGUAGE_TAG_RE = re.compile(r"[A-Za-z]{2,3}(?:-[A-Za-z0-9]{1,8})*")
+
+
+def book_language(book_info: dict[str, Any]) -> str:
+    """Return the book's language as a BCP-47 tag, or ``"en"`` when unknown."""
+    raw = book_info.get("language")
+    tag = raw.strip().replace("_", "-") if isinstance(raw, str) else ""
+    return tag if _LANGUAGE_TAG_RE.fullmatch(tag) else DEFAULT_LANGUAGE
+
+
 # HTML5 void elements that must be self-closed for XHTML output.
 VOID_TAGS: tuple[str, ...] = (
     "br",
@@ -257,8 +269,16 @@ class HtmlProcessorPlugin(Plugin):
                 if not tag["epub:type"]:
                     del tag["epub:type"]
 
-    def wrap_xhtml(self, content: str, css_files: list[str], title: str = "") -> str:
+    def wrap_xhtml(
+        self,
+        content: str,
+        css_files: list[str],
+        title: str = "",
+        language: str = DEFAULT_LANGUAGE,
+    ) -> str:
         import html as html_module
+
+        lang = book_language({"language": language})
 
         css_links = "\n".join(
             f'<link href="{css}" rel="stylesheet" type="text/css"/>' for css in css_files
@@ -268,7 +288,7 @@ class HtmlProcessorPlugin(Plugin):
 
         return f"""<?xml version="1.0" encoding="utf-8"?>
 <!DOCTYPE html>
-<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" lang="en" xml:lang="en">
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" lang="{lang}" xml:lang="{lang}">
 <head>
 <title>{safe_title}</title>
 {css_links}

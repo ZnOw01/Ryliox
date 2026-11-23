@@ -130,3 +130,16 @@ def test_resolve_internal_links_keeps_subfolders(tmp_path: Path):
     assert 'href="../text/ch.xhtml#ref1"' in notes
     assert 'href="text/ch.xhtml#ref1"' in (oebps / "nav.xhtml").read_text(encoding="utf-8")
     assert 'src="notes/fn.xhtml#n1"' in (oebps / "toc.ncx").read_text(encoding="utf-8")
+
+
+@pytest.mark.parametrize(("language", "expected"), [("ja", "ja"), ('en"><x', "en")])
+def test_write_content_opf_validates_language(tmp_path: Path, language: str, expected: str):
+    oebps = tmp_path / "OEBPS"
+    oebps.mkdir()
+
+    EpubPlugin()._write_content_opf(
+        oebps=oebps, book_info={"id": "9781", "language": language}, chapter_entries=[]
+    )
+
+    opf = (oebps / "content.opf").read_text(encoding="utf-8")
+    assert f"<dc:language>{expected}</dc:language>" in opf
