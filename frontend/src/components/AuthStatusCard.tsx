@@ -249,7 +249,7 @@ export function AuthStatusCard() {
               <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
             </div>
             <div className="min-w-0">
-              <span className="text-sm font-semibold text-foreground truncate block">
+              <span className="block text-sm font-semibold text-foreground">
                 {t('auth.title')}:{' '}
                 <span className="text-emerald-600 dark:text-emerald-400 font-bold">
                   {t('auth.status.valid')}

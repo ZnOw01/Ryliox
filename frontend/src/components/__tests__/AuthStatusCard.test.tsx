@@ -104,6 +104,24 @@ describe('AuthStatusCard copy button', () => {
 });
 
 describe('AuthStatusCard with a valid session', () => {
+  it('does not cut the session status short on narrow screens', async () => {
+    vi.mocked(getStatus).mockResolvedValueOnce({ valid: true, has_cookies: true, reason: null });
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const view = render(
+      <QueryClientProvider client={queryClient}>
+        <AuthStatusCard />
+      </QueryClientProvider>
+    );
+
+    try {
+      const status = await screen.findByText('Sesión válida');
+      expect(status.parentElement).not.toHaveClass('truncate');
+    } finally {
+      view.unmount();
+      queryClient.clear();
+    }
+  });
+
   it('describes stored cookies in the UI language', async () => {
     vi.mocked(getStatus).mockResolvedValueOnce({ valid: true, has_cookies: true, reason: null });
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
