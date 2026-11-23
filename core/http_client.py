@@ -505,17 +505,25 @@ class HttpClient:
         response.raise_for_status()
         return response.content
 
+    def _has_session_cookie(self) -> bool:
+        """True when the cookies include O'Reilly's own session, not only Akamai's."""
+        return bool(self._auth_cookies.get("orm-jwt") or self._auth_cookies.get("orm-rt"))
+
     def _raise_for_auth_error(self, response: httpx.Response) -> None:
         if response.status_code == 403:
+            if not self._has_session_cookie():
+                # With a browser fingerprint but no O'Reilly session (missing, or only
+                # Akamai's cookies were pasted), Akamai answers "Access Denied" too.
+                # Waiting does not fix that; saving the session cookies does.
+                raise UpstreamAuthError(
+                    "Not authenticated. Copy your O'Reilly cookies, including orm-jwt, "
+                    "from your browser and save them again.",
+                    code="auth_required",
+                )
             if _is_anti_bot_block(response):
                 raise UpstreamBlockedError(
                     "O'Reilly is temporarily blocking requests from this app. "
                     "Wait a few minutes before trying again; your session is not the problem."
-                )
-            if not self._auth_cookies:
-                raise UpstreamAuthError(
-                    "Not authenticated. Please copy cookies from your browser and POST them to /api/cookies.",
-                    code="auth_required",
                 )
             raise UpstreamAuthError(
                 "O'Reilly rejected the session. Copy fresh cookies from your browser and save them again.",

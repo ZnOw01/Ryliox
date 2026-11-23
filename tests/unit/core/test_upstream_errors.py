@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import tempfile
+from pathlib import Path
+
 import httpx
 import pytest
 
@@ -22,7 +25,9 @@ def _client_answering(response_for):
         calls.append(request)
         return response_for(request)
 
-    client = HttpClient(cookies_file=config.COOKIES_FILE)
+    # A cookies file of its own: config.COOKIES_FILE would make __aenter__ reload whatever
+    # session another test left in the shared store, over the cookies set below.
+    client = HttpClient(cookies_file=Path(tempfile.mkdtemp()) / "cookies.json")
     client._client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
     client._owns_client = True
     client._auth_cookies = {"orm-jwt": "x"}
@@ -105,3 +110,28 @@ def test_a_failed_job_records_the_upstream_error_code(tmp_path):
         service._handle_job_exception(job, exc, threading.Event())
         error_dto = repository.mark_failed.call_args.args[1]
         assert error_dto.code == expected, (type(exc).__name__, error_dto.code)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "cookies",
+    [
+        {},
+        # Only Akamai's cookies: what a partial copy from the browser leaves.
+        {"_abck": "sensor", "bm_sz": "size", "akaalb_LearningALB": "lb"},
+        # Cookie names that are not O'Reilly's session at all.
+        {"session_id": "x", "auth_token": "y"},
+    ],
+)
+async def test_access_denied_without_a_session_cookie_asks_for_cookies(cookies):
+    """Akamai denies a browser fingerprint with no O'Reilly session. That is not a block
+    to wait out: the user has to save the session cookies."""
+    client, _ = _client_answering(
+        lambda _r: httpx.Response(403, headers={"content-type": "text/html"}, text=AKAMAI_PAGE)
+    )
+    async with client:
+        client._auth_cookies = dict(cookies)
+        with pytest.raises(UpstreamAuthError) as excinfo:
+            await client.get_json(f"{config.API_V2}/search/?query=python")
+
+    assert excinfo.value.code == "auth_required"
