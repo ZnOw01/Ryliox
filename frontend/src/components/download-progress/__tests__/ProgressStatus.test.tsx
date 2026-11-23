@@ -1,7 +1,13 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { vi } from 'vitest';
 
+import { ApiError, revealFile } from '../../../lib/api';
 import { ProgressStatus } from '../ProgressStatus';
+
+vi.mock('../../../lib/api', async importOriginal => ({
+  ...(await importOriginal<typeof import('../../../lib/api')>()),
+  revealFile: vi.fn(),
+}));
 
 describe('ProgressStatus', () => {
   it('shows a cancelled summary state', () => {
@@ -35,6 +41,24 @@ describe('ProgressStatus', () => {
     );
 
     expect(screen.getByText(/estado: cancelado/i)).toBeInTheDocument();
+  });
+
+  it('explains a failed reveal in the UI language', async () => {
+    vi.mocked(revealFile).mockRejectedValueOnce(
+      new ApiError({ error: 'Path does not exist', code: 'path_not_found' }, 404)
+    );
+    render(
+      <ProgressStatus
+        currentLabel="completed"
+        progressPercent={100}
+        progress={{ status: 'completed', job_id: 'job-4', epub: '/out/book.epub' }}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /abrir ubicación/i }));
+
+    expect(await screen.findByText('El archivo ya no existe.')).toBeInTheDocument();
+    expect(screen.queryByText('Path does not exist')).toBeNull();
   });
 
   it('clears the copied-path timer on unmount', async () => {

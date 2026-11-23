@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 
 import { revealFile } from '../../lib/api';
+import { parseApiError } from '../../lib/api-error';
 import type { ProgressResponse } from '../../lib/types';
 import { downloadErrorMessage, formatEta, formatStatusLabel } from './utils';
 import { Badge } from '../ui/Badge';
@@ -76,7 +77,7 @@ export function ProgressStatus({ currentLabel, progress, progressPercent }: Prog
       await revealFile(path);
       setActionMessage(t('download.progress.location_opened'));
     } catch (error) {
-      setActionError(error instanceof Error ? error.message : t('errors.unknown_description'));
+      setActionError(parseApiError(error).message);
     } finally {
       setRevealingPath(null);
     }
