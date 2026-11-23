@@ -1,4 +1,5 @@
-import { render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
+import { vi } from 'vitest';
 
 import { ProgressStatus } from '../ProgressStatus';
 
@@ -34,5 +35,32 @@ describe('ProgressStatus', () => {
     );
 
     expect(screen.getByText(/estado: cancelado/i)).toBeInTheDocument();
+  });
+
+  it('clears the copied-path timer on unmount', async () => {
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: vi.fn().mockResolvedValue(undefined) },
+    });
+    vi.useFakeTimers();
+    try {
+      const view = render(
+        <ProgressStatus
+          currentLabel="completed"
+          progressPercent={100}
+          progress={{ status: 'completed', job_id: 'job-3', epub: '/out/book.epub' }}
+        />
+      );
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: /copiar ruta/i }));
+      });
+      expect(screen.getAllByText(/ruta copiada/i).length).toBeGreaterThan(0);
+
+      view.unmount();
+
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

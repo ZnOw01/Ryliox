@@ -73,6 +73,8 @@ export function AuthStatusCard() {
   const [showCookieEditor, setShowCookieEditor] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const [copiedCookies, setCopiedCookies] = useState(false);
+  const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => clearTimeout(copiedTimerRef.current), []);
   const cookiesTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const hasPrefilledRef = useRef(false);
 
@@ -192,7 +194,8 @@ export function AuthStatusCard() {
       await navigator.clipboard.writeText(cookiesText);
       setCopiedCookies(true);
       toast.success(t('download.progress.path_copied'));
-      setTimeout(() => setCopiedCookies(false), 2000);
+      clearTimeout(copiedTimerRef.current);
+      copiedTimerRef.current = setTimeout(() => setCopiedCookies(false), 2000);
     } catch {
       // clipboard not available
     }

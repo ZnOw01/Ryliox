@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { vi } from 'vitest';
 import i18n from '../../i18n/config';
@@ -42,6 +42,38 @@ describe('AuthStatusCard i18n', () => {
       view.unmount();
       queryClient.clear();
       await i18n.changeLanguage(originalLanguage);
+    }
+  });
+});
+
+describe('AuthStatusCard copy button', () => {
+  it('clears the copied-cookies timer on unmount', async () => {
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: vi.fn().mockResolvedValue(undefined) },
+    });
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const view = render(
+      <QueryClientProvider client={queryClient}>
+        <AuthStatusCard />
+      </QueryClientProvider>
+    );
+    fireEvent.change(await screen.findByLabelText('Cookies (JSON o encabezado HTTP)'), {
+      target: { value: '{"session":"value"}' },
+    });
+    vi.useFakeTimers();
+    try {
+      await act(async () => {
+        fireEvent.click(screen.getByLabelText('Copiar JSON al portapapeles'));
+      });
+      expect(screen.getByText('Copiado')).toBeInTheDocument();
+
+      view.unmount();
+      queryClient.clear();
+
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
     }
   });
 });

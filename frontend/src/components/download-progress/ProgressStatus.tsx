@@ -1,4 +1,4 @@
-import { useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import type { TFunction } from 'i18next';
 import {
   CheckCircle,
@@ -33,6 +33,8 @@ export function ProgressStatus({ currentLabel, progress, progressPercent }: Prog
   const [actionError, setActionError] = useState<string | null>(null);
   const [revealingPath, setRevealingPath] = useState<string | null>(null);
   const [copiedPath, setCopiedPath] = useState<string | null>(null);
+  const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => clearTimeout(copiedTimerRef.current), []);
   const idPrefix = useId().replace(/:/g, '');
   const etaLabel = formatEta(progress?.eta_seconds);
   const statusLabel = formatStatusLabel(currentLabel, t);
@@ -87,7 +89,8 @@ export function ProgressStatus({ currentLabel, progress, progressPercent }: Prog
       await navigator.clipboard.writeText(value);
       setCopiedPath(value);
       toast.success(t('download.progress.path_copied'));
-      setTimeout(() => setCopiedPath(null), 2000);
+      clearTimeout(copiedTimerRef.current);
+      copiedTimerRef.current = setTimeout(() => setCopiedPath(null), 2000);
     } catch {
       setActionError(t('download.progress.copy_failed'));
     }
