@@ -26,6 +26,7 @@ from urllib.parse import urljoin, urlparse
 import httpx
 
 import config
+from core.browser_transport import BrowserTransport
 
 if TYPE_CHECKING:
     from core.session_store import SessionStore
@@ -92,8 +93,6 @@ def _is_anti_bot_block(response: httpx.Response) -> bool:
 class HttpClient:
     """Async HTTP client with built-in URL allowlist and retry."""
 
-    _AKAMAI_COOKIE_PREFIXES = ("_abck", "bm_", "ak_", "akaalb_")
-
     def __init__(
         self,
         cookies_file: Path | None = None,
@@ -123,9 +122,11 @@ class HttpClient:
 
     async def __aenter__(self) -> HttpClient:
         if self._client is None:
+            impersonate = config.SETTINGS.http.impersonate
             self._client = httpx.AsyncClient(
                 headers=dict(config.HEADERS),
                 timeout=config.SETTINGS.http.timeout,
+                transport=BrowserTransport(impersonate) if impersonate else None,
             )
             self._owns_client = True
         self._load_cookies(self._cookies_file)
@@ -174,15 +175,11 @@ class HttpClient:
             try:
                 records = self._get_session_store().load_cookie_records(migrate_legacy=True)
                 if records:
-                    self._auth_cookie_records = [
-                        dict(record)
-                        for record in records
-                        if not self._is_akamai_cookie(str(record["name"]))
-                    ]
+                    # All of them, Akamai's _abck and bm_* included: with the browser
+                    # fingerprint, Akamai checks those cookies and blocks requests without them.
+                    self._auth_cookie_records = [dict(record) for record in records]
                     self._auth_cookies = {
-                        str(record["name"]): str(record["value"])
-                        for record in records
-                        if not self._is_akamai_cookie(str(record["name"]))
+                        str(record["name"]): str(record["value"]) for record in records
                     }
                     return
             except Exception as exc:
@@ -196,7 +193,7 @@ class HttpClient:
         except (OSError, json.JSONDecodeError, ValueError):
             return
         if isinstance(cookies, dict):
-            self._auth_cookies = {k: v for k, v in cookies.items() if not self._is_akamai_cookie(k)}
+            self._auth_cookies = dict(cookies)
             self._auth_cookie_records = [
                 {"name": name, "value": value, "domain": None, "path": "/"}
                 for name, value in self._auth_cookies.items()
@@ -209,14 +206,11 @@ class HttpClient:
                     continue
                 name = entry.get("name")
                 value = entry.get("value")
-                if name and not self._is_akamai_cookie(str(name)):
+                if name:
                     converted[str(name)] = str(value or "")
                     cookie_records.append(dict(entry))
             self._auth_cookies = converted
             self._auth_cookie_records = cookie_records
-
-    def _is_akamai_cookie(self, name: str) -> bool:
-        return name.startswith(self._AKAMAI_COOKIE_PREFIXES)
 
     def reload_cookies(self) -> None:
         """Clear cookies and reload from disk. Sync for use from the route layer."""
@@ -306,9 +300,7 @@ class HttpClient:
     def _capture_response_cookies(self, response: httpx.Response) -> None:
         """Persist cookies refreshed by the upstream service via Set-Cookie."""
         captured = [
-            self._cookie_to_record(cookie)
-            for cookie in response.cookies.jar
-            if cookie.name and not self._is_akamai_cookie(cookie.name)
+            self._cookie_to_record(cookie) for cookie in response.cookies.jar if cookie.name
         ]
         if not captured:
             return

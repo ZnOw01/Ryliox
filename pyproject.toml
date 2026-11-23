@@ -24,6 +24,8 @@ classifiers = [
 dependencies = [
     # ── HTTP ──
     "httpx>=0.27.0",
+    # Browser TLS fingerprint for upstream requests (O'Reilly's Akamai edge checks it).
+    "curl-cffi>=0.11,<1",
     # ── HTML processing (lxml is the parser BeautifulSoup is asked for) ──
     "beautifulsoup4>=4.13",
     "lxml>=6.1.0",

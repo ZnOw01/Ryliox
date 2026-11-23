@@ -81,13 +81,16 @@ class HttpSettings(BaseModel):
     max_redirects: int = 5
     max_response_size_mb: int = 50
     max_assets_per_book: int = 2_000
-    user_agent: str = (
-        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) "
-        "Chrome/124.0.0.0 Safari/537.36"
-    )
-    accept: str = "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8"
-    accept_encoding: str = "gzip, deflate"
-    accept_language: str = "en-US,en;q=0.5"
+    # Browser whose TLS/HTTP2 fingerprint upstream requests copy (a curl_cffi target such
+    # as "chrome", "safari17_0" or "firefox"). Empty sends plain httpx requests, which
+    # O'Reilly's Akamai edge answers with "Access Denied" once a real session is used.
+    impersonate: str = "chrome"
+    # Leave the next ones unset with impersonation on: the browser profile sends matching
+    # values, and a different User-Agent contradicts the fingerprint.
+    user_agent: str | None = None
+    accept: str | None = None
+    accept_encoding: str | None = None
+    accept_language: str | None = None
     # Sent as ``X-<name>`` so they can never replace a standard header.
     extra_headers: dict[str, str] = Field(default_factory=dict)
 
@@ -173,6 +176,7 @@ SHORT_NAMES: dict[str, tuple[str, str]] = {
     "REQUEST_RETRIES": ("http", "retries"),
     "REQUEST_RETRY_BACKOFF": ("http", "retry_backoff"),
     "REQUEST_TIMEOUT_SECONDS": ("http", "request_timeout_seconds"),
+    "IMPERSONATE": ("http", "impersonate"),
     "USER_AGENT": ("http", "user_agent"),
     "ACCEPT": ("http", "accept"),
     "ACCEPT_ENCODING": ("http", "accept_encoding"),
@@ -298,12 +302,31 @@ class Settings(BaseSettings):
         )
 
 
+_PLAIN_CLIENT_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) "
+    "Chrome/124.0.0.0 Safari/537.36",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+    "Accept-Encoding": "gzip, deflate",
+    "Accept-Language": "en-US,en;q=0.5",
+}
+
+
 def request_headers(http: HttpSettings) -> dict[str, str]:
-    return {
+    """Headers for upstream requests.
+
+    With impersonation, only the values the user set are sent; the browser profile
+    supplies the rest so they match its fingerprint. Without it, httpx needs them all.
+    """
+    configured = {
         "User-Agent": http.user_agent,
         "Accept": http.accept,
         "Accept-Encoding": http.accept_encoding,
         "Accept-Language": http.accept_language,
+    }
+    defaults = {} if http.impersonate else _PLAIN_CLIENT_HEADERS
+    headers = {name: value or defaults.get(name) for name, value in configured.items()}
+    return {
+        **{name: value for name, value in headers.items() if value},
         **{f"X-{name}": value for name, value in http.extra_headers.items()},
     }
 

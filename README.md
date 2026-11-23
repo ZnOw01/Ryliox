@@ -210,7 +210,7 @@ Configuration is loaded from `.env` into a **typed Pydantic settings model**. St
 | Area | Examples | Notes |
 | --- | --- | --- |
 | Server | `HOST`, `PORT`, `BASE_URL` | Bind address and O'Reilly base URL |
-| HTTP | `REQUEST_*`, `USER_AGENT`, `ACCEPT_*` | Outbound client behavior |
+| HTTP | `REQUEST_*`, `IMPERSONATE`, `USER_AGENT`, `ACCEPT_*` | Outbound client behavior (`IMPERSONATE` picks the browser fingerprint) |
 | Security | `ENVIRONMENT`, `CSP_POLICY`, `ALLOWED_HOSTS` | Headers, host checks, CSP |
 | Rate limit | `RATE_LIMIT_*` | Throttling for `POST /api/download` and `POST /api/cookies` |
 | Keys | `SESSION_ENCRYPTION_KEY`, `AUDIT_HMAC_KEY` | Cookie encryption and audit-log integrity |
