@@ -125,6 +125,9 @@ class HtmlProcessorPlugin(Plugin):
         images: list[str] = []
         for img in soup.find_all("img"):
             src = img.get("src", "")
+            if not img.has_attr("alt"):
+                # XHTML requires alt; an empty one marks the image as decorative.
+                img["alt"] = ""
             if not src:
                 continue
 

@@ -113,3 +113,17 @@ def test_rewritten_image_src_names_the_file_the_assets_plugin_saves(src):
 
     assert images == [src]
     assert f'src="Images/{AssetsPlugin._filename_from_url(src)}"' in content
+
+
+def test_process_gives_every_image_an_alt():
+    page = (
+        '<div id="sbo-rt-content"><img src="/a/logo.jpg"/>'
+        '<img alt="Diagram" src="/a/fig.png"/>'
+        '<svg width="10" height="10"><image href="/a/art.png"/></svg></div>'
+    )
+
+    content, _ = HtmlProcessorPlugin().process(page, "9781")
+
+    assert '<img alt="" src="Images/logo.jpg"/>' in content
+    assert 'alt="Diagram"' in content
+    assert content.count("alt=") == 3
