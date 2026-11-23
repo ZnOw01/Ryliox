@@ -84,6 +84,40 @@ async def test_request_body_limit_counts_chunked_body() -> None:
     assert response.json()["code"] == "request_too_large"
 
 
+@pytest.mark.asyncio
+async def test_request_body_limit_lets_streaming_responses_wait_for_disconnect() -> None:
+    """After the body is replayed, receive() must reach the real client again.
+
+    Streaming responses (the progress SSE stream) listen on receive() for the client
+    disconnecting. Replaying an empty body forever made Starlette raise "Unexpected
+    message received: http.request" and log a 500 for every stream.
+    """
+    from starlette.responses import StreamingResponse
+
+    app = FastAPI()
+
+    @app.middleware("http")
+    async def passthrough(request: Request, call_next):  # a BaseHTTPMiddleware, like the app's
+        return await call_next(request)
+
+    app.add_middleware(RequestBodyLimitMiddleware, max_bytes=1024)
+
+    @app.get("/stream")
+    async def stream() -> StreamingResponse:
+        async def events():
+            yield b"data: 1\n\n"
+            yield b"data: 2\n\n"
+
+        return StreamingResponse(events(), media_type="text/event-stream")
+
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.get("/stream")
+
+    assert response.status_code == 200
+    assert response.text == "data: 1\n\ndata: 2\n\n"
+
+
 def test_remote_bind_requires_admin_token(monkeypatch) -> None:
     monkeypatch.setattr(config.SETTINGS.server, "host", "0.0.0.0")
     monkeypatch.setattr(config.SETTINGS.security, "admin_token", None)
