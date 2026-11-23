@@ -332,6 +332,11 @@ class RequestBodyLimitMiddleware:
             message = await receive()
             messages.append(message)
             if message["type"] == "http.disconnect":
+                # The client left before its body arrived. Nobody is listening, but the
+                # BaseHTTPMiddleware layers around this one fail with "No response
+                # returned." unless a response starts, so send an empty one.
+                await send({"type": "http.response.start", "status": 499, "headers": []})
+                await send({"type": "http.response.body", "body": b""})
                 return
             if message["type"] == "http.request":
                 total += len(message.get("body", b""))

@@ -118,6 +118,54 @@ async def test_request_body_limit_lets_streaming_responses_wait_for_disconnect()
     assert response.text == "data: 1\n\ndata: 2\n\n"
 
 
+@pytest.mark.asyncio
+async def test_request_body_limit_handles_a_client_gone_before_the_body() -> None:
+    """A client that disconnects while its body is being read gets no response, quietly.
+
+    Returning without sending anything left the outer BaseHTTPMiddleware with nothing to
+    pass on, and Starlette logged "RuntimeError: No response returned." as a 500.
+    """
+    app = FastAPI()
+    app.add_middleware(RequestBodyLimitMiddleware, max_bytes=1024)
+
+    # Added after the limit, so it wraps it: the app's own BaseHTTPMiddleware stack
+    # (security headers, request id) sits outside RequestBodyLimitMiddleware.
+    @app.middleware("http")
+    async def passthrough(request: Request, call_next):
+        return await call_next(request)
+
+    @app.get("/")
+    async def index() -> dict[str, bool]:
+        return {"ok": True}
+
+    async def receive():
+        return {"type": "http.disconnect"}
+
+    sent: list[dict] = []
+
+    async def send(message):
+        sent.append(message)
+
+    scope = {
+        "type": "http",
+        "asgi": {"version": "3.0"},
+        "http_version": "1.1",
+        "method": "GET",
+        "scheme": "http",
+        "path": "/",
+        "raw_path": b"/",
+        "query_string": b"",
+        "root_path": "",
+        "headers": [(b"host", b"test"), (b"content-type", b"application/json")],
+        "client": ("127.0.0.1", 1),
+        "server": ("test", 80),
+    }
+    await app(scope, receive, send)  # must not raise "No response returned."
+    assert all(
+        message["type"] != "http.response.start" or message["status"] != 500 for message in sent
+    )
+
+
 def test_remote_bind_requires_admin_token(monkeypatch) -> None:
     monkeypatch.setattr(config.SETTINGS.server, "host", "0.0.0.0")
     monkeypatch.setattr(config.SETTINGS.security, "admin_token", None)
