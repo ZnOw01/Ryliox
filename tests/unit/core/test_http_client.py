@@ -235,3 +235,66 @@ def test_jwt_status_decodes_base64url_payload():
 
     assert status is not None
     assert status["valid"] is True
+
+
+@pytest.mark.asyncio
+async def test_http_client_does_not_store_a_session_from_anti_bot_cookies_alone(
+    monkeypatch, tmp_path
+):
+    """Akamai sets _abck/bm_* on every response, even with no session at all.
+
+    Persisting them into an empty store made the app report saved cookies the user never
+    pasted, and the book routes skipped the "configure your cookies" answer.
+    """
+    db_path = tmp_path / "session.sqlite3"
+    cookies_file = tmp_path / "cookies.json"
+    monkeypatch.setattr(config, "SESSION_DB_FILE", db_path)
+    monkeypatch.setattr(config, "COOKIES_FILE", cookies_file)
+
+    async with HttpClient() as client:
+        request = httpx.Request("GET", f"{config.BASE_URL}/api/v2/search/")
+
+        async def fake_get(url: str, **_kwargs):
+            return httpx.Response(
+                status_code=403,
+                headers=[
+                    ("content-type", "text/html"),
+                    ("set-cookie", "_abck=sensor; Path=/; Domain=.oreilly.com"),
+                    ("set-cookie", "bm_sz=size; Path=/; Domain=.oreilly.com"),
+                ],
+                request=request,
+                text="<HTML><TITLE>Access Denied</TITLE></HTML>",
+            )
+
+        client.client.get = fake_get  # type: ignore[method-assign]
+        await client.get("/api/v2/search/")
+
+    assert SessionStore(db_path=db_path, legacy_cookies_file=cookies_file).get_cookies() == {}
+
+
+@pytest.mark.asyncio
+async def test_http_client_refreshes_anti_bot_cookies_of_a_saved_session(monkeypatch, tmp_path):
+    db_path = tmp_path / "session.sqlite3"
+    cookies_file = tmp_path / "cookies.json"
+    monkeypatch.setattr(config, "SESSION_DB_FILE", db_path)
+    monkeypatch.setattr(config, "COOKIES_FILE", cookies_file)
+    SessionStore(db_path=db_path, legacy_cookies_file=cookies_file).save_cookies(
+        {"orm-jwt": "token", "_abck": "old"}
+    )
+
+    async with HttpClient() as client:
+        request = httpx.Request("GET", f"{config.BASE_URL}/api/v2/search/")
+
+        async def fake_get(url: str, **_kwargs):
+            return httpx.Response(
+                status_code=200,
+                headers={"set-cookie": "_abck=new; Path=/"},
+                request=request,
+                json={"results": []},
+            )
+
+        client.client.get = fake_get  # type: ignore[method-assign]
+        await client.get("/api/v2/search/")
+
+    stored = SessionStore(db_path=db_path, legacy_cookies_file=cookies_file).get_cookies()
+    assert stored == {"orm-jwt": "token", "_abck": "new"}

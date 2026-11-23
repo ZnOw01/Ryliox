@@ -325,6 +325,10 @@ class HttpClient:
             )
         if not self._should_persist_captured_cookies():
             return
+        if not self._has_session_cookie():
+            # Akamai sets _abck/bm_* on every response, session or not. Storing them
+            # alone would make an empty store look like saved cookies.
+            return
 
         try:
             store = self._get_session_store()
