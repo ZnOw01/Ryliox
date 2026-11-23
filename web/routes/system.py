@@ -20,7 +20,7 @@ from core.metrics import metrics
 from core.validators import ValidationError, validate_file_path, validate_url
 from plugins.downloader import DownloaderPlugin
 from web.api_utils import ErrorCode, error_response
-from web.dependencies import get_kernel, require_same_origin
+from web.dependencies import _is_loopback_host, get_kernel, require_same_origin
 from web.schemas import (
     FormatsResponse,
     HealthResponse,
@@ -476,7 +476,7 @@ async def set_output_dir(
     output_plugin = kernel["output"]
 
     if data.browse:
-        if config.SETTINGS.server.host not in {"127.0.0.1", "localhost", "::1"}:
+        if not _is_loopback_host(config.SETTINGS.server.host):
             return error_response(
                 "Native folder picker is only available in local mode",
                 status.HTTP_403_FORBIDDEN,

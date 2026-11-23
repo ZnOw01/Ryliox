@@ -155,6 +155,39 @@ def test_browse_output_dir_validates_before_persisting(
     assert response.json()["code"] == "invalid_output_dir"
 
 
+@pytest.mark.parametrize(
+    ("host", "expected_status"),
+    [("127.0.0.2", 200), ("[::1]", 200), ("0.0.0.0", 403), ("192.168.1.10", 403)],
+)
+def test_browse_output_dir_local_only_rule_uses_loopback_check(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, host: str, expected_status: int
+):
+    selected_dir = tmp_path / "picked"
+    selected_dir.mkdir()
+    kernel = DummyKernel(
+        system=SyncSystemPlugin(selected_dir=selected_dir),
+        output=SimpleNamespace(
+            validate_dir=lambda path: (True, "ok", Path(path)),
+            get_default_dir=lambda: tmp_path,
+        ),
+    )
+    monkeypatch.setattr("web.routes.system.config.OUTPUT_DIR", tmp_path)
+
+    with _build_client(monkeypatch, kernel=kernel) as client:
+        monkeypatch.setattr("web.routes.system.config.SETTINGS.server.host", host)
+        # Let remote binds past the admin-auth middleware so the route's own rule decides.
+        monkeypatch.setattr(
+            "web.routes.system.config.SETTINGS.security.allow_unauthenticated_local_proxy", True
+        )
+        response = client.post(
+            "/api/settings/output-dir",
+            json={"browse": True},
+            headers={"origin": "http://testserver"},
+        )
+
+    assert response.status_code == expected_status
+
+
 def test_reveal_supports_synchronous_system_plugin(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
     revealed_file = tmp_path / "book.epub"
     revealed_file.touch()
