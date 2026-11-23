@@ -1,13 +1,7 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { vi } from 'vitest';
 
-import { ApiError, revealFile } from '../../../lib/api';
 import { ProgressStatus } from '../ProgressStatus';
-
-vi.mock('../../../lib/api', async importOriginal => ({
-  ...(await importOriginal<typeof import('../../../lib/api')>()),
-  revealFile: vi.fn(),
-}));
 
 describe('ProgressStatus', () => {
   it('shows a cancelled summary state', () => {
@@ -44,9 +38,13 @@ describe('ProgressStatus', () => {
   });
 
   it('explains a failed reveal in the UI language', async () => {
-    vi.mocked(revealFile).mockRejectedValueOnce(
-      new ApiError({ error: 'Path does not exist', code: 'path_not_found' }, 404)
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ error: 'Path does not exist', code: 'path_not_found' }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json' },
+      })
     );
+    vi.stubGlobal('fetch', fetchMock);
     render(
       <ProgressStatus
         currentLabel="completed"
@@ -59,6 +57,8 @@ describe('ProgressStatus', () => {
 
     expect(await screen.findByText('El archivo ya no existe.')).toBeInTheDocument();
     expect(screen.queryByText('Path does not exist')).toBeNull();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    vi.unstubAllGlobals();
   });
 
   it('clears the copied-path timer on unmount', async () => {
