@@ -73,8 +73,12 @@ def sanitize_filename(name: str | None) -> str:
         stem = f"{stem}_"
         cleaned = f"{stem}{dot}{ext}" if ext else stem
 
-    if len(cleaned) > MAX_FILENAME_LENGTH:
-        cleaned = cleaned[:MAX_FILENAME_LENGTH].strip().strip(".")
+    # Filesystems limit names in bytes (255 on ext4, APFS and NTFS), and callers
+    # append an extension, so cap the UTF-8 size rather than the character count.
+    encoded = cleaned.encode("utf-8")
+    if len(encoded) > MAX_FILENAME_LENGTH:
+        cleaned = encoded[:MAX_FILENAME_LENGTH].decode("utf-8", errors="ignore")
+        cleaned = cleaned.strip().strip(".")
 
     return cleaned or "unnamed_file"
 

@@ -97,6 +97,14 @@ class TestSanitizeFilename:
         # or it falls back to 'unnamed_file'
         assert result != "" and (result == "unnamed_file" or "-" in result)
 
+    def test_long_multibyte_title_fits_filesystem_name_limit(self):
+        """A long CJK title must still fit a 255-byte name once an extension is added."""
+        result = sanitize_filename("编" * 300)
+        assert result
+        assert len(f"{result}.epub".encode()) <= 255
+        assert len(f"001_{result}.pdf".encode()) <= 255
+        assert set(result) == {"编"}
+
     def test_none_input(self):
         """Test handling of None input."""
         assert sanitize_filename(None) == "unnamed_file"
