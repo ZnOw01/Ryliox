@@ -94,3 +94,39 @@ def test_write_content_opf_has_no_empty_required_metadata(tmp_path: Path):
     assert "<dc:description>" not in opf
     assert "<dc:date>" not in opf
     assert 'href="Images/pic.webp" media-type="image/webp"' in opf
+
+
+def test_resolve_internal_links_keeps_subfolders(tmp_path: Path):
+    oebps = tmp_path / "OEBPS"
+    (oebps / "text").mkdir(parents=True)
+    (oebps / "notes").mkdir()
+    page = '<html xmlns="http://www.w3.org/1999/xhtml"><body>{}</body></html>'
+    (oebps / "text" / "ch.xhtml").write_text(
+        page.format(
+            '<a id="ref1" href="../notes/fn.xhtml#n1">1</a>'
+            '<a href="#missing">gone</a>'
+            '<a href="https://example.com/x.html#n1">web</a>'
+        ),
+        encoding="utf-8",
+    )
+    (oebps / "notes" / "fn.xhtml").write_text(
+        page.format('<p id="n1"><a href="ch.xhtml#ref1">back</a></p>'), encoding="utf-8"
+    )
+    (oebps / "nav.xhtml").write_text(
+        page.format('<a href="ch.xhtml#ref1">Chapter</a>'), encoding="utf-8"
+    )
+    (oebps / "toc.ncx").write_text(
+        '<ncx><navMap><navPoint><content src="fn.xhtml#n1"/></navPoint></navMap></ncx>',
+        encoding="utf-8",
+    )
+
+    EpubPlugin()._resolve_internal_links(oebps)
+
+    chapter = (oebps / "text" / "ch.xhtml").read_text(encoding="utf-8")
+    assert 'href="../notes/fn.xhtml#n1"' in chapter
+    assert 'href=""' in chapter
+    assert 'href="https://example.com/x.html#n1"' in chapter
+    notes = (oebps / "notes" / "fn.xhtml").read_text(encoding="utf-8")
+    assert 'href="../text/ch.xhtml#ref1"' in notes
+    assert 'href="text/ch.xhtml#ref1"' in (oebps / "nav.xhtml").read_text(encoding="utf-8")
+    assert 'src="notes/fn.xhtml#n1"' in (oebps / "toc.ncx").read_text(encoding="utf-8")

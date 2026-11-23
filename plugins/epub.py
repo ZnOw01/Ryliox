@@ -1,4 +1,5 @@
 import html
+import posixpath
 import re
 import shutil
 import zipfile
@@ -371,48 +372,59 @@ class EpubPlugin(Plugin):
         actually contains it.  Drops fragments that don't exist anywhere, which
         prevents RSC-012 errors in epubcheck."""
 
-        # 1. Build a global id → filename map across every XHTML file.
+        # 1. Build a global id → path map (relative to OEBPS) across every XHTML file.
         id_map: dict[str, str] = {}
         for xhtml in oebps.rglob("*.xhtml"):
+            rel_path = xhtml.relative_to(oebps).as_posix()
             text = xhtml.read_text(encoding="utf-8")
             for m in re.finditer(r'\bid="([^"]+)"', text):
-                id_map[m.group(1)] = xhtml.name
+                id_map[m.group(1)] = rel_path
             for m in re.finditer(r'\bname="([^"]+)"', text):
                 if m.group(1) not in id_map:
-                    id_map[m.group(1)] = xhtml.name
+                    id_map[m.group(1)] = rel_path
 
         if not id_map:
             return
 
-        # 2. Rewrite hrefs and srcs in every XHTML (including nav.xhtml).
-        for xhtml in oebps.rglob("*.xhtml"):
-            text = xhtml.read_text(encoding="utf-8")
+        # 2. Rewrite hrefs and srcs in every XHTML (including nav.xhtml) and toc.ncx,
+        #    relative to the folder of the document that holds the link.
+        documents = [*oebps.rglob("*.xhtml"), oebps / "toc.ncx"]
+        for document in documents:
+            if not document.is_file():
+                continue
+            doc_dir = posixpath.dirname(document.relative_to(oebps).as_posix())
+            text = document.read_text(encoding="utf-8")
             original = text
 
-            def _rewrite(match: re.Match) -> str:
+            def _rewrite(match: re.Match, doc_dir: str = doc_dir) -> str:
                 val = match.group(1)
                 if "#" not in val:
                     return match.group(0)
                 file_part, frag = val.split("#", 1)
+                parts = urlsplit(file_part)
+                if parts.scheme or parts.netloc:
+                    return match.group(0)
+                attr = match.group(0).split("=")[0]
                 target = id_map.get(frag)
                 if target is None:
                     # Fragment doesn't exist anywhere — drop it.
                     if file_part:
-                        return f'{match.group(0).split("=")[0]}="{file_part}"'
-                    return f'{match.group(0).split("=")[0]}=""'
+                        return f'{attr}="{file_part}"'
+                    return f'{attr}=""'
+                relative_target = posixpath.relpath(target, doc_dir or ".")
                 if not file_part:
                     # Bare fragment like href="#id" → href="file.xhtml#id"
-                    return f'{match.group(0).split("=")[0]}="{target}#{frag}"'
-                # Fragment exists; if it moved to a different file, correct it.
-                if file_part != target:
-                    return f'{match.group(0).split("=")[0]}="{target}#{frag}"'
+                    return f'{attr}="{relative_target}#{frag}"'
+                # Fragment exists; if it lives in a different file, correct it.
+                if posixpath.normpath(posixpath.join(doc_dir, file_part)) != target:
+                    return f'{attr}="{relative_target}#{frag}"'
                 return match.group(0)
 
             text = re.sub(r'href="([^"]*)"', _rewrite, text)
             text = re.sub(r'src="([^"]*)"', _rewrite, text)
 
             if text != original:
-                xhtml.write_text(text, encoding="utf-8")
+                document.write_text(text, encoding="utf-8")
 
         # 3. Also fix any malformed self-closing tags introduced by earlier steps.
         for xhtml in oebps.rglob("*.xhtml"):
