@@ -576,6 +576,26 @@ class TestDownloadProgressStream:
         with pytest.raises(StopAsyncIteration):
             await anext(stream)
 
+    @pytest.mark.asyncio
+    async def test_progress_stream_unknown_job_returns_not_found(self, mock_download_queue):
+        """An unknown job gets the same 404 as GET /api/progress, not an idle stream."""
+        import json
+
+        from web.routes.downloads import progress_stream
+
+        request = MagicMock()
+        request.is_disconnected = AsyncMock(return_value=False)
+
+        response = await progress_stream(
+            request=request,
+            job_id="missing",
+            download_queue=mock_download_queue,
+            request_id="test-request-id",
+        )
+
+        assert response.status_code == 404
+        assert json.loads(bytes(response.body))["code"] == "job_not_found"
+
     def test_progress_stream_cross_origin_blocked(self, test_client: TestClient):
         """Test that cross-origin SSE requests are blocked."""
         response = test_client.get(

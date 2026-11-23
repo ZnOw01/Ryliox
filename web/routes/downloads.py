@@ -17,7 +17,7 @@ from fastapi import (
     Request,
     status,
 )
-from fastapi.responses import StreamingResponse
+from fastapi.responses import Response, StreamingResponse
 from pydantic import TypeAdapter
 
 from core.services import QueueCapacityError
@@ -186,11 +186,17 @@ async def progress_stream(
     job_id: str | None = Query(default=None),
     download_queue: DownloadQueueService = Depends(get_download_queue),
     request_id: str = Depends(get_request_id),
-) -> StreamingResponse:
+) -> Response:
     """Stream download progress with client disconnection handling.
 
     Implements graceful disconnect detection and proper cleanup.
     """
+    if job_id and not await asyncio.to_thread(download_queue.get_progress, job_id=job_id):
+        # Match GET /api/progress instead of holding an idle stream open for an hour.
+        return error_response(
+            "Job not found", status.HTTP_404_NOT_FOUND, code=ErrorCode.JOB_NOT_FOUND
+        )
+
     logger.info("[%s] Starting SSE stream for job_id=%s", request_id, job_id)
 
     async def event_stream() -> AsyncIterator[str]:
