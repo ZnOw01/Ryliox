@@ -6,7 +6,55 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-11-22
+
 ### Fixed
+- Searching and downloading work again with a valid session. O'Reilly's
+  Akamai edge answered "Access Denied" because requests carried Python's TLS
+  fingerprint and dropped the browser's `_abck` and `bm_*` cookies. Requests
+  now go out with a real browser's TLS and HTTP/2 fingerprint and keep those
+  cookies.
+- A refused request explains itself, in the UI language. A temporary block by
+  O'Reilly (`upstream_blocked`), a rejected session (`session_rejected`) and
+  missing cookies (`auth_required`) each get their own message. The UI no
+  longer says "Session token expired" when the session is fine, and it does
+  not retry while O'Reilly is blocking.
+- Sessions whose token contains `-` or `_` are no longer reported as invalid.
+- Downloads:
+  - The output folder is created on first use.
+  - A single broken image is skipped instead of failing the whole book.
+  - A download interrupted by a server shutdown resumes on the next start.
+  - An empty chapter list downloads the whole book.
+  - A timed-out download says which setting to raise.
+  - `~` works in configured paths.
+  - "Open location" finds books saved to an earlier output folder.
+- EPUB and PDF:
+  - Internal links and images resolve for chapters stored in subfolders.
+  - The book's language is set on every chapter, the table of contents and
+    the PDF.
+  - The description is plain text.
+  - Every image has an `alt` attribute.
+  - Package metadata no longer fails epubcheck.
+- Filenames from long non-Latin titles fit the 255-byte filesystem limit.
+- Error responses no longer include upstream URLs or exception names.
+- The progress stream answers 404 for an unknown job and no longer logs a 500
+  on every connection.
+- The native folder picker accepts any loopback address.
+- The launcher stops its server when it receives SIGTERM, and its old-Node
+  fallback finds the Astro CLI again.
+- Interface:
+  - Remaining English text is translated.
+  - Results and chapters use correct plurals.
+  - Failed jobs show a translated message, with the server's text only under
+    technical details.
+  - `?` opens the shortcut help.
+  - An old job's result is no longer announced on every page load.
+  - The chapter filter resets when the book changes and says when nothing
+    matches.
+  - The error notice follows dark mode.
+  - Keyboard focus stays in place while the cookie editor opens and closes.
+  - The session status fits narrow screens.
+  - The light theme's brand red is darker, so primary text keeps AA contrast.
 - `docker compose up` works again. The image did not build on Debian trixie,
   and the app then crashed at import because comma-separated host lists were
   not accepted.
@@ -28,6 +76,19 @@ adheres to [Semantic Versioning](https://semver.org/).
   rejected-cookies error) and a few hard-coded strings now follow the UI
   language.
 - Secondary text meets WCAG AA contrast on every surface, in both themes.
+
+### Added
+- `IMPERSONATE` setting: the browser whose TLS fingerprint upstream requests
+  copy (default `chrome`; empty restores plain httpx requests).
+
+### Changed
+- New runtime dependency: `curl-cffi`, which provides the browser
+  fingerprint.
+- `USER_AGENT` and the `ACCEPT*` settings are unset by default. The
+  impersonated browser sends matching values, and a fixed User-Agent would
+  contradict its fingerprint.
+- Missing cookies on the book routes answer 401 instead of 503, so the
+  interface asks for cookies at once instead of retrying.
 
 ### Removed
 - `core/secrets.py`, `core/feature_flags.py` and the `/api/feature-flags`
@@ -120,5 +181,6 @@ adheres to [Semantic Versioning](https://semver.org/).
   `tests/integration/core/test_download_queue_service_cancel.py`,
   `tests/test_performance.py` (demo script, not a test).
 
-[Unreleased]: https://github.com/ZnOw01/Ryliox/compare/v2.0.0...HEAD
+[Unreleased]: https://github.com/ZnOw01/Ryliox/compare/v2.1.0...HEAD
+[2.1.0]: https://github.com/ZnOw01/Ryliox/compare/v2.0.0...v2.1.0
 [2.0.0]: https://github.com/ZnOw01/Ryliox/releases/tag/v2.0.0

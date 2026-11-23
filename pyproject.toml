@@ -1,6 +1,6 @@
 [project]
 name = "ryliox"
-version = "2.0.0"
+version = "2.1.0"
 description = "Ryliox — O'Reilly Learning Platform book downloader with a FastAPI backend and Astro/React frontend."
 readme = "README.md"
 license = { text = "MIT" }

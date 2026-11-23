@@ -50,7 +50,7 @@ function AppHeader({ onOpenShortcuts }: { onOpenShortcuts: () => void }) {
                 {t('app.title')}
               </h1>
               <span className="hidden sm:inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary font-mono">
-                v2.0
+                v2.1
               </span>
             </div>
             <p className="mt-0.5 truncate text-xs leading-tight text-muted-foreground">
