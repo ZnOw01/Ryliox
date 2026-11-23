@@ -21,13 +21,9 @@ export function ErrorNotice({ error, id, ariaLabel }: ErrorNoticeProps) {
       aria-live="assertive"
       aria-atomic="true"
       aria-label={ariaLabel || t('common.error')}
-      className="mb-3 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800"
+      className="mb-3 flex items-start gap-2 rounded-lg border border-destructive/20 bg-destructive/5 p-3 text-sm text-destructive"
     >
-      <AlertCircle
-        className="mt-0.5 h-4 w-4 shrink-0 text-red-600"
-        strokeWidth={2}
-        aria-hidden="true"
-      />
+      <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={2} aria-hidden="true" />
       <div className="min-w-0">
         <p className="font-medium">{parsed.message}</p>
         {parsed.code ? (
@@ -36,7 +32,7 @@ export function ErrorNotice({ error, id, ariaLabel }: ErrorNoticeProps) {
           </p>
         ) : null}
         {parsed.details ? (
-          <pre className="mt-2 overflow-x-auto whitespace-pre-wrap rounded border border-red-200 bg-white p-2 text-xs text-red-800">
+          <pre className="mt-2 overflow-x-auto whitespace-pre-wrap rounded border border-destructive/20 bg-background p-2 text-xs text-foreground">
             {parsed.details}
           </pre>
         ) : null}
