@@ -67,6 +67,10 @@ function getUserFriendlyMessage(error: ApiError | Record<string, unknown>): stri
     return t(`errors.${code}`);
   }
 
+  if (code && i18n.exists(`errors.codes.${code}`)) {
+    return t(`errors.codes.${code}`);
+  }
+
   // Return original message if no specific handling
   if (error instanceof ApiError) {
     return error.message;

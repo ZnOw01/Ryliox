@@ -367,7 +367,26 @@
 		"invalid_session_after_cookies": "Las cookies se guardaron, pero O'Reilly no acepta la sesión. Copia el encabezado 'Cookie' desde la pestaña Red de DevTools, o exporta con EditThisCookie incluyendo las cookies HttpOnly.",
 		"upstream_blocked": "O'Reilly está bloqueando temporalmente las peticiones de Ryliox. Espera unos minutos y vuelve a intentarlo; tu sesión no es el problema.",
 		"session_rejected": "O'Reilly rechazó tu sesión. Copia cookies nuevas desde tu navegador y guárdalas otra vez.",
-		"rate_limited": "Demasiadas peticiones seguidas. Espera un momento y vuelve a intentarlo."
+		"rate_limited": "Demasiadas peticiones seguidas. Espera un momento y vuelve a intentarlo.",
+		"codes": {
+			"invalid_cookies_payload": "Las cookies no tienen un formato válido. Pega un objeto JSON, una exportación de EditThisCookie o el encabezado 'nombre=valor; ...'.",
+			"cookies_save_failed": "No se pudieron guardar las cookies en el servidor. Inténtalo de nuevo.",
+			"book_fetch_failed": "No se pudo obtener la información del libro.",
+			"invalid_book_id": "El identificador del libro no es válido.",
+			"book_id_required": "Selecciona un libro primero.",
+			"invalid_format": "Ese formato de descarga no está disponible.",
+			"chapters_not_supported_for_format": "Este formato descarga el libro completo; quita la selección de capítulos.",
+			"invalid_output_dir": "La carpeta de salida no es válida o no se puede usar.",
+			"path_required": "Falta la ruta del archivo.",
+			"path_not_found": "El archivo ya no existe.",
+			"path_outside_output_dir": "Ese archivo está fuera de la carpeta de descargas.",
+			"reveal_failed": "No se pudo abrir la ubicación del archivo.",
+			"job_not_found": "No se encontró esa descarga.",
+			"download_queue_full": "Hay demasiadas descargas en cola. Espera a que termine alguna.",
+			"request_timeout": "El servidor tardó demasiado en responder. Inténtalo de nuevo.",
+			"request_too_large": "La petición es demasiado grande.",
+			"cross_origin_blocked": "La petición se bloqueó porque no viene de esta página."
+		}
 	},
 	"loading": {
 		"searching": "Buscando libros...",

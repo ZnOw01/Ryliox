@@ -367,7 +367,26 @@
 		"invalid_session_after_cookies": "The cookies were saved, but O'Reilly does not accept the session. Copy the 'Cookie' header from the DevTools Network tab, or export with EditThisCookie including HttpOnly cookies.",
 		"upstream_blocked": "O'Reilly is temporarily blocking requests from Ryliox. Wait a few minutes and try again; your session is not the problem.",
 		"session_rejected": "O'Reilly rejected your session. Copy fresh cookies from your browser and save them again.",
-		"rate_limited": "Too many requests in a row. Wait a moment and try again."
+		"rate_limited": "Too many requests in a row. Wait a moment and try again.",
+		"codes": {
+			"invalid_cookies_payload": "The cookies are not in a valid format. Paste a JSON object, an EditThisCookie export or a 'name=value; ...' header.",
+			"cookies_save_failed": "The server could not save the cookies. Try again.",
+			"book_fetch_failed": "Could not load the book details.",
+			"invalid_book_id": "The book ID is not valid.",
+			"book_id_required": "Select a book first.",
+			"invalid_format": "That download format is not available.",
+			"chapters_not_supported_for_format": "This format downloads the whole book; clear the chapter selection.",
+			"invalid_output_dir": "The output folder is not valid or cannot be used.",
+			"path_required": "The file path is missing.",
+			"path_not_found": "The file no longer exists.",
+			"path_outside_output_dir": "That file is outside the downloads folder.",
+			"reveal_failed": "Could not open the file location.",
+			"job_not_found": "That download was not found.",
+			"download_queue_full": "Too many downloads are queued. Wait for one to finish.",
+			"request_timeout": "The server took too long to respond. Try again.",
+			"request_too_large": "The request is too large.",
+			"cross_origin_blocked": "The request was blocked because it did not come from this page."
+		}
 	},
 	"loading": {
 		"searching": "Searching books...",

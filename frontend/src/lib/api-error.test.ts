@@ -54,3 +54,31 @@ describe('API error codes shown in the UI language', () => {
     expect(message).toBe(i18n.t(`errors.${code}`));
   });
 });
+
+describe('other API error codes', () => {
+  const invalidCookies = new ApiError(
+    {
+      error:
+        "Invalid cookie data. Expected a cookie JSON object, EditThisCookie JSON array/object, or 'name=value; ...' string.",
+      code: 'invalid_cookies_payload',
+    },
+    400
+  );
+
+  it.each(['es', 'en'])('explains an invalid cookie payload in %s', async language => {
+    await i18n.changeLanguage(language);
+
+    const { message } = parseApiError(invalidCookies);
+
+    expect(message).toBe(i18n.t('errors.codes.invalid_cookies_payload'));
+    expect(message).not.toContain('Invalid cookie data');
+  });
+
+  it('keeps the server text for a code it does not know', () => {
+    const { message } = parseApiError(
+      new ApiError({ error: 'Brand new failure', code: 'nope' }, 400)
+    );
+
+    expect(message).toBe('Brand new failure');
+  });
+});
