@@ -103,6 +103,42 @@ describe('AuthStatusCard copy button', () => {
   });
 });
 
+describe('AuthStatusCard focus', () => {
+  it('keeps focus in the card when the cookie editor opens and closes', async () => {
+    vi.mocked(getStatus).mockResolvedValue({ valid: true, has_cookies: true, reason: null });
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const view = render(
+      <QueryClientProvider client={queryClient}>
+        <AuthStatusCard />
+      </QueryClientProvider>
+    );
+
+    try {
+      await screen.findByText('Sesión válida');
+      fireEvent.click(screen.getByRole('button', { name: 'Configurar cookies' }));
+      const show = await screen.findByRole('button', { name: 'Ver / editar cookies' });
+      expect(show).toHaveFocus();
+
+      fireEvent.click(show);
+      expect(await screen.findByLabelText('Cookies (JSON o encabezado HTTP)')).toHaveFocus();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Ocultar editor' }));
+      expect(await screen.findByRole('button', { name: 'Ver / editar cookies' })).toHaveFocus();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Contraer' }));
+      expect(await screen.findByRole('button', { name: 'Configurar cookies' })).toHaveFocus();
+    } finally {
+      view.unmount();
+      queryClient.clear();
+      vi.mocked(getStatus).mockResolvedValue({
+        valid: false,
+        has_cookies: false,
+        reason: 'not_authenticated',
+      });
+    }
+  });
+});
+
 describe('AuthStatusCard with a valid session', () => {
   it('does not cut the session status short on narrow screens', async () => {
     vi.mocked(getStatus).mockResolvedValueOnce({ valid: true, has_cookies: true, reason: null });

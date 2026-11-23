@@ -77,6 +77,29 @@ export function AuthStatusCard() {
   useEffect(() => () => clearTimeout(copiedTimerRef.current), []);
   const cookiesTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const hasPrefilledRef = useRef(false);
+  // The button that opened or closed the editor unmounts, so focus moves on
+  // to whatever replaces it instead of falling back to the page body.
+  const pendingFocusRef = useRef<'editor' | 'card' | null>(null);
+  const showEditorButtonRef = useRef<HTMLButtonElement | null>(null);
+  const configureButtonRef = useRef<HTMLButtonElement | null>(null);
+
+  useEffect(() => {
+    const target = pendingFocusRef.current;
+    if (!target) return;
+    pendingFocusRef.current = null;
+    const element =
+      target === 'editor'
+        ? cookiesTextareaRef.current
+        : (showEditorButtonRef.current ?? configureButtonRef.current);
+    element?.focus();
+  });
+
+  const openCookieEditor = () => {
+    setCookiesText('');
+    hasPrefilledRef.current = false;
+    setShowCookieEditor(true);
+    pendingFocusRef.current = 'editor';
+  };
 
   const statusQuery = useQuery({
     queryKey: queryKeys.authStatus,
@@ -136,6 +159,7 @@ export function AuthStatusCard() {
       setCookiesText('');
       hasPrefilledRef.current = false;
       setShowCookieEditor(false);
+      pendingFocusRef.current = 'card';
       toast.success(t('download.notifications.cookies_saved'));
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: queryKeys.authStatus }),
@@ -264,8 +288,12 @@ export function AuthStatusCard() {
             </div>
           </div>
           <button
+            ref={configureButtonRef}
             type="button"
-            onClick={() => setIsExpanded(true)}
+            onClick={() => {
+              setIsExpanded(true);
+              pendingFocusRef.current = 'card';
+            }}
             className="flex items-center gap-1.5 rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-semibold text-foreground transition hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring shrink-0"
           >
             {t('auth.cookies.configure')}
@@ -290,7 +318,10 @@ export function AuthStatusCard() {
           {sessionHealthy && (
             <button
               type="button"
-              onClick={() => setIsExpanded(false)}
+              onClick={() => {
+                setIsExpanded(false);
+                pendingFocusRef.current = 'card';
+              }}
               className="text-xs text-muted-foreground hover:text-foreground transition underline underline-offset-2 ml-2"
             >
               {t('common.collapse')}
@@ -400,11 +431,7 @@ export function AuthStatusCard() {
           variant="default"
           action={{
             label: t('auth.cookies.configure'),
-            onClick: () => {
-              setCookiesText('');
-              hasPrefilledRef.current = false;
-              setShowCookieEditor(true);
-            },
+            onClick: openCookieEditor,
             variant: 'primary',
           }}
         />
@@ -495,7 +522,10 @@ export function AuthStatusCard() {
             {sessionHealthy ? (
               <button
                 type="button"
-                onClick={() => setShowCookieEditor(false)}
+                onClick={() => {
+                  setShowCookieEditor(false);
+                  pendingFocusRef.current = 'card';
+                }}
                 className="rounded-xl border border-border bg-background px-3 py-2 text-xs font-medium text-foreground transition hover:bg-accent"
               >
                 {t('auth.cookies.hide_editor')}
@@ -522,12 +552,9 @@ export function AuthStatusCard() {
       ) : (
         <div className="mt-3">
           <button
+            ref={showEditorButtonRef}
             type="button"
-            onClick={() => {
-              setCookiesText('');
-              hasPrefilledRef.current = false;
-              setShowCookieEditor(true);
-            }}
+            onClick={openCookieEditor}
             aria-expanded={shouldShowCookieEditor}
             className="rounded-xl border border-border bg-background px-3 py-2 text-xs font-semibold text-foreground transition hover:bg-accent"
           >
