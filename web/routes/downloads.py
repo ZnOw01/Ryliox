@@ -315,7 +315,8 @@ def download(
             detail={"error": str(exc), "code": ErrorCode.INVALID_FORMAT},
         )
 
-    selected_chapters = data.chapters
+    # An empty selection means "the whole book", which every format supports.
+    selected_chapters = data.chapters or None
     if selected_chapters is not None:
         unsupported = sorted(
             fmt for fmt in formats if not DownloaderPlugin.supports_chapter_selection(fmt)

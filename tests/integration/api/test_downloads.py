@@ -169,6 +169,32 @@ class TestDownloadQueue:
             detail = data if "error" in data else data.get("detail", {})
             assert "Chapter selection not supported" in detail.get("error", "")
 
+    @pytest.mark.parametrize("fmt", ["epub", "pdf"])
+    def test_download_empty_chapter_list_means_whole_book(
+        self, test_client: TestClient, mock_kernel, mock_download_queue, fmt: str
+    ):
+        """chapters=[] is accepted for every format and queued as the whole book."""
+        mock_kernel._plugins["output"].validate_dir = MagicMock(
+            return_value=(True, None, "/tmp/output")
+        )
+
+        with patch.object(
+            mock_download_queue, "enqueue", wraps=mock_download_queue.enqueue
+        ) as enqueue:
+            response = test_client.post(
+                "/api/download",
+                json={
+                    "book_id": "urn:orm:book:a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6",
+                    "format": [fmt],
+                    "chapters": [],
+                    "output_dir": "/tmp/output",
+                },
+                headers={"Origin": "http://testserver"},
+            )
+
+        assert response.status_code == 200, response.text
+        assert enqueue.call_args.kwargs["selected_chapters"] is None
+
     def test_download_cross_origin_blocked(self, test_client: TestClient):
         """Test that cross-origin download requests are blocked."""
         request_data = {
