@@ -121,7 +121,6 @@ async def search(
             detail={
                 "error": "Failed to search books. The external service may be unavailable.",
                 "code": ErrorCode.SEARCH_FAILED,
-                "details": str(exc) if str(exc) else None,
             },
         ) from exc
 
@@ -178,9 +177,8 @@ async def book_chapters(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail={
-                "error": f"Unexpected error fetching chapters: {type(exc).__name__}",
+                "error": "Unexpected error fetching chapters.",
                 "code": ErrorCode.INTERNAL_ERROR,
-                "details": str(exc) if str(exc) else None,
             },
         ) from exc
 

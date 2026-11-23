@@ -100,6 +100,21 @@ class TestBookSearch:
         # Should return 502 for upstream service errors
         assert response.status_code == 502
 
+    def test_search_plugin_error_hides_internal_text(self, test_client: TestClient, mock_kernel):
+        """The upstream exception text stays in the server log, not the response."""
+        mock_kernel._plugins["book"].search = AsyncMock(
+            side_effect=RuntimeError("GET https://internal.example/api/v2/search?token=abc")
+        )
+
+        response = test_client.get("/api/search?q=python")
+
+        assert response.status_code == 502
+        body = response.json()
+        assert body["code"] == "search_failed"
+        assert "internal.example" not in response.text
+        assert "RuntimeError" not in response.text
+        assert "details" not in body
+
     def test_search_unicode_query(self, test_client: TestClient, mock_kernel):
         """Test search with unicode characters."""
         mock_kernel._plugins["book"].search = AsyncMock(
@@ -293,6 +308,23 @@ class TestBookChapters:
         data = response.json()
         detail = data if "error" in data else data.get("detail", {})
         assert "Unexpected error" in detail.get("error", "")
+
+    def test_get_chapters_plugin_error_hides_internal_text(
+        self, test_client: TestClient, mock_kernel
+    ):
+        """Neither the exception text nor its class name reaches the client."""
+        mock_kernel._plugins["chapters"].fetch_list = AsyncMock(
+            side_effect=AttributeError("https://internal.example/api/v1/book/x/chapter/")
+        )
+
+        response = test_client.get("/api/book/9780134685991/chapters")
+
+        assert response.status_code == 500
+        body = response.json()
+        assert body["code"] == "internal_error"
+        assert "internal.example" not in response.text
+        assert "AttributeError" not in response.text
+        assert "details" not in body
 
 
 @pytest.mark.integration
