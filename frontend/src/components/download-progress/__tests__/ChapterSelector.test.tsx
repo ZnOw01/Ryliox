@@ -130,3 +130,34 @@ describe('ChapterSelector', () => {
     expect(screen.getByText('Rust ownership')).toBeInTheDocument();
   });
 });
+
+describe('ChapterSelector filter', () => {
+  it('says so when no chapter matches the filter', () => {
+    render(
+      <ChapterSelector
+        chapters={[
+          { index: 0, title: 'Chapter 1' },
+          { index: 1, title: 'Chapter 2' },
+        ]}
+        error={null}
+        hasData
+        isFetching={false}
+        isLoading={false}
+        onClear={() => {}}
+        onSelectAll={() => {}}
+        onToggleChapter={() => {}}
+        selectedBook={{ id: 'demo', title: 'Demo' }}
+        selectedChapterIndexes={[]}
+        selectedChapterSet={new Set()}
+        selectable={true}
+        totalChapters={2}
+      />
+    );
+
+    fireEvent.change(screen.getByPlaceholderText('Buscar capítulo...'), {
+      target: { value: 'zzz' },
+    });
+
+    expect(screen.getByText('Ningún capítulo coincide con «zzz».')).toBeInTheDocument();
+  });
+});

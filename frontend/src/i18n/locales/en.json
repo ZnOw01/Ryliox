@@ -171,7 +171,8 @@
 			"last_n": "Last {{count}}",
 			"view_less": "Show fewer chapters",
 			"view_all": "Show all chapters ({{count}})",
-			"select_matching": "Select matching chapters"
+			"select_matching": "Select matching chapters",
+			"no_match": "No chapter matches “{{query}}”."
 		},
 		"actions": {
 			"aria_label": "Download actions",

@@ -171,7 +171,8 @@
 			"last_n": "Últimos {{count}}",
 			"view_less": "Ver menos capítulos",
 			"view_all": "Ver todos los capítulos ({{count}})",
-			"select_matching": "Seleccionar coincidentes"
+			"select_matching": "Seleccionar coincidentes",
+			"no_match": "Ningún capítulo coincide con «{{query}}»."
 		},
 		"actions": {
 			"aria_label": "Acciones de descarga",

@@ -564,6 +564,11 @@ export function ChapterSelector({
                   />
                 ))}
               </AnimatedLayoutGroup>
+              {visibleChapters.length === 0 && filterQuery.trim() ? (
+                <p className="px-2 py-4 text-center text-xs text-muted-foreground" role="status">
+                  {t('download.chapters.no_match', { query: filterQuery.trim() })}
+                </p>
+              ) : null}
             </div>
 
             {/* Mostrar botón para expandir/colapsar en EPUB/HTML */}
